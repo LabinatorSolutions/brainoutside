@@ -11,10 +11,13 @@ ever disagree, the repo wins, and a `drift` event is logged.
 
 ---
 
-## 1. Base: fork of `solo-mcp-api-starter`
+## 1. Base: fork of `mcp-api-starter-template`
 
-We fork Hasan's own Django + FastMCP boilerplate (per its `docs/FORKING.md`
-rebrand checklist) rather than starting a fresh Django project. Rationale:
+We fork Hasan's own Django + FastMCP boilerplate — the source repo at
+`D:\repos\mcp-api-starter-template` (github.com/hassancs91/
+mcp-api-starter-template), NOT `solo-mcp-api-starter`, which is just its
+squashed distribution export — per its `docs/FORKING.md` rebrand checklist,
+rather than starting a fresh Django project. Rationale:
 
 - The `@endpoint` registry gives the entire two-layer read side for free:
   one decorated class → REST `POST /api/v1/<slug>` + MCP tool + docs page.

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% comment %}
+  Ops UI layout (Settings, Dashboard, Browser — PLAN.md §8). Same lwh-token
+  chrome as docs but with the ops nav in the sidebar. Session-authed pages
+  only; mounted under the admin-panel prefix.
+
+  Pages extending this provide:
+    {% block page_title %} / {% block page_subtitle %} / {% block content %}
+{% endcomment %}
+{% load static %}
+
+{% block title %}{% block page_title_tag %}Ops{% endblock %} · {{ APP_NAME }}{% endblock %}
+
+{% block body %}
+<div x-data="{drawerOpen: false}" class="min-h-screen" style="background: var(--surface-2); color: var(--ink);">
+  {% include "partials/_sidebar.html" with nav_sections=ops_nav_sections %}
+
+  <div class="lg:ps-64">
+    {% include "partials/_topbar.html" with title=APP_NAME nav_links=ops_top_links show_drawer=True %}
+
+    <main id="main-content" class="px-4 py-8 sm:px-6 lg:px-8" role="main">
+      <div class="mx-auto max-w-4xl">
+        <header class="mb-6">
+          <h1 class="text-2xl font-semibold tracking-tight" style="font-family: var(--font-display);">
+            {% block page_title %}Ops{% endblock %}
+          </h1>
+          {% block page_subtitle %}{% endblock %}
+        </header>
+
+        {% include "partials/_flash.html" %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  {% include "partials/_toast.html" %}
+</div>
+{% endblock %}

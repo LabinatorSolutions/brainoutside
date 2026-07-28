@@ -64,6 +64,12 @@ urlpatterns: list = [
 if settings.DJANGO_ADMIN_URL_PATH:
     urlpatterns.append(path(settings.DJANGO_ADMIN_URL_PATH, admin.site.urls))
 
+# Ops UI (Settings now; dashboard/browser in M1.10). Mounted under the
+# admin-panel prefix so AdminIPAllowlistMiddleware guards it; in prod the
+# whole prefix also sits behind the network boundary (PLAN.md §9).
+_ops_prefix = (settings.ADMIN_PANEL_URL_PATH or "ops/").strip("/") + "/"
+urlpatterns.append(path(_ops_prefix, include("apps.brainconfig.urls")))
+
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.BASE_DIR / "static")
 

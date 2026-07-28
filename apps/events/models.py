@@ -45,3 +45,54 @@ def emit(type: str, *, consumer=None, entity_ids: list[str] | None = None, **det
     return Event.objects.create(
         type=type, consumer=consumer, entity_ids=entity_ids or [], details=details
     )
+
+
+class SdkOperation(models.Model):
+    """The token ledger — one row per Claude Agent SDK invocation.
+
+    Written BEFORE the run (`ok=None` = running) and finalized after, so a
+    killed worker never produces an invisible spend (PLAN.md §3, grill C6).
+    `cost_usd` is the CLI's estimate and display-only; raw token counts are
+    canonical — cost is recomputable from the price table (grill C23).
+    Usage fields stay NULL on errored/killed runs: those runs legitimately
+    have no usage to report.
+    """
+
+    KINDS = [
+        ("test_connection", "test_connection"),
+        ("feed_extraction", "feed_extraction"),
+        ("assemble_context", "assemble_context"),
+        ("chat", "chat"),
+    ]
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    kind = models.CharField(max_length=32, choices=KINDS, db_index=True)
+    # Filled from the ResultMessage after the run (the SDK resolves aliases).
+    model = models.CharField(max_length=64, blank=True, default="")
+    # None = still running (or killed before finalize); True/False = outcome.
+    ok = models.BooleanField(null=True, blank=True)
+    error_class = models.CharField(max_length=128, blank=True, default="")
+    input_tokens = models.BigIntegerField(null=True, blank=True)
+    output_tokens = models.BigIntegerField(null=True, blank=True)
+    cache_read_tokens = models.BigIntegerField(null=True, blank=True)
+    cache_write_tokens = models.BigIntegerField(null=True, blank=True)
+    cost_usd = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    duration_ms = models.BigIntegerField(null=True, blank=True)
+    num_turns = models.IntegerField(null=True, blank=True)
+    # Hash of the composed prompt (system + user), for reproducibility (C7).
+    prompt_hash = models.CharField(max_length=64, blank=True, default="")
+    # What triggered the run: a Feed, a ChatMessage… (generic FK per PLAN.md
+    # §3; NULL for admin-triggered runs like Test connection).
+    subject_type = models.ForeignKey(
+        "contenttypes.ContentType", null=True, blank=True, on_delete=models.SET_NULL
+    )
+    subject_id = models.CharField(max_length=64, blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["kind", "created_at"])]
+
+    def __str__(self) -> str:  # pragma: no cover - repr only
+        state = {None: "running", True: "ok", False: "error"}[self.ok]
+        return f"{self.kind} [{state}] @ {self.created_at:%Y-%m-%d %H:%M:%S}"

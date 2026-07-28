@@ -37,11 +37,12 @@ INSTALLED_APPS = [
     "apps.api_keys",
     "apps.mcp_proxy",
     "apps.docs",
-    # Brain apps (more land later: apps.feeds, apps.reader, apps.events,
-    # apps.brainconfig)
+    # Brain apps (apps.feeds lands with M2)
     "apps.brain",
     "apps.events",
     "apps.mind",
+    "apps.brainconfig",
+    "apps.reader",
 ]
 
 MIDDLEWARE = [
@@ -102,7 +103,8 @@ DATABASES = {
 # ----- Auth --------------------------------------------------------------------
 # Django's default auth.User — single human operator (Hasan). The vendored
 # api_keys app FKs settings.AUTH_USER_MODEL, which resolves to auth.User here.
-LOGIN_URL = "/admin/login/"
+# Django admin is the only login surface; it mounts at DJANGO_ADMIN_URL_PATH.
+LOGIN_URL = "/" + (_env.DJANGO_ADMIN_URL_PATH or "admin/").strip("/") + "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
 

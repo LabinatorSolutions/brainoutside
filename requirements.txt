@@ -19,8 +19,9 @@ pygments>=2.18
 cryptography>=42.0
 django-cryptography-django5>=2.2
 psycopg[binary]>=3.1
-# M1.9+: Claude Agent SDK (pin exact — pinning the SDK pins its bundled CLI)
-# claude-agent-sdk==<pin at M1.9>
+# Claude Agent SDK — pinned EXACT: pinning the SDK pins its bundled CLI
+# binary (PLAN.md §7 grill C1). Bump deliberately, never with a range.
+claude-agent-sdk==0.2.128
 python-json-logger>=3.0
 filelock>=3.13
 pyyaml>=6.0

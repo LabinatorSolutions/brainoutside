@@ -1,0 +1,96 @@
+{% extends "ops/_layout.html" %}
+
+{% block page_title_tag %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    Claude SDK key, models, budgets. Stored Fernet-encrypted; secrets are write-only.
+  </p>
+{% endblock %}
+
+{% block content %}
+  {% if test_result %}
+    <div class="mb-6 rounded-xl border p-4"
+         style="border-color: {% if test_result.ok %}var(--success, #4db8a8){% else %}#ff6b6b{% endif %}; background: var(--surface);">
+      {% if test_result.ok %}
+        <div class="font-semibold" style="color: #2c8577;">Connection OK</div>
+        <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4" style="font-family: var(--font-mono);">
+          <div><dt style="color: var(--muted);">model</dt><dd>{{ test_result.model }}</dd></div>
+          <div><dt style="color: var(--muted);">latency</dt><dd>{{ test_result.duration_ms }} ms</dd></div>
+          <div><dt style="color: var(--muted);">tokens in/out</dt><dd>{{ test_result.input_tokens }}/{{ test_result.output_tokens }}</dd></div>
+          <div><dt style="color: var(--muted);">cost</dt><dd>${{ test_result.cost_usd|floatformat:4 }}</dd></div>
+        </dl>
+        <div class="mt-2 text-sm" style="color: var(--muted);">reply: “{{ test_result.text }}” · op #{{ test_result.operation_id }}</div>
+      {% else %}
+        <div class="font-semibold" style="color: #c0392b;">Connection failed</div>
+        <div class="mt-1 text-sm" style="font-family: var(--font-mono);">{{ test_result.error }}</div>
+        {% if test_result.operation_id %}
+          <div class="mt-1 text-sm" style="color: var(--muted);">logged as op #{{ test_result.operation_id }}</div>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="mb-6 flex items-center justify-between rounded-xl border p-4"
+       style="border-color: var(--line); background: var(--surface);">
+    <div class="text-sm">
+      <span style="color: var(--muted);">SDK spend today:</span>
+      <span style="font-family: var(--font-mono);">${{ today_cost|floatformat:4 }}</span>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" name="action" value="test_connection"
+              class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style="background: var(--accent, #6366f1);">
+        Test connection
+      </button>
+    </form>
+  </div>
+
+  <form method="post" class="rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    {% csrf_token %}
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+          <th class="px-4 py-3 font-medium">Setting</th>
+          <th class="px-4 py-3 font-medium">Effective value</th>
+          <th class="px-4 py-3 font-medium">New value</th>
+          <th class="px-4 py-3 font-medium">Clear</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr class="border-b align-top" style="border-color: var(--line);">
+            <td class="px-4 py-3">
+              <div class="font-medium">{{ row.spec.label }}</div>
+              <div class="mt-0.5 text-xs" style="color: var(--muted); font-family: var(--font-mono);">{{ row.spec.key }}</div>
+              <div class="mt-1 max-w-xs text-xs" style="color: var(--muted);">{{ row.spec.help }}</div>
+            </td>
+            <td class="px-4 py-3" style="font-family: var(--font-mono);">
+              {% if row.effective %}{{ row.effective }}{% else %}<span style="color: var(--muted);">unset</span>{% endif %}
+              {% if row.db_set %}<div class="text-xs" style="color: var(--muted);">db · {{ row.updated_at|date:"Y-m-d H:i" }}</div>
+              {% elif row.effective %}<div class="text-xs" style="color: var(--muted);">env/default</div>{% endif %}
+            </td>
+            <td class="px-4 py-3">
+              <input type="{% if row.spec.secret %}password{% else %}text{% endif %}"
+                     name="value__{{ row.spec.key }}" autocomplete="off"
+                     placeholder="{% if row.spec.secret %}write-only{% else %}leave blank to keep{% endif %}"
+                     class="w-56 rounded-lg border px-2 py-1.5"
+                     style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);" />
+            </td>
+            <td class="px-4 py-3 text-center">
+              <input type="checkbox" name="clear__{{ row.spec.key }}" title="Clear the stored value" />
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="flex justify-end px-4 py-3">
+      <button type="submit" name="action" value="save"
+              class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style="background: var(--ink);">
+        Save changes
+      </button>
+    </div>
+  </form>
+{% endblock %}

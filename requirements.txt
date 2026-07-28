@@ -23,3 +23,4 @@ psycopg[binary]>=3.1
 # claude-agent-sdk==<pin at M1.9>
 python-json-logger>=3.0
 filelock>=3.13
+pyyaml>=6.0

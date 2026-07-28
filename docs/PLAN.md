@@ -18,7 +18,7 @@ Chat history are *primary* data that exist only in the DB — see §10 Backups.)
 
 ---
 
-## 1. Base: vendored core, not a full fork  ⚠ DECISION FOR HASAN
+## 1. Base: vendored core, not a full fork  ✅ DECIDED (Hasan, 2026-07-28)
 
 Original plan: fork `mcp-api-starter-template` wholesale. The grill changed
 the recommendation. The template is 22 apps / ~30 models / 15 middleware
@@ -503,9 +503,10 @@ into §§3–11 where they land.
 
 ## 13. Open questions
 
-1. **§1 base decision** — vendored-core fresh project (recommended) vs
-   full fork with the six extra work items. Hasan decides before M1.1.
+1. ~~§1 base decision~~ — **resolved 2026-07-28: vendored-core** ("we don't
+   need all features anyway").
 2. Ops-UI boundary: Tailscale vs Cloudflare Access (both fine; pick per
    existing setup).
-3. Public-voice subset content (M0.3) — needs Hasan's editorial call.
+3. ~~Public-voice subset~~ — resolved: deferred until a public clone exists
+   (see M0.3).
 4. Postgres stays (settled — worker queue + events benefit; SQLite dropped).

@@ -198,20 +198,104 @@ Pages (ops-first V1):
   unset-vs-empty crash) — all env reads treat empty as unset.
 - GitHub webhook → the Coolify-exposed domain `/webhooks/github`.
 
-## 9. Milestones
+## 9. Build sequence — step by step
 
-- **M1 — Read-only online brain**: fork + rebrand starter, brain app (clone,
-  index, sync, drift), dumb-layer endpoints, consumers with tiers, brain
-  browser + dashboard skeleton + settings page (SDK config + test
-  connection). *Brain is consumable via REST/MCP.*
-- **M2 — Write path**: feeds app, feeder agent, approval queue UI, validator,
-  commit+push, webhook round-trip. *Feeding works from anywhere.*
-- **M3 — Smart reader + chat**: SdkRunner streaming, `assemble_context`,
-  chat with tier simulator + sources panel, full event/token dashboards.
-- **M4 — Consumers migrate**: point My-Agents-Team + pipelines at MCP/REST;
-  run `eval/` falsification against the live endpoint vs local; then feed a
-  project card for this app into the brain (via mind-feeder, gated as
-  always).
+Each step is small, independently verifiable, and committed on its own.
+A step is DONE only when its check passes.
+
+### M0 — Prepare the brain repo (prerequisite, in `my-brain`)
+- **0.1** Curate untracked files: commit `CLAUDE.md`, `.claude/skills/`,
+  `eval/`, templates, `.gitignore`; keep `.vscode/` and any local-only
+  settings out of git.
+  *Check: `git status` clean; no secrets or editor config tracked.*
+- **0.2** Create private GitHub repo `my-brain`, push `main`.
+  *Check: fresh `git clone` elsewhere reproduces the full contract
+  (CLAUDE.md + skills + eval present).*
+- **0.3** Generate a dedicated read-write deploy key for the server; add to
+  GitHub repo settings. *Check: clone + push works with that key only.*
+
+### M1 — Read-only online brain
+- **1.1** Fork `mcp-api-starter-template` → this repo; run its
+  `docs/FORKING.md` rebrand checklist (APP_NAME=BrainServer, brand color =
+  indigo `#6366f1`, strip demo endpoint, leave billing dormant).
+  *Check: `make stack-up` boots; `/healthz` green.*
+- **1.2** Import learnwithhasan theme tokens (`tokens.css` palette + fonts)
+  into the template's base styles. *Check: base template renders with
+  paper/ink/indigo look.*
+- **1.3** `apps/brain`: git layer — clone-on-boot (deploy key from env),
+  single-writer lock, `pull_rebase()`, `/data/brain-repo` volume.
+  *Check: container boots with a fresh clone; restart reuses it.*
+- **1.4** `apps/brain`: Entity model + frontmatter parser + `rebuild_index`
+  management command. *Check: command indexes every entity; counts match
+  the repo; `_TEMPLATE.md` and non-entity files correctly excluded.*
+- **1.5** Sync + drift: SyncRun model, post-pull reindex, state-hash drift
+  check emitting `drift` events, webhook `POST /webhooks/github`
+  (HMAC-verified) + 15-min fallback pull.
+  *Check: push a commit from local → server reindexes within seconds;
+  manually corrupt a DB row → next sync logs drift and self-repairs.*
+- **1.6** Visibility core: file-access service enforcing tier; extend the
+  starter's API-key model with `max_visibility`.
+  *Check: unit tests — public key cannot read agents-only/private paths.*
+- **1.7** Dumb-layer endpoints (`get_index`, `list_notes`, `get_note`,
+  `get_lens`, `get_identity`, `get_raw`) via the `@endpoint` registry.
+  *Check: REST + MCP + docs pages all serve; tier filtering verified per
+  endpoint.*
+- **1.8** `apps/brainconfig`: AppSetting (Fernet-encrypted) + Settings page
+  (API key write-only field, model pickers, budgets, repo/webhook config,
+  "pull + reindex now", "rebuild index") + SdkRunner skeleton +
+  **Test connection** button logging its SdkOperation.
+  *Check: bad key → clear error; good key → model+latency+tokens shown and
+  one SdkOperation row written.*
+- **1.9** UI: dashboard v1 (sync health, entity counts, staleness list) +
+  brain browser (filterable table, note view with frontmatter chips).
+  *Check: every entity reachable and rendered; staleness flags match
+  `last-verified` + 45 days.*
+- **1.10** Deploy to Coolify (compose resource, volumes, env, webhook URL,
+  empty-env guards). *Check: end-to-end from the public domain: auth'd
+  REST read + MCP tool call + UI login.*
+
+### M2 — Write path
+- **2.1** Feed model + `propose_feed` endpoint + UI feed form (URL / pasted
+  text / transcript). *Check: proposals from all three channels land as
+  pending Feeds; repo untouched.*
+- **2.2** Feeder agent via SdkRunner (read-only tools, proposal object out,
+  SdkOperation logged). *Check: feeding a real blog post yields 2–4
+  schema-valid proposed notes with provenance.*
+- **2.3** Validator (the 7 rules, §4) as a pure function over a proposal.
+  *Check: unit tests — each rule rejects a crafted bad proposal.*
+- **2.4** Approval queue UI: diff view, edit-before-approve, reject with
+  reason. *Check: edited proposal re-validates before approve enabled.*
+- **2.5** Approval handler: lock → pull --rebase → write → validate →
+  commit `feed: <source-id>` → push → reindex → unlock; rollback on any
+  failure. *Check: kill the push mid-flight → Feed marked failed, working
+  tree clean, repo consistent.*
+- **2.6** Round-trip proof: feed online → approve → `git pull` locally
+  shows the commit; feed locally via Claude Code → push → appears in the
+  online browser. *Check: both directions, no divergence.*
+
+### M3 — Smart reader + chat
+- **3.1** `assemble_context` endpoint: reader agent over the clone, returns
+  context pack + entity_ids + tokens; visibility-capped by caller tier.
+  *Check: same task at public vs private tier returns different packs;
+  private entities never appear at lower tiers.*
+- **3.2** Chat: sessions, tier switcher, sources panel (entities +
+  visibility + staleness + verbatims), per-message token counts.
+  *Check: asking about Qissatuna in public mode returns nothing private.*
+- **3.3** Event + token dashboards: filterable event stream, SdkOperation
+  ledger with day/week aggregates, most-served notes.
+  *Check: numbers reconcile with raw table queries.*
+- **3.4** Transport decision for chat streaming (see open question 4) —
+  implement the simplest honest option.
+
+### M4 — Consumers migrate + prove accuracy
+- **4.1** Run `eval/` falsification against the live endpoints vs the same
+  questions answered locally in Claude Code; compare. *Check: no
+  regressions attributable to the server path.*
+- **4.2** Point My-Agents-Team + content pipelines at the MCP/REST surface
+  with `agents-only` keys. *Check: one real task per consumer produced
+  from online context only.*
+- **4.3** Feed a project card for `my-brain-web-app` into the brain (via
+  mind-feeder, gated as always). *Check: card indexed and served.*
 
 ## 10. Open questions (settle during M1)
 

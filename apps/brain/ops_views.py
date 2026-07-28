@@ -1,0 +1,203 @@
+"""Ops UI: dashboard v1 + brain browser (PLAN.md §8, step M1.10).
+
+Staff-only pages over the Entity index and event/ledger tables. The
+browser reads note bodies from the server's clone (full private view —
+this UI is Hasan-only, behind the network boundary); consumers never see
+these pages, they get tier snapshots via the API.
+"""
+from __future__ import annotations
+
+import datetime as dt
+from collections import Counter
+
+import markdown as md
+from django.contrib.admin.views.decorators import staff_member_required
+from django.db.models import Count, Sum
+from django.http import Http404
+from django.shortcuts import render
+from django.utils import timezone
+
+from apps.brainconfig.nav import ops_context
+from apps.events.models import Event, SdkOperation
+
+from .models import Entity, SyncRun
+from .services import gitrepo
+
+STALE_AFTER_DAYS = 45  # reader rule 3 (CLAUDE.md §6)
+
+
+def _stale_cutoff() -> dt.date:
+    return timezone.localdate() - dt.timedelta(days=STALE_AFTER_DAYS)
+
+
+def _is_stale(entity: Entity) -> bool:
+    """Staleness applies to project cards: last-verified missing or >45d old."""
+    if entity.kind != "project":
+        return False
+    return entity.last_verified is None or entity.last_verified < _stale_cutoff()
+
+
+@staff_member_required
+def dashboard(request):
+    now = timezone.now()
+    day_ago = now - dt.timedelta(days=1)
+    week_ago = now - dt.timedelta(days=7)
+
+    last_sync = SyncRun.objects.first()
+    probe = gitrepo.status_probe()
+
+    entities = Entity.objects.all()
+    kind_counts = list(
+        entities.values("kind").annotate(n=Count("id")).order_by("-n")
+    )
+    vis_counts = {
+        row["visibility"]: row["n"]
+        for row in entities.values("visibility").annotate(n=Count("id"))
+    }
+    superseded = entities.filter(status="superseded").count()
+
+    stale_projects = sorted(
+        (e for e in entities.filter(kind="project") if _is_stale(e)),
+        key=lambda e: (e.last_verified or dt.date.min),
+    )
+
+    reads_day = Event.objects.filter(type="read", created_at__gte=day_ago).count()
+    reads_week = Event.objects.filter(type="read", created_at__gte=week_ago).count()
+
+    served = Counter()
+    for ids in Event.objects.filter(
+        type="read", created_at__gte=now - dt.timedelta(days=30)
+    ).values_list("entity_ids", flat=True):
+        served.update(ids or [])
+    most_served = served.most_common(8)
+
+    def spend(since):
+        qs = SdkOperation.objects.filter(created_at__gte=since)
+        agg = qs.aggregate(
+            cost=Sum("cost_usd"), tin=Sum("input_tokens"), tout=Sum("output_tokens")
+        )
+        return {
+            "runs": qs.count(),
+            "errors": qs.filter(ok=False).count(),
+            "cost": agg["cost"] or 0,
+            "tokens_in": agg["tin"] or 0,
+            "tokens_out": agg["tout"] or 0,
+        }
+
+    return render(
+        request,
+        "ops/dashboard.html",
+        {
+            "last_sync": last_sync,
+            "probe": probe,
+            "entity_total": entities.count(),
+            "kind_counts": kind_counts,
+            "vis_public": vis_counts.get("public", 0),
+            "vis_agents": vis_counts.get("agents-only", 0),
+            "vis_private": vis_counts.get("private", 0),
+            "superseded": superseded,
+            "stale_projects": stale_projects,
+            "stale_after": STALE_AFTER_DAYS,
+            "reads_day": reads_day,
+            "reads_week": reads_week,
+            "most_served": most_served,
+            "spend_day": spend(day_ago),
+            "spend_week": spend(week_ago),
+            "pending_feeds": 0,  # apps.feeds lands in M2
+            "recent_events": Event.objects.select_related("consumer")[:10],
+            "recent_ops": SdkOperation.objects.all()[:5],
+            **ops_context(request),
+        },
+    )
+
+
+@staff_member_required
+def browser(request):
+    qs = Entity.objects.all().order_by("kind", "entity_id")
+    kind = request.GET.get("kind", "")
+    visibility = request.GET.get("visibility", "")
+    status = request.GET.get("status", "")
+    q = (request.GET.get("q") or "").strip()
+
+    if kind:
+        qs = qs.filter(kind=kind)
+    if visibility:
+        qs = qs.filter(visibility=visibility)
+    if status == "superseded":
+        qs = qs.filter(status="superseded")
+    elif status == "current":
+        qs = qs.exclude(status="superseded")
+    if q:
+        from django.db.models import Q
+
+        qs = qs.filter(
+            Q(entity_id__icontains=q)
+            | Q(title__icontains=q)
+            | Q(topics__icontains=q)
+            | Q(projects__icontains=q)
+        )
+
+    rows = [{"e": e, "stale": _is_stale(e)} for e in qs]
+    return render(
+        request,
+        "ops/browser.html",
+        {
+            "rows": rows,
+            "total": Entity.objects.count(),
+            "kinds": [k for k, _ in Entity.KINDS],
+            "visibilities": [v for v, _ in Entity.VISIBILITIES],
+            "f_kind": kind,
+            "f_visibility": visibility,
+            "f_status": status,
+            "f_q": q,
+            **ops_context(request),
+        },
+    )
+
+
+_FRONTMATTER_END = "\n---"
+
+
+def _split_frontmatter(raw: str) -> tuple[str, str]:
+    if not raw.startswith("---"):
+        return "", raw
+    end = raw.find(_FRONTMATTER_END, 3)
+    if end == -1:
+        return "", raw
+    return raw[3:end].strip(), raw[end + len(_FRONTMATTER_END):].lstrip("-\n")
+
+
+@staff_member_required
+def entity_detail(request, entity_id: str):
+    try:
+        entity = Entity.objects.get(entity_id=entity_id)
+    except Entity.DoesNotExist:
+        raise Http404(entity_id)
+
+    path = gitrepo.repo_dir() / entity.path
+    frontmatter, body_html, read_error = "", "", ""
+    try:
+        raw = path.read_text(encoding="utf-8")
+        frontmatter, body = _split_frontmatter(raw)
+        body_html = md.markdown(body, extensions=["extra", "sane_lists"])
+    except OSError as exc:
+        read_error = f"{exc.__class__.__name__}: could not read {entity.path}"
+
+    superseded_by = None
+    if entity.superseded_by:
+        superseded_by = Entity.objects.filter(entity_id=entity.superseded_by).first()
+
+    return render(
+        request,
+        "ops/entity.html",
+        {
+            "e": entity,
+            "stale": _is_stale(entity),
+            "stale_after": STALE_AFTER_DAYS,
+            "frontmatter": frontmatter,
+            "body_html": body_html,
+            "read_error": read_error,
+            "superseded_by": superseded_by,
+            **ops_context(request),
+        },
+    )

@@ -135,7 +135,12 @@ class AdminIPAllowlistMiddleware:
         path = request.path or ""
         if _is_admin_request(path):
             ip = _client_ip(request)
-            if not is_ip_allowed(ip):
+            # is_ip_allowed reads the DB (runtime override) — must hop to a
+            # thread or the ORM raises SynchronousOnlyOperation under ASGI
+            # and the override silently never loads.
+            from asgiref.sync import sync_to_async
+
+            if not await sync_to_async(is_ip_allowed)(ip):
                 log.warning(
                     "admin IP allowlist: refusing path=%s ip=%s",
                     path,

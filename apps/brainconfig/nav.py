@@ -14,6 +14,8 @@ def ops_context(request) -> dict:
             {
                 "label": "Ops",
                 "items": [
+                    {"label": "Dashboard", "url": reverse("brainconfig:dashboard")},
+                    {"label": "Brain browser", "url": reverse("brainconfig:browser")},
                     {"label": "Settings", "url": settings_url},
                 ],
             },

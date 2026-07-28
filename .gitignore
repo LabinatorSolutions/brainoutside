@@ -8,3 +8,4 @@ db.sqlite3
 node_modules/
 staticfiles/
 .DS_Store
+secrets/

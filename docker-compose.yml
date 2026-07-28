@@ -1,0 +1,95 @@
+# Coolify compose resource for the brain server (PLAN.md §10, M1.11).
+#
+# Only `web` is exposed (Coolify's proxy terminates TLS and routes the
+# public domain to it). The ops UI lives under ADMIN_PANEL_URL_PATH on
+# the same app but MUST additionally sit behind Tailscale / Cloudflare
+# Access + ADMIN_IP_ALLOWLIST — see docs/DEPLOY.md.
+#
+# Volumes (named, so a Coolify redeploy never wipes them):
+#   brain-repo   — the server's git clone (single source of truth mirror)
+#   brain-views  — per-tier materialized snapshots
+#   pgdata       — Postgres (Feeds/Events/SdkOperations are NOT rebuildable)
+# brain-repo + brain-views mount into EVERY container that touches brain
+# code — web, mcp, worker (grill A5).
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  env_file:
+    - path: .env
+      required: false  # Coolify injects env directly; a file is optional
+  environment: &app-env
+    DJANGO_SETTINGS_MODULE: config.settings.prod
+    DATABASE_URL: postgres://brain:${POSTGRES_PASSWORD:?set in Coolify}@postgres:5432/brain
+    REDIS_URL: redis://redis:6379/0
+    BRAIN_REPO_DIR: /data/brain-repo
+    BRAIN_VIEWS_DIR: /data/brain-views
+    BRAIN_GIT_SSH_KEY_PATH: /run/secrets/brain_deploy_key
+  volumes:
+    - brain-repo:/data/brain-repo
+    - brain-views:/data/brain-views
+    # Read-only deploy key (clone/pull path). The WRITE credential (PAT)
+    # is env-injected into the worker ONLY, at M2 (grill C13).
+    - ${BRAIN_DEPLOY_KEY_FILE:-./secrets/brain_deploy_key}:/run/secrets/brain_deploy_key:ro
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_started
+
+services:
+  web:
+    <<: *app
+    command: [web]
+    environment:
+      <<: *app-env
+      # The /mcp proxy targets the mcp container over the compose network;
+      # the shared secret authenticates non-loopback callers.
+      MCP_LOOPBACK_HOST: mcp
+    ports:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mcp:
+    <<: *app
+    command: [mcp]
+    environment:
+      <<: *app-env
+      MCP_LOOPBACK_HOST: 0.0.0.0   # bind for cross-container traffic
+
+  worker:
+    <<: *app
+    command: [worker]
+    environment:
+      <<: *app-env
+      MCP_LOOPBACK_HOST: mcp
+      # M2: BRAIN_WRITE_PAT lands here (worker only — never web/mcp).
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: brain
+      POSTGRES_USER: brain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in Coolify}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brain -d brain"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+
+volumes:
+  brain-repo:
+  brain-views:
+  pgdata:

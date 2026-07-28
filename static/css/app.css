@@ -1,8 +1,9 @@
 /*
- * {{APP_NAME}} — design tokens + base styles
- *
- * Tailwind layers compile to `static/dist/app.css` via `make tailwind`.
- * Self-hosted Inter + JetBrains Mono (Phase 1.4.6) live in static/fonts/.
+ * Tailwind SOURCE — compiles to `static/css/tw.css` (what base.html
+ * loads) via `bash scripts/build-css.sh`. Never serve this file raw:
+ * browsers can't interpret @tailwind/@apply. Commit the rebuilt tw.css
+ * after edits — the Docker image has no CSS build step.
+ * Self-hosted Inter + JetBrains Mono live in static/fonts/.
  */
 
 @tailwind base;

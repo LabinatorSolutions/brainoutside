@@ -6,6 +6,7 @@ venv/
 db.sqlite3
 /data/
 node_modules/
+.cache/
 staticfiles/
 .DS_Store
 secrets/

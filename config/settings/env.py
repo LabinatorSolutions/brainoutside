@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     APP_NAME: str = "{{APP_NAME}}"
     DJANGO_SETTINGS_MODULE: str = "config.settings.dev"
 
+    # ----- Brain repo (my-brain-web-app) -----
+    # All default-empty; base.py treats empty string as unset (Coolify
+    # injects every compose ${VAR} as "" — never distinguish unset/empty).
+    BRAIN_REPO_URL: str = ""
+    BRAIN_REPO_DIR: str = ""
+    BRAIN_VIEWS_DIR: str = ""
+    # When set, git talks to origin via this SSH key (the server's
+    # read-only deploy key). Empty in dev — git uses the local credential
+    # helper for the https URL.
+    BRAIN_GIT_SSH_KEY_PATH: str = ""
+
     # ----- Public-facing identifiers (rendered into /docs/guide/* pages) -----
     # These four feed `apps.docs.services.guides._resolve_placeholders` —
     # every {{ NAME }} token in the markdown under `apps/docs/guides/` is

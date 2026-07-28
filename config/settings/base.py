@@ -37,8 +37,9 @@ INSTALLED_APPS = [
     "apps.api_keys",
     "apps.mcp_proxy",
     "apps.docs",
-    # Brain apps (more land in M1.3+: apps.brain, apps.feeds, apps.reader,
-    # apps.events, apps.brainconfig)
+    # Brain apps (more land later: apps.feeds, apps.reader, apps.events,
+    # apps.brainconfig)
+    "apps.brain",
     "apps.mind",
 ]
 
@@ -183,6 +184,21 @@ MCP_OAUTH_DCR_MODE = "off"
 # ----- Field encryption --------------------------------------------------------
 # Fernet key for AppSetting encrypted values (apps.brainconfig, M1.9).
 FIELD_ENCRYPTION_KEY = _env.FIELD_ENCRYPTION_KEY.get_secret_value()
+
+# ----- Brain repo --------------------------------------------------------------
+# Empty-string env values are treated as unset (Coolify lesson).
+BRAIN_REPO_URL = _env.BRAIN_REPO_URL.strip()
+BRAIN_REPO_DIR = (
+    Path(_env.BRAIN_REPO_DIR.strip()).resolve()
+    if _env.BRAIN_REPO_DIR.strip()
+    else BASE_DIR / "data" / "brain-repo"
+)
+BRAIN_VIEWS_DIR = (
+    Path(_env.BRAIN_VIEWS_DIR.strip()).resolve()
+    if _env.BRAIN_VIEWS_DIR.strip()
+    else BASE_DIR / "data" / "brain-views"
+)
+BRAIN_GIT_SSH_KEY_PATH = _env.BRAIN_GIT_SSH_KEY_PATH.strip()
 
 # ----- Cache -------------------------------------------------------------------
 from config.cache import build_caches  # noqa: E402

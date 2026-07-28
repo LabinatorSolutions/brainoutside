@@ -22,14 +22,22 @@ def healthz(request):
 
 
 def readyz(request):
-    """Readiness: DB reachable. (Clone/sync checks join in M1.3+.)"""
-    checks: dict[str, str] = {}
+    """Readiness: DB reachable + brain clone valid with the contract present."""
+    from apps.brain.services import gitrepo
+
+    checks: dict[str, object] = {}
     status = 200
     try:
         connections["default"].cursor().execute("SELECT 1")
         checks["db"] = "ok"
     except Exception as exc:  # pragma: no cover - failure path
         checks["db"] = f"fail: {exc.__class__.__name__}"
+        status = 503
+    brain = gitrepo.status_probe()
+    if brain.get("valid") and brain.get("contract_ok"):
+        checks["brain"] = {"head": str(brain.get("head", ""))[:12]}
+    else:
+        checks["brain"] = brain
         status = 503
     return JsonResponse({"status": "ok" if status == 200 else "fail", **checks}, status=status)
 

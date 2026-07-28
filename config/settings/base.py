@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     # Brain apps (more land later: apps.feeds, apps.reader, apps.events,
     # apps.brainconfig)
     "apps.brain",
+    "apps.events",
     "apps.mind",
 ]
 
@@ -199,6 +200,7 @@ BRAIN_VIEWS_DIR = (
     else BASE_DIR / "data" / "brain-views"
 )
 BRAIN_GIT_SSH_KEY_PATH = _env.BRAIN_GIT_SSH_KEY_PATH.strip()
+GITHUB_WEBHOOK_SECRET = _env.GITHUB_WEBHOOK_SECRET.get_secret_value().strip()
 
 # ----- Cache -------------------------------------------------------------------
 from config.cache import build_caches  # noqa: E402

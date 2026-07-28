@@ -1,0 +1,77 @@
+"""The sync pipeline: pull → drift check → reindex → snapshots.
+
+Drift definition (PLAN.md §4, grill #2 discussion): the DB disagreeing
+with the repo *at the same HEAD* — i.e. corruption or a parser change,
+not a legitimately-ahead repo. Detected BEFORE the pull by comparing
+state hashes when HEAD hasn't moved; always self-repaired by the rebuild
+(repo wins) and logged as a `drift` Event so the dashboard health tile
+goes loud instead of silently healing.
+
+After every rebuild, a post-check asserts db_hash == repo_hash — if the
+indexer itself can't reproduce the repo, the sync FAILS rather than
+serving a wrong index.
+"""
+from __future__ import annotations
+
+import logging
+
+from apps.brain.models import SyncRun
+from apps.brain.services import gitrepo, indexer, snapshots
+from apps.events.models import emit
+
+log = logging.getLogger(__name__)
+
+
+class SyncError(RuntimeError):
+    pass
+
+
+def last_indexed_sha() -> str:
+    run = SyncRun.objects.filter(ok=True).exclude(commit_sha="").first()
+    return run.commit_sha if run else ""
+
+
+def sync(trigger: str = "manual") -> SyncRun:
+    """Full pipeline. Returns the SyncRun row (drift flag set when detected)."""
+    pre_head = gitrepo.head_sha() if gitrepo.is_valid_repo() else ""
+    drift = False
+    drift_reason = ""
+
+    # Drift check: only meaningful when the DB claims to be at this HEAD.
+    if pre_head and last_indexed_sha() == pre_head:
+        repo_hash = indexer.state_hash()
+        db_hash = indexer.db_state_hash()
+        if repo_hash != db_hash:
+            drift = True
+            drift_reason = "db state diverged from repo at same HEAD"
+            log.warning("brain: DRIFT detected at %s — self-repairing", pre_head[:12])
+
+    pull = gitrepo.pull_rebase()
+    run = indexer.rebuild(trigger=trigger)
+
+    # Post-check: the rebuilt DB must reproduce the repo exactly.
+    if indexer.state_hash() != indexer.db_state_hash():
+        run.ok = False
+        run.error = "post-rebuild hash mismatch: indexer cannot reproduce repo state"
+        run.save(update_fields=["ok", "error"])
+        emit("drift", entity_ids=[], stage="post-rebuild", head=run.commit_sha)
+        raise SyncError(run.error)
+
+    snapshots.build_all()
+
+    if drift:
+        run.drift_detected = True
+        run.save(update_fields=["drift_detected"])
+        emit("drift", stage="pre-pull", reason=drift_reason, head=pre_head, repaired=True)
+
+    emit(
+        "sync",
+        trigger=trigger,
+        head=run.commit_sha,
+        pulled=pull["changed"],
+        added=run.added,
+        changed=run.changed,
+        removed=run.removed,
+        drift=drift,
+    )
+    return run

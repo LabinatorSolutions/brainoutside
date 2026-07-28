@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # read-only deploy key). Empty in dev — git uses the local credential
     # helper for the https URL.
     BRAIN_GIT_SSH_KEY_PATH: str = ""
+    # HMAC secret for POST /webhooks/github. Empty = webhook disabled
+    # (403 on every delivery) — never open.
+    GITHUB_WEBHOOK_SECRET: SecretStr = SecretStr("")
 
     # ----- Public-facing identifiers (rendered into /docs/guide/* pages) -----
     # These four feed `apps.docs.services.guides._resolve_placeholders` —

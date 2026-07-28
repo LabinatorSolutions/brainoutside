@@ -12,6 +12,7 @@ from django.db import connections
 from django.http import HttpResponse, JsonResponse
 from django.urls import include, path
 
+from apps.brain.views import github_webhook
 from apps.core.views import csp_report, robots_txt, security_txt
 from apps.mcp_proxy.views import mcp_proxy_view
 
@@ -56,6 +57,8 @@ urlpatterns: list = [
     path("mcp", mcp_proxy_view),
     # Public docs site (registry-driven catalog + per-endpoint detail).
     path("docs/", include("apps.docs.urls", namespace="docs")),
+    # GitHub push → sync (HMAC-verified, deduped, echo-guarded).
+    path("webhooks/github", github_webhook, name="github-webhook"),
 ]
 
 if settings.DJANGO_ADMIN_URL_PATH:

@@ -67,8 +67,13 @@ def check(
     endpoint_slug: str,
     ip: str | None,
     cost: int = 1,
+    credential: object = None,
 ) -> ThrottleResult:
-    """Sync entry point. Returns "allowed" no-op when no checker registered."""
+    """Sync entry point. Returns "allowed" no-op when no checker registered.
+
+    BRAIN-SERVER FORK DIVERGENCE: accepts + forwards `credential` so the
+    registered checker can rate-limit per KEY (see apps.mind.throttle).
+    """
     if _checker is None:
         return ThrottleResult(
             allowed=True,
@@ -77,7 +82,7 @@ def check(
             limit_per_min=0,
             reason="disabled",
         )
-    raw = _checker(user=user, endpoint_slug=endpoint_slug, ip=ip, cost=cost)
+    raw = _checker(user=user, endpoint_slug=endpoint_slug, ip=ip, cost=cost, credential=credential)
     # The feature app may return its own dataclass; convert via duck
     # typing so `apps.core.throttling.ThrottleResult` is the only shape
     # callers see. Same trick as the apps.core.bearer Principal

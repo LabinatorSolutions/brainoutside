@@ -182,10 +182,15 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         # returns "allowed" when rate_limit isn't installed (no-op
         # default) so unit tests of EndpointView still work.
         principal_user = principal.user if principal else None
+        # BRAIN-SERVER FORK DIVERGENCE: pass the credential so the
+        # throttle can be per-KEY (all consumers share one user here;
+        # the upstream per-user bucket would let one chatty consumer
+        # starve the rest — PLAN.md grill A3).
         throttle = await sync_to_async(throttle_check, thread_sensitive=True)(
             user=principal_user,
             endpoint_slug=spec.slug,
             ip=_client_ip(request),
+            credential=principal.credential if principal else None,
         )
         if not throttle.allowed:
             response = _err(

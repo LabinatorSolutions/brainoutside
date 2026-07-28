@@ -83,6 +83,32 @@ body.brain-ui code, body.brain-ui pre, body.brain-ui .mono {
 .brain-ui .home-cta:hover { background: var(--accent-strong); }
 .brain-ui .home-hero-img { filter: drop-shadow(0 12px 32px rgba(99, 102, 241, 0.25)); }
 
+/* Login card (templates/login.html) */
+.brain-ui .login-card {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.brain-ui .login-input {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+.brain-ui .login-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+.brain-ui .login-error {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: var(--radius-sm);
+  color: #b91c1c;
+}
+
 /* Dark terminal pane — logs, code, raw output */
 .brain-ui .pane-terminal {
   background: var(--c-ink-900);

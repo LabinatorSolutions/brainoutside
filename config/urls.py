@@ -9,6 +9,7 @@ perimeter in prod (nothing-public decision, 2026-07-28; PLAN.md §9).
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
@@ -54,6 +55,16 @@ def readyz(request):
 
 urlpatterns: list = [
     path("", home, name="home"),
+    # Branded login/logout (templates/login.html). Inside the
+    # IP-allowlist perimeter in prod (IP_ALLOWLIST_EXTRA_PREFIXES).
+    path(
+        "login/",
+        auth_views.LoginView.as_view(
+            template_name="login.html", redirect_authenticated_user=True
+        ),
+        name="login",
+    ),
+    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("healthz", healthz, name="healthz"),
     path("readyz", readyz, name="readyz"),
     path(".well-known/security.txt", security_txt, name="security-txt"),

@@ -28,7 +28,7 @@ def _is_staff(request: HttpRequest) -> bool:
     return bool(user is not None and user.is_authenticated and user.is_staff)
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 @require_GET
 def index_view(request: HttpRequest) -> HttpResponse:
     """Endpoint catalog.
@@ -43,7 +43,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
     return render(request, "docs/index.html", ctx)
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 @require_GET
 def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     """Per-endpoint detail page (10.4.3 / 10.4.4 / 10.4.5).
@@ -81,7 +81,7 @@ def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     return render(request, "docs/endpoint_detail.html", ctx)
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 @require_GET
 def guide_view(request: HttpRequest, slug: str) -> HttpResponse:
     """Static guide.

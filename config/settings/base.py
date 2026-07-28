@@ -103,9 +103,10 @@ DATABASES = {
 # ----- Auth --------------------------------------------------------------------
 # Django's default auth.User — single human operator (Hasan). The vendored
 # api_keys app FKs settings.AUTH_USER_MODEL, which resolves to auth.User here.
-# Django admin is the only login surface; it mounts at DJANGO_ADMIN_URL_PATH.
-LOGIN_URL = "/" + (_env.DJANGO_ADMIN_URL_PATH or "admin/").strip("/") + "/login/"
-LOGIN_REDIRECT_URL = "/"
+# Custom branded login page at /login/ (templates/login.html); the Django
+# admin at DJANGO_ADMIN_URL_PATH keeps its own login as a fallback.
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/" + (_env.ADMIN_PANEL_URL_PATH or "ops/").strip("/") + "/"
 LOGOUT_REDIRECT_URL = "/"
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -163,9 +164,10 @@ ADMIN_PANEL_URL_PATH = _env.ADMIN_PANEL_URL_PATH  # read by vendored security mw
 DJANGO_ADMIN_URL_PATH = _env.DJANGO_ADMIN_URL_PATH
 ADMIN_IP_ALLOWLIST = list(_env.ADMIN_IP_ALLOWLIST)
 # Non-admin prefixes pulled inside the same IP-allowlist perimeter.
-# Docs are staff-only and must 404 (not redirect) for outsiders — a
-# login redirect would leak the secret admin slug in its Location.
-IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/"]
+# Docs are staff-only and must 404 (not redirect) for outsiders; the
+# login page is a door that shouldn't exist for the open internet at
+# all (nothing-public decision).
+IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/", "login/", "logout/"]
 
 DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
 DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL

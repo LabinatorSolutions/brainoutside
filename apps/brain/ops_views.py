@@ -37,7 +37,7 @@ def _is_stale(entity: Entity) -> bool:
     return entity.last_verified is None or entity.last_verified < _stale_cutoff()
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 def dashboard(request):
     now = timezone.now()
     day_ago = now - dt.timedelta(days=1)
@@ -111,7 +111,7 @@ def dashboard(request):
     )
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 def browser(request):
     qs = Entity.objects.all().order_by("kind", "entity_id")
     kind = request.GET.get("kind", "")
@@ -167,7 +167,7 @@ def _split_frontmatter(raw: str) -> tuple[str, str]:
     return raw[3:end].strip(), raw[end + len(_FRONTMATTER_END):].lstrip("-\n")
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 def entity_detail(request, entity_id: str):
     try:
         entity = Entity.objects.get(entity_id=entity_id)

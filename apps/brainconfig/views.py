@@ -19,7 +19,7 @@ from .models import AppSetting
 from .nav import ops_context
 
 
-@staff_member_required
+@staff_member_required(login_url="login")
 @require_http_methods(["GET", "POST"])
 def settings_page(request):
     if request.method == "POST":

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% comment %}
+  public docs layout. Same chrome (sidebar with endpoint
+  index in Phase 10.4 + topbar + content) but the topbar shows nav_links
+  instead of an env badge. Sidebar shows the endpoint catalog grouped by
+  tag once Phase 10.4.1 lands.
+
+  Pages extending this provide:
+    {% block page_title %}    — endpoint name / guide title
+    {% block page_subtitle %} — verb + path / guide subtitle
+    {% block content %}       — main page content (schema, tabs, try-it, …)
+{% endcomment %}
+{% load static %}
+{% load ui i18n %}
+
+{% block title %}{% block page_title_tag %}{% trans "Docs" %}{% endblock %} · {{ APP_NAME }}{% endblock %}
+
+{% block head_extra %}
+  <script defer src="{% static 'js/code-copy.js' %}"></script>
+{% endblock %}
+
+{% block body %}
+<div x-data="{drawerOpen: false}" class="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+  {% include "partials/_sidebar.html" with nav_sections=docs_nav_sections %}
+
+  <div class="lg:ps-64">
+    {% include "partials/_topbar.html" with title=APP_NAME nav_links=docs_top_links show_drawer=True %}
+
+    <main id="main-content" class="px-4 py-8 sm:px-6 lg:px-8" role="main">
+      <div class="mx-auto max-w-4xl">
+        <header class="mb-6">
+          <h1 class="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            {% block page_title %}{% trans "Docs" %}{% endblock %}
+          </h1>
+          {% block page_subtitle %}{% endblock %}
+        </header>
+
+        {% include "partials/_flash.html" %}
+
+        <div class="prose prose-zinc max-w-none dark:prose-invert">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </main>
+  </div>
+
+  {% include "partials/_toast.html" %}
+</div>
+{% endblock %}

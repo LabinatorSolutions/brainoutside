@@ -1,0 +1,223 @@
+"""Shared Django settings — brain server (vendored-core build).
+
+Vendored from mcp-api-starter-template: apps/core (endpoint registry,
+REST + MCP bridge, security middleware), apps/api_keys, apps/mcp_proxy,
+apps/docs. Everything SaaS-shaped (accounts/allauth, billing, plans,
+oauth, notifications, observability app) is intentionally absent —
+see my-brain-web-app/docs/PLAN.md §1.
+
+Env vars are loaded by `config.settings.env::Settings` (pydantic-settings);
+unused template env fields are inert.
+"""
+from pathlib import Path
+
+from config.logging import build_logging
+
+from .env import settings as _env
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+# ----- Core --------------------------------------------------------------------
+APP_NAME = _env.APP_NAME or "BrainServer"
+SECRET_KEY = _env.SECRET_KEY.get_secret_value()
+DEBUG = False  # overridden in dev.py
+ALLOWED_HOSTS: list[str] = list(_env.ALLOWED_HOSTS)
+
+# ----- Apps --------------------------------------------------------------------
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django_q",
+    # Vendored framework apps
+    "apps.core",
+    "apps.api_keys",
+    "apps.mcp_proxy",
+    "apps.docs",
+    # Brain apps (more land in M1.3+: apps.brain, apps.feeds, apps.reader,
+    # apps.events, apps.brainconfig)
+    "apps.mind",
+]
+
+MIDDLEWARE = [
+    # Outermost so request_id is bound before anything logs.
+    "apps.core.middleware.RequestIdMiddleware",
+    # Scanner honeypot: generic 404 for /wp-admin, /.env, etc.
+    "apps.core.security.HoneypotMiddleware",
+    # Admin-prefix IP allowlist (404, not 403, outside the list).
+    "apps.core.security.AdminIPAllowlistMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    # CSP + Permissions-Policy on top of Django's security headers.
+    "apps.core.security.SecurityHeadersMiddleware",
+    # Admin-login brute-force lockout (per-IP, pre-auth).
+    "apps.core.security.auth_signals.AdminLoginThrottleMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
+    "django.middleware.http.ConditionalGetMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+ASGI_APPLICATION = "config.asgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+                "config.context_processors.app_meta",
+                "config.context_processors.csp_nonce",
+            ],
+        },
+    },
+]
+
+# ----- Database ----------------------------------------------------------------
+# SQLite for dev; prod.py switches to Postgres via DATABASE_URL.
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+        "CONN_MAX_AGE": _env.DB_CONN_MAX_AGE,
+        "OPTIONS": {"timeout": 5},
+    }
+}
+
+# ----- Auth --------------------------------------------------------------------
+# Django's default auth.User — single human operator (Hasan). The vendored
+# api_keys app FKs settings.AUTH_USER_MODEL, which resolves to auth.User here.
+LOGIN_URL = "/admin/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# ----- I18N + TZ ---------------------------------------------------------------
+LANGUAGE_CODE = "en"
+TIME_ZONE = "UTC"
+USE_I18N = False
+USE_TZ = True
+
+# ----- Static ------------------------------------------------------------------
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else []
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {
+        "BACKEND": "apps.core.staticfiles_storage.TolerantManifestStaticFilesStorage",
+    },
+}
+WHITENOISE_MAX_AGE = 60 * 60 * 24
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# ----- Security headers --------------------------------------------------------
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_HTTPONLY = False  # HTMX reads the CSRF cookie via JS.
+CSRF_COOKIE_SAMESITE = "Lax"
+
+CSP_REPORT_ONLY = False if _env.CSP_REPORT_ONLY is None else _env.CSP_REPORT_ONLY
+CSP_REPORT_URI = "/_csp-report/"
+
+SECURITY_TXT_CONTACT = _env.SECURITY_TXT_CONTACT
+SECURITY_TXT_POLICY_URL = _env.SECURITY_TXT_POLICY_URL
+SECURITY_TXT_ENCRYPTION_URL = _env.SECURITY_TXT_ENCRYPTION_URL
+SECURITY_TXT_EXPIRES_DAYS = _env.SECURITY_TXT_EXPIRES_DAYS
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = _env.DATA_UPLOAD_MAX_MEMORY_MB * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = _env.FILE_UPLOAD_MAX_MEMORY_MB * 1024 * 1024
+
+# ----- Admin URL paths ---------------------------------------------------------
+ADMIN_PANEL_URL_PATH = _env.ADMIN_PANEL_URL_PATH  # read by vendored security mw
+DJANGO_ADMIN_URL_PATH = _env.DJANGO_ADMIN_URL_PATH
+ADMIN_IP_ALLOWLIST = list(_env.ADMIN_IP_ALLOWLIST)
+
+DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
+DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL
+
+# ----- Email (console only — no transactional email in this app) ---------------
+EMAIL_BACKEND_DRIVER = "console"
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = _env.DEFAULT_FROM_EMAIL
+
+# ----- MCP subprocess ----------------------------------------------------------
+MCP_LOOPBACK_HOST = _env.MCP_LOOPBACK_HOST
+MCP_LOOPBACK_PORT = _env.MCP_LOOPBACK_PORT
+MCP_LOOPBACK_SECRET = (
+    _env.MCP_LOOPBACK_SECRET.get_secret_value() if _env.MCP_LOOPBACK_SECRET else ""
+)
+# URL-path MCP tokens are NOT vendored — hard off so the proxy view's
+# url-token branch (lazy import of apps.url_mcp_tokens) can never fire.
+MCP_URL_AUTH_ENABLED = False
+# OAuth flows are not vendored; issuer is still announced in 401 hints.
+OAUTH_ISSUER = _env.OAUTH_ISSUER.rstrip("/")
+MCP_OAUTH_DCR_MODE = "off"
+
+# ----- Field encryption --------------------------------------------------------
+# Fernet key for AppSetting encrypted values (apps.brainconfig, M1.9).
+FIELD_ENCRYPTION_KEY = _env.FIELD_ENCRYPTION_KEY.get_secret_value()
+
+# ----- Cache -------------------------------------------------------------------
+from config.cache import build_caches  # noqa: E402
+
+CACHES = build_caches(
+    redis_url=_env.REDIS_URL,
+    env=_env.CACHE_ENV,
+    version=_env.CACHE_KEY_VERSION,
+)
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# ----- Logging -----------------------------------------------------------------
+LOGGING = build_logging(debug=DEBUG)
+
+# ----- Observability hooks (observability app not vendored) --------------------
+SENTRY_DSN = ""
+GOOGLE_ANALYTICS_ID = ""
+
+# ----- django-q2 ---------------------------------------------------------------
+Q_CLUSTER = {
+    "name": APP_NAME,
+    "workers": _env.Q_WORKER_COUNT,
+    "recycle": _env.Q_RECYCLE_AFTER_TASKS,
+    # retry (ack) must stay > timeout or long SDK runs double-execute
+    # (and double-bill Anthropic) — validated in env.py.
+    "timeout": _env.Q_TASK_TIMEOUT_SECONDS,
+    "retry": _env.Q_ACK_TIMEOUT_SECONDS,
+    "compress": True,
+    "save_limit": 250,
+    "queue_limit": 500,
+    "label": "Q2",
+    "redis": _env.REDIS_URL,
+    "poll": 1,
+    "catch_up": False,
+    "sync": False,
+}

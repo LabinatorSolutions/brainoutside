@@ -376,9 +376,14 @@ Each step small, verifiable, committed on its own. DONE = check passes.
   *Check: fresh clone elsewhere contains everything the server needs.*
 - **0.3** Contract amendments, one commit: per-directory visibility default
   map + inline `(agents-only:)` span convention written into CLAUDE.md §4;
-  lens metadata promoted to frontmatter; `PENDING.md` reviewed (private by
-  default); the public-voice question decided (public voice subset or
-  explicit "no public voice yet"). *Check: every tracked file resolves to
+  lens metadata promoted to frontmatter. Resolved decisions: `PENDING.md`
+  stays as-is — it is the feeder's workbench by design ("not part of the
+  mind" per its own header) — classified **workbench/admin-only**, excluded
+  from all snapshots, rendered as an "open items" panel in the ops UI.
+  `voice.md` stays **agents-only** (it's an agent instruction manual with
+  strategy + partially unapproved distillations); a distilled public voice
+  subset is deferred until a public clone is actually built — until then
+  public tier serves no voice file. *Check: every tracked file resolves to
   a tier via frontmatter or the map; nothing unclassified.*
 - **0.4** Server-mode preambles for feeder/reader added under
   `.claude/skills/*/server-mode.md`. *Check: reviewed against §7 rules.*

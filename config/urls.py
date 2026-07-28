@@ -1,20 +1,29 @@
 """Root URL routing — brain server.
 
-Public surface: /api/ (registry REST), /mcp (proxy → FastMCP subprocess),
-/docs/ (endpoint docs), /healthz, /readyz. Ops UI mounts later under
-DJANGO_ADMIN_URL_PATH + app pages; everything session-authed sits behind a
-network boundary in prod (PLAN.md §9).
+Public surface: / (landing page, reveals nothing), /api/ (registry REST,
+key-authed), /mcp (proxy → FastMCP subprocess, key-authed),
+/webhooks/github (HMAC), /healthz, /readyz. Everything else — /docs/ and
+the whole ops UI — is staff-session-only AND behind the IP-allowlist
+perimeter in prod (nothing-public decision, 2026-07-28; PLAN.md §9).
 """
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.db import connections
 from django.http import HttpResponse, JsonResponse
+from django.shortcuts import render
 from django.urls import include, path
 
 from apps.brain.views import github_webhook
 from apps.core.views import csp_report, robots_txt, security_txt
 from apps.mcp_proxy.views import mcp_proxy_view
+
+
+def home(request):
+    """Public landing page. Shows the name and a sign-in door, nothing
+    else — no links that reveal URLs beyond the ops prefix (which the
+    IP-allowlist perimeter 404s for outsiders in prod anyway)."""
+    return render(request, "home.html")
 
 
 def healthz(request):
@@ -44,6 +53,7 @@ def readyz(request):
 
 
 urlpatterns: list = [
+    path("", home, name="home"),
     path("healthz", healthz, name="healthz"),
     path("readyz", readyz, name="readyz"),
     path(".well-known/security.txt", security_txt, name="security-txt"),
@@ -55,7 +65,8 @@ urlpatterns: list = [
     # Both slash forms: MCP clients POST without the trailing slash.
     path("mcp/", mcp_proxy_view, name="mcp"),
     path("mcp", mcp_proxy_view),
-    # Public docs site (registry-driven catalog + per-endpoint detail).
+    # Docs site (registry-driven catalog + per-endpoint detail).
+    # Staff-only; in prod also inside the IP-allowlist perimeter.
     path("docs/", include("apps.docs.urls", namespace="docs")),
     # GitHub push → sync (HMAC-verified, deduped, echo-guarded).
     path("webhooks/github", github_webhook, name="github-webhook"),

@@ -52,13 +52,15 @@ from the repo.
 
 ## 3. Network boundary for the ops UI (§9.4)
 
-Public internet may reach ONLY `/api/`, `/mcp`, `/webhooks/github`,
-`/docs/`, `/healthz|/readyz`. The ops UI (`/ops/…`, `/x7-admin/…`) must not
-be reachable from the open internet:
+Public internet may reach ONLY `/` (landing page — name + sign-in, no
+content), `/api/`, `/mcp`, `/webhooks/github`, `/healthz|/readyz`.
+Everything else — `/docs/`, `/ops/…`, `/x7-admin/…` — is staff-only AND
+inside the IP-allowlist perimeter (docs via
+`IP_ALLOWLIST_EXTRA_PREFIXES`), so outsiders get 404s:
 
 - Preferred: Tailscale on the VPS; set `ADMIN_IP_ALLOWLIST` to the
   tailnet range (middleware returns 404 to everyone else), or
-- Cloudflare Access rule covering `/ops/*` and the admin slug.
+- Cloudflare Access rule covering `/docs/*`, `/ops/*` and the admin slug.
 
 ## 4. Host baseline
 

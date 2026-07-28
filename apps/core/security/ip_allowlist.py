@@ -81,14 +81,17 @@ def _admin_path_prefixes() -> list[str]:
     """Return the URL prefixes the allowlist guards.
 
     Both ADMIN_PANEL_URL_PATH (custom panel) and DJANGO_ADMIN_URL_PATH
-    (Django admin fallback). Each is normalized with leading +
-    trailing slash so a request to `/admin` (no slash) doesn't slip
-    past while `/admin/` is guarded.
+    (Django admin fallback), plus any IP_ALLOWLIST_EXTRA_PREFIXES
+    (e.g. `docs/` — staff-only pages that must 404 for outsiders
+    rather than redirect and leak the admin slug). Each is normalized
+    with leading + trailing slash so a request to `/admin` (no slash)
+    doesn't slip past while `/admin/` is guarded.
     """
     paths: list[str] = []
     for raw in (
         getattr(settings, "ADMIN_PANEL_URL_PATH", ""),
         getattr(settings, "DJANGO_ADMIN_URL_PATH", ""),
+        *getattr(settings, "IP_ALLOWLIST_EXTRA_PREFIXES", []),
     ):
         if not raw:
             continue

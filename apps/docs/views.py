@@ -1,16 +1,15 @@
 """Docs site views.
 
-G1 ships the layout shell + 3 placeholder views — index, endpoint
-detail, guide — so the URL surface is complete and every nav link
-resolves. G2-G5 swap real content in.
-
-No `@login_required` on any docs view: docs should be browsable
-without an account. The Try-it panel (G4) is the only authed surface
-— it shows a "Sign in to use Try it" CTA for anonymous users
-(per locked design choice 1(a)).
+Staff-only since the nothing-public decision (2026-07-28): every view
+requires a logged-in staff session, and in prod the whole `/docs/`
+prefix additionally sits behind the IP-allowlist perimeter
+(IP_ALLOWLIST_EXTRA_PREFIXES) so outsiders get a 404, never a login
+redirect. The only public pages are the landing page, /api/, /mcp,
+the webhook, and health checks.
 """
 from __future__ import annotations
 
+from django.contrib.admin.views.decorators import staff_member_required
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET
@@ -22,14 +21,14 @@ from apps.docs.services import guides as guides_service
 
 
 def _is_staff(request: HttpRequest) -> bool:
-    """True iff a logged-in staff user is browsing (session auth). Docs
-    are public, so anonymous visitors resolve to AnonymousUser → False.
-    Drives admin-only endpoint hiding: non-staff never see admin-only
-    cards or detail pages."""
+    """True iff a logged-in staff user is browsing (session auth).
+    With docs now staff-gated this is always True at view time; kept
+    because the catalog/detail services take it as a parameter."""
     user = getattr(request, "user", None)
     return bool(user is not None and user.is_authenticated and user.is_staff)
 
 
+@staff_member_required
 @require_GET
 def index_view(request: HttpRequest) -> HttpResponse:
     """Endpoint catalog.
@@ -44,6 +43,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
     return render(request, "docs/index.html", ctx)
 
 
+@staff_member_required
 @require_GET
 def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     """Per-endpoint detail page (10.4.3 / 10.4.4 / 10.4.5).
@@ -81,6 +81,7 @@ def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     return render(request, "docs/endpoint_detail.html", ctx)
 
 
+@staff_member_required
 @require_GET
 def guide_view(request: HttpRequest, slug: str) -> HttpResponse:
     """Static guide.

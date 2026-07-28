@@ -162,6 +162,10 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = _env.FILE_UPLOAD_MAX_MEMORY_MB * 1024 * 1024
 ADMIN_PANEL_URL_PATH = _env.ADMIN_PANEL_URL_PATH  # read by vendored security mw
 DJANGO_ADMIN_URL_PATH = _env.DJANGO_ADMIN_URL_PATH
 ADMIN_IP_ALLOWLIST = list(_env.ADMIN_IP_ALLOWLIST)
+# Non-admin prefixes pulled inside the same IP-allowlist perimeter.
+# Docs are staff-only and must 404 (not redirect) for outsiders — a
+# login redirect would leak the secret admin slug in its Location.
+IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/"]
 
 DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
 DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL

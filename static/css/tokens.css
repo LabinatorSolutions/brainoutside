@@ -67,6 +67,22 @@ body.brain-ui code, body.brain-ui pre, body.brain-ui .mono {
   font-family: var(--font-mono);
 }
 
+/* Landing page (templates/home.html) */
+.brain-ui .home-title {
+  font-family: var(--font-display);
+  color: var(--ink);
+}
+.brain-ui .home-sub { color: var(--muted); }
+.brain-ui .home-cta {
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.15s ease;
+}
+.brain-ui .home-cta:hover { background: var(--accent-strong); }
+.brain-ui .home-hero-img { filter: drop-shadow(0 12px 32px rgba(99, 102, 241, 0.25)); }
+
 /* Dark terminal pane — logs, code, raw output */
 .brain-ui .pane-terminal {
   background: var(--c-ink-900);

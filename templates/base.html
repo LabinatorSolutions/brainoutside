@@ -1,0 +1,23 @@
+{% load static %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}{{ APP_NAME }} — the online head of Hasan's brain.{% endblock %}" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="{% static 'css/tokens.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/tw.css' %}" />
+  <script defer src="{% static 'vendor/alpine.min.js' %}" nonce="{{ csp_nonce }}"></script>
+  <script defer src="{% static 'vendor/lucide.min.js' %}" nonce="{{ csp_nonce }}"></script>
+  <script defer nonce="{{ csp_nonce }}">
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.lucide) { window.lucide.createIcons(); }
+    });
+  </script>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="brain-ui min-h-full">
+  {% block body %}{% endblock %}
+</body>
+</html>

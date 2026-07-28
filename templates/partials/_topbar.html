@@ -1,163 +1,29 @@
-{% load i18n %}
-{% get_current_language as LANGUAGE_CODE %}
-{% get_available_languages as LANGUAGES %}
 {% comment %}
-  shared topbar partial.
-
-  Parameters (set via `{% include ... with ... %}`):
-    title           — text shown left of nav (defaults to {{ APP_NAME }})
-    subtitle        — small caption under title (optional)
-    show_drawer     — when truthy, renders the mobile-drawer hamburger that
-                      toggles `drawerOpen` on the parent layout's Alpine root.
-    nav_links       — list of {label, url, active?} dicts rendered inline
-                      (centered nav row; used by docs/dashboard layouts).
-    actions_partial — optional path to a partial rendered in the right-side
-                      action slot before the theme toggle + user menu (admin
-                      uses this for the Ctrl+K palette + notifications bell).
-
-  Layouts that need a deeper topbar (env badge, search palette, notification
-  bell — Phase 10.2.0.3) extend this with their own `{% block topbar %}`.
-
-  the locale switcher between the theme toggle and the user
-  menu renders ONLY when `len(LANGUAGES) > 1`. This is the topbar half of
-  the "Pattern B" gate: a boilerplate that ships with a single-language
-  `settings.LANGUAGES` (the recommended default for English-only sites)
-  shows no switcher; flipping to multi-language by adding one row to
-  `LANGUAGES` lights it up.
+  Brain-server topbar — replaces the template's SaaS topbar (which linked
+  dashboard/account/i18n routes this app doesn't mount). Included by the
+  docs layout with: title, nav_links, show_drawer.
 {% endcomment %}
-<header
-  class="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-zinc-200 bg-white/80 px-4 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80 sm:px-6"
-  role="banner"
->
-  {% if show_drawer %}
-    <button
-      type="button"
-      x-on:click="drawerOpen = true"
-      class="-ms-1 inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 lg:hidden focus-visible:ring-2 focus-visible:ring-brand-500"
-      aria-label="{% trans 'Open navigation' %}"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    </button>
-  {% endif %}
-
-  {% comment %}
-    Brand mark — hidden on lg+ because the sidebar already shows it there;
-    shown on mobile where the sidebar is off-canvas. Avoids a duplicate logo.
-  {% endcomment %}
-  <a href="/" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 lg:hidden">
-    <span class="inline-block h-6 w-6 rounded-md bg-brand-500"></span>
-    <span class="hidden sm:inline">{{ title|default:APP_NAME }}</span>
-  </a>
-
-  {% comment %}
-    Env/subtitle badge stays visible on all breakpoints — the sidebar brand
-    doesn't carry it, so it must survive when the brand mark above is hidden.
-  {% endcomment %}
-  {% if subtitle %}
-    <span class="hidden sm:inline rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">{{ subtitle }}</span>
-  {% endif %}
-
-  {% if nav_links %}
-    <nav class="ms-6 hidden items-center gap-1 text-sm md:flex" aria-label="{% trans 'Primary' %}">
+<header class="sticky top-0 z-30 border-b"
+        style="background: var(--surface); border-color: var(--line);"
+        role="banner">
+  <div class="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
+    {% if show_drawer %}
+      <button type="button" class="lg:hidden" aria-label="Open navigation"
+              x-on:click="drawerOpen = !drawerOpen">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    {% endif %}
+    <a href="/docs/" class="flex items-center gap-2 font-semibold"
+       style="font-family: var(--font-display); color: var(--ink);">
+      <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: var(--accent);"></span>
+      {{ title|default:APP_NAME }}
+    </a>
+    <nav class="ms-auto flex items-center gap-4 text-sm">
       {% for link in nav_links %}
-        <a
-          href="{{ link.url }}"
-          class="rounded-md px-3 py-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100{% if link.active %} bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100{% endif %}"
-        >{{ link.label }}</a>
+        <a href="{{ link.url }}" style="color: var(--muted);">{{ link.label }}</a>
       {% endfor %}
     </nav>
-  {% endif %}
-
-  <div class="ms-auto flex items-center gap-1">
-    {% if actions_partial %}{% include actions_partial %}{% endif %}
-
-    {% include "partials/_theme_toggle.html" %}
-
-    {% if LANGUAGES|length > 1 %}
-      <div x-data="{open: false}" class="relative">
-        <button
-          type="button"
-          x-on:click="open = !open"
-          x-on:click.outside="open = false"
-          x-on:keydown.escape.window="open = false"
-          class="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-xs font-medium uppercase tracking-wider text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-brand-500"
-          aria-haspopup="menu"
-          :aria-expanded="open"
-          aria-label="{% trans 'Change language' %}"
-          title="{% trans 'Change language' %}"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M2 12h20" />
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-          </svg>
-          <span>{{ LANGUAGE_CODE }}</span>
-        </button>
-        <div
-          x-show="open"
-          x-transition.opacity.duration.100ms
-          x-cloak
-          role="menu"
-          class="absolute end-0 mt-1 w-40 rounded-lg border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
-        >
-          {% get_language_info_list for LANGUAGES as languages %}
-          {% for lang in languages %}
-            <form method="post" action="{% url 'set_language' %}" role="none">
-              {% csrf_token %}
-              <input type="hidden" name="next" value="{{ request.get_full_path }}">
-              <input type="hidden" name="language" value="{{ lang.code }}">
-              <button
-                type="submit"
-                role="menuitem"
-                class="flex w-full items-center justify-between px-3 py-2 text-start text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800{% if lang.code == LANGUAGE_CODE %} font-semibold text-brand-700 dark:text-brand-300{% endif %}"
-              >
-                <span>{{ lang.name_local }}</span>
-                <span class="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500">{{ lang.code }}</span>
-              </button>
-            </form>
-          {% endfor %}
-        </div>
-      </div>
-    {% endif %}
-
-    {% if request.user.is_authenticated %}
-      <div x-data="{open: false}" class="relative">
-        <button
-          type="button"
-          x-on:click="open = !open"
-          x-on:click.outside="open = false"
-          x-on:keydown.escape.window="open = false"
-          class="inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-brand-500"
-          aria-haspopup="menu"
-          :aria-expanded="open"
-        >
-          <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-500/20 text-xs font-semibold text-brand-700 dark:text-brand-300">{{ request.user.email|slice:":1"|upper }}</span>
-          <span class="hidden max-w-[12rem] truncate sm:inline">{{ request.user.email }}</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="m6 9 6 6 6-6" />
-          </svg>
-        </button>
-        <div
-          x-show="open"
-          x-transition.opacity.duration.100ms
-          x-cloak
-          role="menu"
-          class="absolute end-0 mt-1 w-56 rounded-lg border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-800 dark:bg-zinc-900"
-        >
-          <a href="{% url 'dashboard' %}" role="menuitem" class="block px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">{% trans "Dashboard" %}</a>
-          <a href="{% url 'dashboard_account_settings' %}" role="menuitem" class="block px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">{% trans "Account settings" %}</a>
-          <a href="{% url 'dashboard_sessions_list' %}" role="menuitem" class="block px-3 py-2 text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">{% trans "Active sessions" %}</a>
-          <div class="my-1 h-px bg-zinc-200 dark:bg-zinc-800"></div>
-          <form method="post" action="{% url 'account_signout' %}" role="none">
-            {% csrf_token %}
-            <button type="submit" role="menuitem" class="block w-full px-3 py-2 text-start text-zinc-700 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800">{% trans "Sign out" %}</button>
-          </form>
-        </div>
-      </div>
-    {% else %}
-      <a href="{% url 'account_login' %}" class="btn btn-secondary text-xs">{% trans "Sign in" %}</a>
-    {% endif %}
   </div>
 </header>

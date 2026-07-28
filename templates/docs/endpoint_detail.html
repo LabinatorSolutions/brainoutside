@@ -90,11 +90,11 @@
   <div role="tabpanel" x-show="tab === 'rest'" class="mt-4">
     {% if bundle.is_anonymous %}
       <p class="mb-3 rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-xs text-brand-900 dark:border-brand-900 dark:bg-brand-950/40 dark:text-brand-200">
-        <a href="{% url 'account_login' %}" class="font-medium underline">Sign in</a> + create an API key on the <a href="{% url 'dashboard_keys' %}" class="font-medium underline">keys page</a> to authenticate calls.
+        API keys are issued per consumer in the ops console. Every call requires <code class="text-[11px]">Authorization: Bearer &lt;key&gt;</code>.
       </p>
     {% else %}
       <p class="mb-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        You have <span class="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">{{ bundle.user_active_keys }}</span> active key{{ bundle.user_active_keys|pluralize }} — manage at <a href="{% url 'dashboard_keys' %}" class="font-medium underline">/dashboard/keys/</a>. Replace <code class="text-[11px]">mcpsk_&lt;your_api_key&gt;</code> below with one of yours.
+        You have <span class="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">{{ bundle.user_active_keys }}</span> active key{{ bundle.user_active_keys|pluralize }} — managed in the ops console. Replace <code class="text-[11px]">mcpsk_&lt;your_api_key&gt;</code> below with one of yours.
       </p>
     {% endif %}
     {{ bundle.curl_html|safe }}

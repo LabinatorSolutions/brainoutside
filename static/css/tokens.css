@@ -1,0 +1,77 @@
+/* ============================================================
+   BRAIN SERVER THEME TOKENS — derived from learnwithhasan.com's
+   theme contract (static/css/theme/tokens.css, "studio" theme).
+   Same palette + type so the brain app reads as a sibling of the
+   main site. Brain-app pages style against the semantic layer
+   (--surface, --ink, --accent...); never against raw primitives.
+   ============================================================ */
+
+:root {
+  /* ---- Shared primitives (lwh palette) ---- */
+  --c-paper:   #fffef7;
+  --c-cream:   #faf8f5;
+  --c-ink:     #1a1a2e;
+  --c-muted:   #6b6b7b;
+  --c-teal:    #4db8a8;
+  --c-indigo:        #6366f1;
+  --c-indigo-strong: #4f46e5;
+  --c-violet:  #9b7cc4;
+  --c-yellow:  #f5d76e;
+  --c-coral:   #e8a07a;
+  --c-red:     #ff6b6b;
+
+  /* Terminal dark surfaces (log/code panes) */
+  --c-ink-900: #0d1117;
+  --c-ink-800: #161b22;
+  --c-ink-700: #21262d;
+  --c-ink-600: #30363d;
+  --c-ink-400: #8b949e;
+  --c-ink-300: #c9d1d9;
+
+  /* ---- Semantic layer ---- */
+  --surface:    var(--c-paper);
+  --surface-2:  var(--c-cream);
+  --surface-ink: var(--c-ink);
+  --ink:        var(--c-ink);
+  --muted:      var(--c-muted);
+  --line:       rgba(26, 26, 46, 0.12);
+
+  --accent:        var(--c-indigo);
+  --accent-strong: var(--c-indigo-strong);
+  --accent-2:   var(--c-violet);
+  --accent-3:   var(--c-coral);
+  --signal:     var(--c-teal);
+  --warn:       var(--c-yellow);
+  --danger:     var(--c-red);
+
+  --radius:      14px;
+  --radius-sm:   10px;
+  --radius-pill: 999px;
+  --shadow:    0 1px 2px rgba(26,26,46,.06), 0 8px 24px rgba(26,26,46,.08);
+  --shadow-sm: 0 1px 2px rgba(26,26,46,.06), 0 2px 8px rgba(26,26,46,.06);
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+}
+
+body.brain-ui {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+body.brain-ui h1, body.brain-ui h2, body.brain-ui h3 {
+  font-family: var(--font-display);
+}
+body.brain-ui code, body.brain-ui pre, body.brain-ui .mono {
+  font-family: var(--font-mono);
+}
+
+/* Dark terminal pane — logs, code, raw output */
+.brain-ui .pane-terminal {
+  background: var(--c-ink-900);
+  color: var(--c-ink-300);
+  border: 1px solid var(--c-ink-700);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+}

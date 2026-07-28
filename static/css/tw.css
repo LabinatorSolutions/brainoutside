@@ -1,0 +1,368 @@
+/*
+ * {{APP_NAME}} — design tokens + base styles
+ *
+ * Tailwind layers compile to `static/dist/app.css` via `make tailwind`.
+ * Self-hosted Inter + JetBrains Mono (Phase 1.4.6) live in static/fonts/.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ----- Web fonts (self-hosted, no CDN) ----- */
+@layer base {
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/static/fonts/Inter-Regular.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("/static/fonts/Inter-Medium.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("/static/fonts/Inter-SemiBold.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "Inter";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("/static/fonts/Inter-Bold.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/static/fonts/JetBrainsMono-Regular.woff2") format("woff2");
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("/static/fonts/JetBrainsMono-Bold.woff2") format("woff2");
+  }
+}
+
+/* ----- Design tokens + base resets ----- */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+
+  html {
+    @apply antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Inter ligature features */
+  }
+
+  html.dark {
+    @apply bg-zinc-950 text-zinc-100;
+  }
+  html:not(.dark) {
+    @apply bg-zinc-50 text-zinc-900;
+  }
+
+  body {
+    @apply min-h-screen font-sans;
+  }
+
+  /* Focus ring (Phase 10.5.2 — WCAG AA). The ring color is brand-400
+   * (contrast ≥ 3:1 against both zinc-50 light bg AND zinc-950 dark
+   * bg — checked via APCA + WCAG 2.1 SC 1.4.11). The ring-offset
+   * was zinc-950 only — that paints a thin black border on light-mode
+   * cards, which is fine but inconsistent with the surrounding
+   * surface. Light mode now uses zinc-50 offset; dark stays zinc-950
+   * so the ring reads as a true gap between the focused element and
+   * its background rather than a second visual outline. */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-400 ring-offset-2 ring-offset-zinc-50;
+  }
+  html.dark *:focus-visible {
+    @apply ring-offset-zinc-950;
+  }
+
+  ::selection {
+    @apply bg-brand-500/30;
+  }
+
+  /* Reduced-motion respect (Phase 10.5.6). Nukes animations +
+   * transitions and disables smooth-scroll behavior so a keyboard
+   * user with vestibular-disorder accommodations isn't pulled along
+   * for an animated scroll-into-view ride either. The 0.01ms (rather
+   * than 0ms) is the W3C-recommended escape hatch so JS animations
+   * driven by `transitionend` events still fire to completion — they
+   * just complete on the next frame. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto !important;
+    }
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ----- Reusable component primitives ----- */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 hover:bg-brand-400 text-zinc-950;
+  }
+  .btn-secondary {
+    @apply btn border border-zinc-300 hover:border-zinc-400 text-zinc-900
+           dark:border-zinc-700 dark:hover:border-zinc-500 dark:text-zinc-100;
+  }
+  .container-app {
+    @apply mx-auto max-w-6xl px-6;
+  }
+
+  /* Code-block container — wraps Pygments-highlighted fenced blocks
+     from the codehilite extension. The `.highlight` div is the outer
+     wrap; colored token spans live inside `pre code`. We neutralize
+     Tailwind typography's default `pre` styling so the Pygments
+     style provides the surface. The header strip carries the
+     language label + copy button so they don't overlap the code. */
+  .prose .highlight {
+    @apply relative my-6 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden;
+  }
+  .prose .highlight pre {
+    @apply m-0 px-4 py-4 overflow-x-auto bg-transparent text-sm leading-relaxed;
+    color: inherit;
+  }
+  .prose .highlight code {
+    @apply bg-transparent p-0 text-sm font-mono font-normal;
+    color: inherit;
+  }
+  .prose .highlight code::before,
+  .prose .highlight code::after {
+    content: none;
+  }
+
+  /* Header strip: language label (left) + copy button (right). The
+     JS prepends this to `.highlight`. Hidden when empty (no language
+     resolved and copy disabled) via the `hidden` class. */
+  .code-toolbar {
+    @apply absolute inset-x-0 top-0 z-10 flex items-center justify-between
+           px-3 py-1.5 text-[11px] font-medium tracking-wide uppercase
+           text-zinc-500 dark:text-zinc-400 pointer-events-none;
+  }
+  .code-toolbar > * {
+    @apply pointer-events-auto;
+  }
+  .code-toolbar .code-lang {
+    @apply font-mono normal-case tracking-normal;
+  }
+  /* Push code down so the toolbar doesn't overlap the first line. */
+  .prose .highlight pre {
+    @apply pt-9;
+  }
+
+  /* Copy button — icon-only resting state, slight surface on hover,
+     turns brand-green on success. Always interactive (no opacity:0
+     trick — discoverability matters more than minimalism here). */
+  .code-copy-btn {
+    @apply inline-flex h-7 w-7 items-center justify-center rounded-md
+           text-zinc-500 transition
+           hover:bg-zinc-100 hover:text-zinc-900
+           focus-visible:bg-zinc-100 focus-visible:text-zinc-900
+           dark:text-zinc-400
+           dark:hover:bg-zinc-800 dark:hover:text-zinc-100
+           dark:focus-visible:bg-zinc-800 dark:focus-visible:text-zinc-100;
+  }
+  .code-copy-btn svg {
+    @apply h-4 w-4;
+  }
+  .code-copy-btn .icon-check {
+    display: none;
+  }
+  .code-copy-btn[data-copied="true"] {
+    @apply text-brand-600 dark:text-brand-400;
+  }
+  .code-copy-btn[data-copied="true"] .icon-copy {
+    display: none;
+  }
+  .code-copy-btn[data-copied="true"] .icon-check {
+    display: inline-block;
+  }
+}
+
+/* ----- Pygments syntax highlighting (generated) ----- */
+/* Light theme: Pygments 'default'. Dark theme: 'monokai'. */
+.highlight pre { background: transparent; }
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+.highlight .hll { background-color: #ffffcc }
+.highlight { background: #f8f8f8; }
+.highlight .c { color: #3D7B7B; font-style: italic } /* Comment */
+.highlight .err { border: 1px solid #F00 } /* Error */
+.highlight .k { color: #008000; font-weight: bold } /* Keyword */
+.highlight .o { color: #666 } /* Operator */
+.highlight .ch { color: #3D7B7B; font-style: italic } /* Comment.Hashbang */
+.highlight .cm { color: #3D7B7B; font-style: italic } /* Comment.Multiline */
+.highlight .cp { color: #9C6500 } /* Comment.Preproc */
+.highlight .cpf { color: #3D7B7B; font-style: italic } /* Comment.PreprocFile */
+.highlight .c1 { color: #3D7B7B; font-style: italic } /* Comment.Single */
+.highlight .cs { color: #3D7B7B; font-style: italic } /* Comment.Special */
+.highlight .gd { color: #A00000 } /* Generic.Deleted */
+.highlight .ge { font-style: italic } /* Generic.Emph */
+.highlight .ges { font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.highlight .gr { color: #E40000 } /* Generic.Error */
+.highlight .gh { color: #000080; font-weight: bold } /* Generic.Heading */
+.highlight .gi { color: #008400 } /* Generic.Inserted */
+.highlight .go { color: #717171 } /* Generic.Output */
+.highlight .gp { color: #000080; font-weight: bold } /* Generic.Prompt */
+.highlight .gs { font-weight: bold } /* Generic.Strong */
+.highlight .gu { color: #800080; font-weight: bold } /* Generic.Subheading */
+.highlight .gt { color: #04D } /* Generic.Traceback */
+.highlight .kc { color: #008000; font-weight: bold } /* Keyword.Constant */
+.highlight .kd { color: #008000; font-weight: bold } /* Keyword.Declaration */
+.highlight .kn { color: #008000; font-weight: bold } /* Keyword.Namespace */
+.highlight .kp { color: #008000 } /* Keyword.Pseudo */
+.highlight .kr { color: #008000; font-weight: bold } /* Keyword.Reserved */
+.highlight .kt { color: #B00040 } /* Keyword.Type */
+.highlight .m { color: #666 } /* Literal.Number */
+.highlight .s { color: #BA2121 } /* Literal.String */
+.highlight .na { color: #687822 } /* Name.Attribute */
+.highlight .nb { color: #008000 } /* Name.Builtin */
+.highlight .nc { color: #00F; font-weight: bold } /* Name.Class */
+.highlight .no { color: #800 } /* Name.Constant */
+.highlight .nd { color: #A2F } /* Name.Decorator */
+.highlight .ni { color: #717171; font-weight: bold } /* Name.Entity */
+.highlight .ne { color: #CB3F38; font-weight: bold } /* Name.Exception */
+.highlight .nf { color: #00F } /* Name.Function */
+.highlight .nl { color: #767600 } /* Name.Label */
+.highlight .nn { color: #00F; font-weight: bold } /* Name.Namespace */
+.highlight .nt { color: #008000; font-weight: bold } /* Name.Tag */
+.highlight .nv { color: #19177C } /* Name.Variable */
+.highlight .ow { color: #A2F; font-weight: bold } /* Operator.Word */
+.highlight .w { color: #BBB } /* Text.Whitespace */
+.highlight .mb { color: #666 } /* Literal.Number.Bin */
+.highlight .mf { color: #666 } /* Literal.Number.Float */
+.highlight .mh { color: #666 } /* Literal.Number.Hex */
+.highlight .mi { color: #666 } /* Literal.Number.Integer */
+.highlight .mo { color: #666 } /* Literal.Number.Oct */
+.highlight .sa { color: #BA2121 } /* Literal.String.Affix */
+.highlight .sb { color: #BA2121 } /* Literal.String.Backtick */
+.highlight .sc { color: #BA2121 } /* Literal.String.Char */
+.highlight .dl { color: #BA2121 } /* Literal.String.Delimiter */
+.highlight .sd { color: #BA2121; font-style: italic } /* Literal.String.Doc */
+.highlight .s2 { color: #BA2121 } /* Literal.String.Double */
+.highlight .se { color: #AA5D1F; font-weight: bold } /* Literal.String.Escape */
+.highlight .sh { color: #BA2121 } /* Literal.String.Heredoc */
+.highlight .si { color: #A45A77; font-weight: bold } /* Literal.String.Interpol */
+.highlight .sx { color: #008000 } /* Literal.String.Other */
+.highlight .sr { color: #A45A77 } /* Literal.String.Regex */
+.highlight .s1 { color: #BA2121 } /* Literal.String.Single */
+.highlight .ss { color: #19177C } /* Literal.String.Symbol */
+.highlight .bp { color: #008000 } /* Name.Builtin.Pseudo */
+.highlight .fm { color: #00F } /* Name.Function.Magic */
+.highlight .vc { color: #19177C } /* Name.Variable.Class */
+.highlight .vg { color: #19177C } /* Name.Variable.Global */
+.highlight .vi { color: #19177C } /* Name.Variable.Instance */
+.highlight .vm { color: #19177C } /* Name.Variable.Magic */
+.highlight .il { color: #666 } /* Literal.Number.Integer.Long */
+pre { line-height: 125%; }
+td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 5px; padding-right: 5px; }
+html.dark .highlight .hll { background-color: #49483e }
+html.dark .highlight { background: #272822; color: #F8F8F2 }
+html.dark .highlight .c { color: #959077 } /* Comment */
+html.dark .highlight .err { color: #ED007E; background-color: #1E0010 } /* Error */
+html.dark .highlight .esc { color: #F8F8F2 } /* Escape */
+html.dark .highlight .g { color: #F8F8F2 } /* Generic */
+html.dark .highlight .k { color: #66D9EF } /* Keyword */
+html.dark .highlight .l { color: #AE81FF } /* Literal */
+html.dark .highlight .n { color: #F8F8F2 } /* Name */
+html.dark .highlight .o { color: #FF4689 } /* Operator */
+html.dark .highlight .x { color: #F8F8F2 } /* Other */
+html.dark .highlight .p { color: #F8F8F2 } /* Punctuation */
+html.dark .highlight .ch { color: #959077 } /* Comment.Hashbang */
+html.dark .highlight .cm { color: #959077 } /* Comment.Multiline */
+html.dark .highlight .cp { color: #959077 } /* Comment.Preproc */
+html.dark .highlight .cpf { color: #959077 } /* Comment.PreprocFile */
+html.dark .highlight .c1 { color: #959077 } /* Comment.Single */
+html.dark .highlight .cs { color: #959077 } /* Comment.Special */
+html.dark .highlight .gd { color: #FF4689 } /* Generic.Deleted */
+html.dark .highlight .ge { color: #F8F8F2; font-style: italic } /* Generic.Emph */
+html.dark .highlight .ges { color: #F8F8F2; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+html.dark .highlight .gr { color: #F8F8F2 } /* Generic.Error */
+html.dark .highlight .gh { color: #F8F8F2 } /* Generic.Heading */
+html.dark .highlight .gi { color: #A6E22E } /* Generic.Inserted */
+html.dark .highlight .go { color: #66D9EF } /* Generic.Output */
+html.dark .highlight .gp { color: #FF4689; font-weight: bold } /* Generic.Prompt */
+html.dark .highlight .gs { color: #F8F8F2; font-weight: bold } /* Generic.Strong */
+html.dark .highlight .gu { color: #959077 } /* Generic.Subheading */
+html.dark .highlight .gt { color: #F8F8F2 } /* Generic.Traceback */
+html.dark .highlight .kc { color: #66D9EF } /* Keyword.Constant */
+html.dark .highlight .kd { color: #66D9EF } /* Keyword.Declaration */
+html.dark .highlight .kn { color: #FF4689 } /* Keyword.Namespace */
+html.dark .highlight .kp { color: #66D9EF } /* Keyword.Pseudo */
+html.dark .highlight .kr { color: #66D9EF } /* Keyword.Reserved */
+html.dark .highlight .kt { color: #66D9EF } /* Keyword.Type */
+html.dark .highlight .ld { color: #E6DB74 } /* Literal.Date */
+html.dark .highlight .m { color: #AE81FF } /* Literal.Number */
+html.dark .highlight .s { color: #E6DB74 } /* Literal.String */
+html.dark .highlight .na { color: #A6E22E } /* Name.Attribute */
+html.dark .highlight .nb { color: #F8F8F2 } /* Name.Builtin */
+html.dark .highlight .nc { color: #A6E22E } /* Name.Class */
+html.dark .highlight .no { color: #66D9EF } /* Name.Constant */
+html.dark .highlight .nd { color: #A6E22E } /* Name.Decorator */
+html.dark .highlight .ni { color: #F8F8F2 } /* Name.Entity */
+html.dark .highlight .ne { color: #A6E22E } /* Name.Exception */
+html.dark .highlight .nf { color: #A6E22E } /* Name.Function */
+html.dark .highlight .nl { color: #F8F8F2 } /* Name.Label */
+html.dark .highlight .nn { color: #F8F8F2 } /* Name.Namespace */
+html.dark .highlight .nx { color: #A6E22E } /* Name.Other */
+html.dark .highlight .py { color: #F8F8F2 } /* Name.Property */
+html.dark .highlight .nt { color: #FF4689 } /* Name.Tag */
+html.dark .highlight .nv { color: #F8F8F2 } /* Name.Variable */
+html.dark .highlight .ow { color: #FF4689 } /* Operator.Word */
+html.dark .highlight .pm { color: #F8F8F2 } /* Punctuation.Marker */
+html.dark .highlight .w { color: #F8F8F2 } /* Text.Whitespace */
+html.dark .highlight .mb { color: #AE81FF } /* Literal.Number.Bin */
+html.dark .highlight .mf { color: #AE81FF } /* Literal.Number.Float */
+html.dark .highlight .mh { color: #AE81FF } /* Literal.Number.Hex */
+html.dark .highlight .mi { color: #AE81FF } /* Literal.Number.Integer */
+html.dark .highlight .mo { color: #AE81FF } /* Literal.Number.Oct */
+html.dark .highlight .sa { color: #E6DB74 } /* Literal.String.Affix */
+html.dark .highlight .sb { color: #E6DB74 } /* Literal.String.Backtick */
+html.dark .highlight .sc { color: #E6DB74 } /* Literal.String.Char */
+html.dark .highlight .dl { color: #E6DB74 } /* Literal.String.Delimiter */
+html.dark .highlight .sd { color: #E6DB74 } /* Literal.String.Doc */
+html.dark .highlight .s2 { color: #E6DB74 } /* Literal.String.Double */
+html.dark .highlight .se { color: #AE81FF } /* Literal.String.Escape */
+html.dark .highlight .sh { color: #E6DB74 } /* Literal.String.Heredoc */
+html.dark .highlight .si { color: #E6DB74 } /* Literal.String.Interpol */
+html.dark .highlight .sx { color: #E6DB74 } /* Literal.String.Other */
+html.dark .highlight .sr { color: #E6DB74 } /* Literal.String.Regex */
+html.dark .highlight .s1 { color: #E6DB74 } /* Literal.String.Single */
+html.dark .highlight .ss { color: #E6DB74 } /* Literal.String.Symbol */
+html.dark .highlight .bp { color: #F8F8F2 } /* Name.Builtin.Pseudo */
+html.dark .highlight .fm { color: #A6E22E } /* Name.Function.Magic */
+html.dark .highlight .vc { color: #F8F8F2 } /* Name.Variable.Class */
+html.dark .highlight .vg { color: #F8F8F2 } /* Name.Variable.Global */
+html.dark .highlight .vi { color: #F8F8F2 } /* Name.Variable.Instance */
+html.dark .highlight .vm { color: #F8F8F2 } /* Name.Variable.Magic */
+html.dark .highlight .il { color: #AE81FF } /* Literal.Number.Integer.Long */
+/* ----- /Pygments ----- */

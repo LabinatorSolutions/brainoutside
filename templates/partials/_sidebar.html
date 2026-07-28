@@ -1,87 +1,35 @@
-{% load i18n %}
 {% comment %}
-  sidebar partial. Mobile-first; lives inside the parent
-  layout's Alpine root which owns `drawerOpen` (10.1.3).
-
-  Parameters:
-    nav_sections — list of dicts:
-      [{"label": "Operations", "items": [
-          {"label": "Dashboard", "url": "...", "icon": "home", "active": True, "badge": 0},
-          ...
-      ]}]
-      `icon` is a key into the inline icon set below; unknown icons render
-      a generic dot. `badge` (int) renders a red pill when > 0.
-    sidebar_footer — optional partial path rendered below the nav (e.g. footer
-      build-version / report-bug link from Phase 10.2.0.9).
-
-  Server-passed labels (`section.label`, `item.label`, `item.badge_tooltip`)
-  are wrapped in `gettext_lazy` at the Python source (see
-  `apps/admin_panel/context.py::build_nav_sections` /
-  `apps/dashboard/context.py`) so they translate alongside the rest of
-  the catalog. The literal aria-labels below stay as `{% trans %}`.
+  Brain-server docs sidebar — endpoint catalog grouped by section.
+  Replaces the template's dashboard sidebar (dashboard/account links).
+  Included with: nav_sections — [{label, items:[{label, url, active?}]}].
+  Parent layout's Alpine root owns `drawerOpen`.
 {% endcomment %}
-<aside
-  class="fixed inset-y-0 start-0 z-40 flex w-64 flex-col border-e border-zinc-200 bg-white transition-transform duration-200 dark:border-zinc-800 dark:bg-zinc-950 lg:translate-x-0"
-  :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
-  aria-label="{% trans 'Sidebar' %}"
->
-  <div class="flex h-14 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-800">
-    <a href="/" class="flex items-center gap-2 text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-      <span class="inline-block h-6 w-6 rounded-md bg-brand-500"></span>
-      <span>{{ APP_NAME }}</span>
+<aside class="fixed inset-y-0 start-0 z-40 w-64 overflow-y-auto border-e transition-transform duration-200 lg:translate-x-0"
+       style="background: var(--surface-2); border-color: var(--line);"
+       :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
+       aria-label="Sidebar">
+  <div class="flex h-14 items-center border-b px-4 font-semibold" style="border-color: var(--line); font-family: var(--font-display);">
+    <a href="/docs/" class="flex items-center gap-2">
+      <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: var(--accent);"></span>
+      {{ APP_NAME }}
     </a>
-    <button
-      type="button"
-      x-on:click="drawerOpen = false"
-      class="-me-1 inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 lg:hidden focus-visible:ring-2 focus-visible:ring-brand-500"
-      aria-label="{% trans 'Close navigation' %}"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M18 6 6 18M6 6l12 12" />
-      </svg>
-    </button>
   </div>
-
-  <nav class="flex-1 overflow-y-auto px-3 py-4 text-sm" aria-label="{% trans 'Sections' %}">
+  <nav class="px-2 pb-8">
     {% for section in nav_sections %}
-      {% if section.label %}
-        <div class="mt-4 mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-300 first:mt-0">{{ section.label }}</div>
-      {% endif %}
-      <ul class="space-y-0.5">
-        {% for item in section.items %}
-          <li>
-            <a
-              href="{{ item.url }}"
-              class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100{% if item.active %} bg-zinc-100 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100{% endif %}"
-              {% if item.active %}aria-current="page"{% endif %}
-            >
-              <span class="inline-flex h-4 w-4 items-center justify-center text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-300{% if item.active %} text-zinc-700 dark:text-zinc-200{% endif %}" aria-hidden="true">
-                {% include "partials/_icon.html" with name=item.icon %}
-              </span>
-              <span class="flex-1">{{ item.label }}</span>
-              {% if item.badge %}
-                <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white"{% if item.badge_tooltip %} title="{{ item.badge_tooltip }}"{% endif %} aria-label="{% if item.badge_tooltip %}{{ item.badge_tooltip }}{% else %}{% blocktrans count counter=item.badge %}{{ counter }} pending{% plural %}{{ counter }} pending{% endblocktrans %}{% endif %}">{{ item.badge }}</span>
-              {% endif %}
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
+      <div class="mt-4">
+        <div class="px-2 text-xs font-medium uppercase tracking-wide" style="color: var(--muted);">
+          {{ section.label }}
+        </div>
+        <ul class="mt-1">
+          {% for item in section.items %}
+            <li>
+              <a href="{{ item.url }}"
+                 class="block rounded-md px-2 py-1.5 text-sm"
+                 style="color: var(--ink);">{{ item.label }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
     {% endfor %}
   </nav>
-
-  {% if sidebar_footer %}
-    <div class="border-t border-zinc-200 px-3 py-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-      {% include sidebar_footer %}
-    </div>
-  {% endif %}
 </aside>
-
-{# Backdrop — only on mobile when drawer is open. #}
-<div
-  x-show="drawerOpen"
-  x-transition.opacity
-  x-cloak
-  x-on:click="drawerOpen = false"
-  class="fixed inset-0 z-30 bg-zinc-950/40 lg:hidden"
-  aria-hidden="true"
-></div>

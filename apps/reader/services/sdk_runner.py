@@ -18,9 +18,11 @@ Responsibilities (PLAN.md §7):
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import hashlib
 import logging
 from dataclasses import dataclass, field
+from typing import Awaitable
 
 from asgiref.sync import sync_to_async
 from django.utils import timezone
@@ -86,6 +88,20 @@ def today_cost_usd() -> float:
     return float(total or 0)
 
 
+def _auth_env(api_key: str) -> dict[str, str]:
+    """Map the stored credential to the env var the CLI expects.
+
+    Console API keys (sk-ant-api…) belong in ANTHROPIC_API_KEY. Claude
+    subscription tokens from `claude setup-token` (sk-ant-oat…) must go
+    in CLAUDE_CODE_OAUTH_TOKEN instead — in the API-key slot the API
+    401s them ("Invalid API key"), while the CLI accepts them natively
+    through the OAuth path.
+    """
+    if api_key.startswith("sk-ant-oat"):
+        return {"CLAUDE_CODE_OAUTH_TOKEN": api_key}
+    return {"ANTHROPIC_API_KEY": api_key}
+
+
 def _check_gates(*, exempt_daily_cap: bool) -> str:
     api_key = config.anthropic_api_key()
     if not api_key:
@@ -116,7 +132,7 @@ def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str, ou
         model=config.model_for(kind),
         max_turns=config.max_turns(kind),
         max_budget_usd=config.max_budget_usd(kind),
-        env={"ANTHROPIC_API_KEY": api_key},
+        env=_auth_env(api_key),
         include_partial_messages=False,
         output_format=output_format,
     )
@@ -242,7 +258,7 @@ async def test_connection_async(*, exempt_daily_cap: bool = True) -> RunResult:
         model=model,
         max_turns=1,
         env={
-            "ANTHROPIC_API_KEY": api_key,
+            **_auth_env(api_key),
             # A ping must fail fast: one retry, short per-request timeout —
             # a bad key surfaces as an auth error, not a 2-minute hang.
             "API_TIMEOUT_MS": "30000",
@@ -259,9 +275,26 @@ async def test_connection_async(*, exempt_daily_cap: bool = True) -> RunResult:
     )
 
 
+def run_sync(coro: Awaitable[RunResult]) -> RunResult:
+    """Run an SDK coroutine to completion from sync code — safely.
+
+    A bare `asyncio.run()` breaks inside Django's middleware bridge: the
+    vendored stack has async-only middlewares, so even under WSGI every
+    sync view runs inside `async_to_sync`, which binds a
+    CurrentThreadExecutor to the request thread. The coroutine's
+    `sync_to_async(thread_sensitive=True)` hops then try to submit back
+    onto that same thread while it's blocked driving the new loop →
+    "You cannot submit onto CurrentThreadExecutor from its own thread".
+    A fresh thread carries no executor binding, so the hops fall through
+    to asgiref's global sync executor as intended.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        return ex.submit(asyncio.run, coro).result()
+
+
 def test_connection(**kwargs) -> RunResult:
-    """Sync facade for classic Django views (runs its own event loop)."""
-    return asyncio.run(test_connection_async(**kwargs))
+    """Sync facade for classic Django views."""
+    return run_sync(test_connection_async(**kwargs))
 
 
 async def run_agent_async(

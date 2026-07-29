@@ -19,7 +19,6 @@ pending and the ops UI offers re-run.
 """
 from __future__ import annotations
 
-import asyncio
 import datetime as dt
 import json
 import logging
@@ -199,7 +198,9 @@ def run_extraction(feed_id: int, attempt: int = 1) -> str:
         return f"feed {feed_id} is {feed.status} — not extracting"
 
     try:
-        run = asyncio.run(extract_async(feed))
+        # run_sync, not asyncio.run: safe under Django's async-only
+        # middleware bridge (same trap as the Settings test button).
+        run = sdk_runner.run_sync(extract_async(feed))
     except sdk_runner.SdkRunnerError as exc:
         # Not configured / daily cap: deterministic refusals — no retry.
         feed.error = f"extraction refused: {exc}"

@@ -36,8 +36,10 @@ class SettingSpec:
 REGISTRY: tuple[SettingSpec, ...] = (
     SettingSpec(
         "ANTHROPIC_API_KEY",
-        "Anthropic API key",
-        "Dedicated workspace-scoped key with a console spend limit (PLAN.md §9).",
+        "Anthropic credential",
+        "Either a workspace-scoped API key (sk-ant-api…, console spend "
+        "limit per PLAN.md §9) or a Claude subscription token from "
+        "`claude setup-token` (sk-ant-oat…) — detected automatically.",
         secret=True,
     ),
     SettingSpec(

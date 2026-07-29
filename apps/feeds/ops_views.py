@@ -18,7 +18,7 @@ from django.views.decorators.http import require_http_methods
 from apps.brainconfig.nav import ops_context
 
 from .models import Feed
-from .services import feeder, intake
+from .services import feeder, intake, validator
 
 SOURCE_KINDS = ("yt", "blog", "x", "newsletter", "repo", "doc", "thought")
 
@@ -86,6 +86,7 @@ def feed_detail(request, pk: int):
             messages.error(request, "Could not reach the worker queue — see the error on the feed.")
         return redirect(request.path)
     payload = feed.raw_payload or {}
+    validation = validator.validate_feed(feed) if feed.proposal else None
     return render(
         request,
         "ops/feed_detail.html",
@@ -97,6 +98,7 @@ def feed_detail(request, pk: int):
             "proposal_json": (
                 json.dumps(feed.proposal, indent=2, ensure_ascii=False) if feed.proposal else ""
             ),
+            "validation": validation,
             **ops_context(request),
         },
     )

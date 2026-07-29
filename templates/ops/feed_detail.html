@@ -41,6 +41,25 @@
     <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ content }}</pre>
   {% endif %}
 
+  {% if validation %}
+    <div class="mb-4 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
+      <h2 class="mb-2 font-medium">
+        Validation:
+        {% if validation.valid %}
+          <span class="rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">passes rules 1–8</span>
+        {% else %}
+          <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;">{{ validation.violations|length }} violation(s)</span>
+        {% endif %}
+      </h2>
+      {% for v in validation.violations %}
+        <div class="text-xs" style="color: #a33;">rule {{ v.rule }} · <span style="font-family: var(--font-mono);">{{ v.path }}</span> — {{ v.message }}</div>
+      {% endfor %}
+      {% for w in validation.warnings %}
+        <div class="text-xs" style="color: #8a6d1a;">warn — {{ w }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   {% if proposal_json %}
     <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Proposal (feeder output)</h2>
     <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ proposal_json }}</pre>

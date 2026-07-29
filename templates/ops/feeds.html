@@ -89,6 +89,11 @@
                     style="background: {% if feed.status == 'pending' %}#fff4d6{% elif feed.status == 'approved' or feed.status == 'edited' %}#e7f6f2{% elif feed.status == 'rejected' %}#eef0ff{% else %}#fdecec{% endif %};">
                 {{ feed.status }}
               </span>
+              {% if feed.proposal %}
+                <span class="ms-1 rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">extracted</span>
+              {% elif feed.error %}
+                <span class="ms-1 rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;" title="{{ feed.error }}">error</span>
+              {% endif %}
               {% if feed.raw_payload.fetch and not feed.raw_payload.fetch.ok %}
                 <span class="ms-1 rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;">fetch failed</span>
               {% endif %}

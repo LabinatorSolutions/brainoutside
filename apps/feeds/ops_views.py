@@ -18,7 +18,7 @@ from django.views.decorators.http import require_http_methods
 from apps.brainconfig.nav import ops_context
 
 from .models import Feed
-from .services import intake
+from .services import feeder, intake
 
 SOURCE_KINDS = ("yt", "blog", "x", "newsletter", "repo", "doc", "thought")
 
@@ -72,10 +72,19 @@ def queue(request):
 
 
 @staff_member_required(login_url="login")
+@require_http_methods(["GET", "POST"])
 def feed_detail(request, pk: int):
     feed = Feed.objects.filter(pk=pk).first()
     if feed is None:
         raise Http404
+    if request.method == "POST" and request.POST.get("action") == "extract":
+        if feed.status != "pending":
+            messages.error(request, f"Feed is {feed.status} — extraction runs on pending feeds only.")
+        elif feeder.enqueue_extraction(feed):
+            messages.success(request, "Extraction queued — the worker will fill the proposal.")
+        else:
+            messages.error(request, "Could not reach the worker queue — see the error on the feed.")
+        return redirect(request.path)
     payload = feed.raw_payload or {}
     return render(
         request,

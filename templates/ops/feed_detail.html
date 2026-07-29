@@ -44,7 +44,15 @@
   {% if proposal_json %}
     <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Proposal (feeder output)</h2>
     <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ proposal_json }}</pre>
-  {% else %}
-    <p class="text-sm" style="color: var(--muted);">No proposal yet — feeder extraction lands in M2.2.</p>
+    <p class="text-sm" style="color: var(--muted);">Diff view + approve/reject land in M2.4.</p>
+  {% elif feed.status == "pending" %}
+    <form method="post" class="flex items-center gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="extract" />
+      <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">
+        {% if feed.error %}Retry extraction{% else %}Run extraction{% endif %}
+      </button>
+      <span class="text-sm" style="color: var(--muted);">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
+    </form>
   {% endif %}
 {% endblock %}

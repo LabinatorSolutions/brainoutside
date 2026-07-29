@@ -70,6 +70,8 @@ class RunResult:
     usage: dict = field(default_factory=dict)
     error_class: str = ""
     operation_id: int | None = None
+    # Schema-validated object when the run used `output_format` (C9).
+    structured_output: object = None
 
 
 def today_cost_usd() -> float:
@@ -96,7 +98,7 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
     return api_key
 
 
-def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str):
+def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str, output_format=None):
     """ClaudeAgentOptions locked to one tier snapshot (§7 'the real config')."""
     from claude_agent_sdk import ClaudeAgentOptions
 
@@ -116,6 +118,7 @@ def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str):
         max_budget_usd=config.max_budget_usd(kind),
         env={"ANTHROPIC_API_KEY": api_key},
         include_partial_messages=False,
+        output_format=output_format,
     )
 
 
@@ -151,6 +154,7 @@ async def _drain(prompt: str, options) -> RunResult:
         cost_usd=result.total_cost_usd,
         usage=usage,
         error_class="" if not result.is_error else (result.subtype or "sdk_error"),
+        structured_output=result.structured_output,
     )
 
 
@@ -161,13 +165,28 @@ async def _run_ledgered(
     options,
     prompt_hash_input: str,
     timeout_s: int,
+    subject=None,
 ) -> RunResult:
     """Row-before-run wrapper: SdkOperation is created before the SDK is
-    touched and finalized in `finally`, whatever happens."""
-    op = await sync_to_async(SdkOperation.objects.create)(
-        kind=kind,
-        prompt_hash=hashlib.sha256(prompt_hash_input.encode()).hexdigest(),
-    )
+    touched and finalized in `finally`, whatever happens. `subject` (a
+    model instance, e.g. the Feed being extracted) fills the generic FK."""
+
+    def _create_op():
+        extra = {}
+        if subject is not None:
+            from django.contrib.contenttypes.models import ContentType
+
+            extra = {
+                "subject_type": ContentType.objects.get_for_model(subject),
+                "subject_id": str(subject.pk),
+            }
+        return SdkOperation.objects.create(
+            kind=kind,
+            prompt_hash=hashlib.sha256(prompt_hash_input.encode()).hexdigest(),
+            **extra,
+        )
+
+    op = await sync_to_async(_create_op)()
     run = RunResult(ok=False, text="", error_class="Unknown")
     try:
         run = await asyncio.wait_for(_drain(prompt, options), timeout=timeout_s)
@@ -251,14 +270,21 @@ async def run_agent_async(
     tier: str,
     prompt: str,
     append_system: str,
+    output_format: dict | None = None,
+    subject=None,
 ) -> RunResult:
-    """Generic tier-locked agent run — the M2/M3 entry point (skeleton).
+    """Generic tier-locked agent run — the M2/M3 entry point.
 
     `kind` is an SDK kind from brainconfig ("reader"/"feeder"); the ledger
-    row records the operational kind derived from it.
+    row records the operational kind derived from it. `output_format`
+    (Messages-API json_schema shape) makes the run return
+    `RunResult.structured_output` (grill C9); `subject` links the ledger
+    row to what triggered the run.
     """
     api_key = await sync_to_async(_check_gates)(exempt_daily_cap=False)
-    options = await sync_to_async(_snapshot_options)(tier, api_key, kind, append_system)
+    options = await sync_to_async(_snapshot_options)(
+        tier, api_key, kind, append_system, output_format
+    )
     ledger_kind = "assemble_context" if kind == "reader" else "feed_extraction"
     timeout_s = await sync_to_async(config.sdk_timeout_seconds)()
     return await _run_ledgered(
@@ -267,4 +293,5 @@ async def run_agent_async(
         options=options,
         prompt_hash_input=f"{kind}|{tier}|{append_system}|{prompt}",
         timeout_s=timeout_s,
+        subject=subject,
     )

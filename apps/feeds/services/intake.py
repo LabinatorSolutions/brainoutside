@@ -251,4 +251,10 @@ def propose(
         payload_bytes=feed.payload_bytes,
         fetch_ok=payload.get("fetch", {}).get("ok"),
     )
+    # Fire-and-forget: the M2.2 feeder agent fills feed.proposal on the
+    # worker. Enqueue failure is recorded on the row, never raised — the
+    # capture is already safe.
+    from apps.feeds.services import feeder
+
+    feeder.enqueue_extraction(feed)
     return feed

@@ -49,8 +49,13 @@ class Feed(models.Model):
     raw_payload = models.JSONField(default=dict)
     # The feeder agent's schema-valid extraction (M2.2). NULL until then.
     proposal = models.JSONField(null=True, blank=True)
+    # True once Hasan has edited the proposal — approval then lands as
+    # status "edited" instead of "approved" (M2.4).
+    proposal_edited = models.BooleanField(default=False)
     status = models.CharField(max_length=12, choices=STATUSES, default="pending", db_index=True)
     decided_at = models.DateTimeField(null=True, blank=True)
+    # Human note on the decision: the reject reason, or context on approve.
+    decision_note = models.TextField(blank=True, default="")
     # Commit that landed this feed in the brain repo (M2.5).
     commit_hash = models.CharField(max_length=64, blank=True, default="")
     # Locked-sequence push retries consumed (M2.5, grill C20).

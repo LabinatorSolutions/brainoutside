@@ -106,10 +106,11 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
     api_key = config.anthropic_api_key()
     if not api_key:
         raise NotConfigured("ANTHROPIC_API_KEY is not configured")
-    if not exempt_daily_cap and today_cost_usd() >= float(config.daily_cost_cap()):
+    cap = config.daily_cost_cap()  # None = breaker disabled (cap set to 0)
+    if not exempt_daily_cap and cap is not None and today_cost_usd() >= float(cap):
         raise DailyCapExceeded(
-            f"daily cost cap {config.daily_cost_cap()} USD reached — "
-            "raise DAILY_COST_CAP or wait for tomorrow"
+            f"daily cost cap {cap} USD reached — raise DAILY_COST_CAP, "
+            "set it to 0 to disable the breaker, or wait for tomorrow"
         )
     return api_key
 

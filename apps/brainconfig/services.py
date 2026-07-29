@@ -89,7 +89,10 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "DAILY_COST_CAP",
         "Daily cost cap (USD)",
         "Circuit breaker: SdkRunner refuses to start once today's summed "
-        "cost exceeds this (admin-exemptable, grill C16).",
+        "cost exceeds this (admin-exemptable, grill C16). Set 0 to "
+        "disable — reasonable on subscription auth, where cost figures "
+        "are synthetic CLI estimates, not billed spend. Clearing restores "
+        "the default.",
         default="10.00",
     ),
     SettingSpec(
@@ -166,11 +169,16 @@ def sdk_timeout_seconds() -> int:
         return 300
 
 
-def daily_cost_cap() -> Decimal:
+def daily_cost_cap() -> Decimal | None:
+    """The breaker threshold, or None when disabled (value ≤ 0).
+
+    Disabling is always explicit: an unparseable or CLEARED value falls
+    back to the safe default, never to "off"."""
     try:
-        return Decimal(get("DAILY_COST_CAP"))
+        cap = Decimal(get("DAILY_COST_CAP"))
     except InvalidOperation:
         return Decimal("10.00")
+    return None if cap <= 0 else cap
 
 
 def _kind(kind: str) -> str:

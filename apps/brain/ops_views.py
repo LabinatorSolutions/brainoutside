@@ -19,6 +19,7 @@ from django.utils import timezone
 
 from apps.brainconfig.nav import ops_context
 from apps.events.models import Event, SdkOperation
+from apps.feeds.models import Feed
 
 from .models import Entity, SyncRun
 from .services import gitrepo
@@ -103,7 +104,7 @@ def dashboard(request):
             "most_served": most_served,
             "spend_day": spend(day_ago),
             "spend_week": spend(week_ago),
-            "pending_feeds": 0,  # apps.feeds lands in M2
+            "pending_feeds": Feed.objects.filter(status="pending").count(),
             "recent_events": Event.objects.select_related("consumer")[:10],
             "recent_ops": SdkOperation.objects.all()[:5],
             **ops_context(request),

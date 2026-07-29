@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # HMAC secret for POST /webhooks/github. Empty = webhook disabled
     # (403 on every delivery) — never open.
     GITHUB_WEBHOOK_SECRET: SecretStr = SecretStr("")
+    # Cap on one feed proposal's content (pasted or fetched), in KB.
+    # Env-tunable because long video transcripts are a legit payload
+    # (grill A12). Pasted content over the cap is rejected; fetched
+    # content is truncated at the cap with a flag.
+    FEED_PAYLOAD_MAX_KB: int = 512
 
     # ----- Public-facing identifiers (rendered into /docs/guide/* pages) -----
     # These four feed `apps.docs.services.guides._resolve_placeholders` —

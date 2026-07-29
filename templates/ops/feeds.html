@@ -1,0 +1,109 @@
+{% extends "ops/_layout.html" %}
+
+{% block page_title_tag %}Feed queue{% endblock %}
+{% block page_title %}Feed queue{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    {{ pending_count }} pending · {{ total }} total — every write to the brain starts here and waits for approval.
+  </p>
+{% endblock %}
+
+{% block content %}
+  <details class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);" {% if total == 0 %}open{% endif %}>
+    <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Propose a feed</summary>
+    <form method="post" class="grid gap-3 border-t px-4 py-4" style="border-color: var(--line);">
+      {% csrf_token %}
+      <div class="flex flex-wrap gap-3">
+        <label class="text-sm">
+          <span class="block text-xs" style="color: var(--muted);">Source kind</span>
+          <select name="source_kind" class="mt-1 rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">
+            {% for k in source_kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="grow text-sm">
+          <span class="block text-xs" style="color: var(--muted);">Title</span>
+          <input type="text" name="title" maxlength="300" class="mt-1 w-full rounded-lg border px-2 py-1.5"
+                 style="border-color: var(--line); background: var(--surface-2);" />
+        </label>
+        <label class="text-sm">
+          <span class="block text-xs" style="color: var(--muted);">Source id (optional, kebab-case)</span>
+          <input type="text" name="source_id" maxlength="120" placeholder="derived when empty"
+                 class="mt-1 rounded-lg border px-2 py-1.5"
+                 style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);" />
+        </label>
+      </div>
+      <label class="text-sm">
+        <span class="block text-xs" style="color: var(--muted);">URL — fetched server-side when no content is pasted</span>
+        <input type="url" name="url" maxlength="2000" class="mt-1 w-full rounded-lg border px-2 py-1.5"
+               style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);" />
+      </label>
+      <label class="text-sm">
+        <span class="block text-xs" style="color: var(--muted);">Content — transcript / post body (cap {{ payload_max_kb }} KB); pasting skips the fetch</span>
+        <textarea name="content" rows="6" class="mt-1 w-full rounded-lg border px-2 py-1.5"
+                  style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);"></textarea>
+      </label>
+      <label class="text-sm">
+        <span class="block text-xs" style="color: var(--muted);">Notes for the feeder — what matters in this source</span>
+        <input type="text" name="notes" maxlength="2000" class="mt-1 w-full rounded-lg border px-2 py-1.5"
+               style="border-color: var(--line); background: var(--surface-2);" />
+      </label>
+      <div>
+        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">
+          Capture as pending
+        </button>
+      </div>
+    </form>
+  </details>
+
+  <form method="get" class="mb-4 flex items-end gap-3">
+    <label class="text-sm">
+      <span class="block text-xs" style="color: var(--muted);">Status</span>
+      <select name="status" onchange="this.form.submit()" class="mt-1 rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">
+        <option value="">all</option>
+        {% for s in statuses %}<option value="{{ s }}" {% if s == f_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </label>
+  </form>
+
+  <div class="overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+          <th class="px-4 py-3 font-medium">Source</th>
+          <th class="px-4 py-3 font-medium">Channel</th>
+          <th class="px-4 py-3 font-medium">Status</th>
+          <th class="px-4 py-3 font-medium">Payload</th>
+          <th class="px-4 py-3 font-medium">Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for feed in feeds %}
+          <tr class="border-b" style="border-color: var(--line);">
+            <td class="px-4 py-2.5">
+              <a href="{% url 'brainconfig:feed-detail' feed.pk %}" style="color: var(--accent, #6366f1); font-family: var(--font-mono);">{{ feed.source_id }}</a>
+              {% if feed.raw_payload.title %}<div class="text-xs" style="color: var(--muted);">{{ feed.raw_payload.title|truncatechars:80 }}</div>{% endif %}
+            </td>
+            <td class="px-4 py-2.5">{{ feed.channel }}</td>
+            <td class="px-4 py-2.5">
+              <span class="rounded-full px-2 py-0.5 text-xs"
+                    style="background: {% if feed.status == 'pending' %}#fff4d6{% elif feed.status == 'approved' or feed.status == 'edited' %}#e7f6f2{% elif feed.status == 'rejected' %}#eef0ff{% else %}#fdecec{% endif %};">
+                {{ feed.status }}
+              </span>
+              {% if feed.raw_payload.fetch and not feed.raw_payload.fetch.ok %}
+                <span class="ms-1 rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;">fetch failed</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">
+              {{ feed.payload_bytes|filesizeformat }}
+            </td>
+            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">
+              {{ feed.created_at|date:"Y-m-d H:i" }}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="px-4 py-6 text-center" style="color: var(--muted);">No feeds{% if f_status %} with status {{ f_status }}{% endif %}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

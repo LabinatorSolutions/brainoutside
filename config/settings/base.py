@@ -37,12 +37,13 @@ INSTALLED_APPS = [
     "apps.api_keys",
     "apps.mcp_proxy",
     "apps.docs",
-    # Brain apps (apps.feeds lands with M2)
+    # Brain apps
     "apps.brain",
     "apps.events",
     "apps.mind",
     "apps.brainconfig",
     "apps.reader",
+    "apps.feeds",
 ]
 
 MIDDLEWARE = [
@@ -208,6 +209,7 @@ BRAIN_VIEWS_DIR = (
     else BASE_DIR / "data" / "brain-views"
 )
 BRAIN_GIT_SSH_KEY_PATH = _env.BRAIN_GIT_SSH_KEY_PATH.strip()
+FEED_PAYLOAD_MAX_KB = _env.FEED_PAYLOAD_MAX_KB
 GITHUB_WEBHOOK_SECRET = _env.GITHUB_WEBHOOK_SECRET.get_secret_value().strip()
 
 # ----- Cache -------------------------------------------------------------------

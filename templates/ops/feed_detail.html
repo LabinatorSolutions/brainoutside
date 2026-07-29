@@ -1,0 +1,50 @@
+{% extends "ops/_layout.html" %}
+
+{% block page_title_tag %}Feed · {{ feed.source_id }}{% endblock %}
+{% block page_title %}<span style="font-family: var(--font-mono);">{{ feed.source_id }}</span>{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    {{ feed.status }} · via {{ feed.channel }} · {{ feed.created_at|date:"Y-m-d H:i" }}
+    {% if feed.consumer %} · key {{ feed.consumer }}{% endif %}
+  </p>
+{% endblock %}
+
+{% block content %}
+  <div class="mb-4"><a href="{% url 'brainconfig:feeds' %}" class="text-sm" style="color: var(--muted);">← back to queue</a></div>
+
+  <div class="mb-4 grid gap-3 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
+    <div><span style="color: var(--muted);">Kind:</span> {{ payload.source_kind }}</div>
+    {% if payload.title %}<div><span style="color: var(--muted);">Title:</span> {{ payload.title }}</div>{% endif %}
+    {% if payload.source_url %}
+      <div style="overflow-wrap: anywhere;"><span style="color: var(--muted);">URL:</span>
+        <span style="font-family: var(--font-mono);">{{ payload.source_url }}</span></div>
+    {% endif %}
+    {% if payload.notes %}<div><span style="color: var(--muted);">Notes:</span> {{ payload.notes }}</div>{% endif %}
+    {% if fetch %}
+      <div>
+        <span style="color: var(--muted);">Fetch:</span>
+        {% if fetch.ok %}
+          ok · HTTP {{ fetch.status }} · {{ fetch.content_type }} · {{ fetch.bytes|filesizeformat }}{% if fetch.truncated %} · <span style="color: #a33;">truncated at cap</span>{% endif %}
+        {% else %}
+          <span style="color: #a33;">failed — {{ fetch.error }}</span>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% if feed.error %}<div style="color: #a33;"><span style="color: var(--muted);">Error:</span> {{ feed.error }}</div>{% endif %}
+    {% if feed.commit_hash %}<div><span style="color: var(--muted);">Commit:</span> <span style="font-family: var(--font-mono);">{{ feed.commit_hash }}</span></div>{% endif %}
+  </div>
+
+  {% if content %}
+    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Captured content ({{ feed.payload_bytes|filesizeformat }})</h2>
+    {# Rendered as plain preformatted text on purpose: fed content is untrusted #}
+    {# input (grill C12d) — never render it as markdown/HTML in the ops UI. #}
+    <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ content }}</pre>
+  {% endif %}
+
+  {% if proposal_json %}
+    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Proposal (feeder output)</h2>
+    <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ proposal_json }}</pre>
+  {% else %}
+    <p class="text-sm" style="color: var(--muted);">No proposal yet — feeder extraction lands in M2.2.</p>
+  {% endif %}
+{% endblock %}

@@ -100,7 +100,7 @@
         {% endfor %}
       </table>
       <div class="mt-2 text-xs" style="color: var(--muted);">
-        pending feeds: {{ pending_feeds }} (write path lands in M2)
+        <a href="{% url 'brainconfig:feeds' %}" style="color: var(--accent, #6366f1);">pending feeds: {{ pending_feeds }}</a>
       </div>
     </div>
 

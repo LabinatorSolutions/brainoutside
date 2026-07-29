@@ -167,8 +167,23 @@ def _handle_action(request, feed: Feed) -> None:
         if not res.valid:
             messages.error(request, "Proposal fails validation — fix or reject; approve stays disabled.")
             return
-        # The locked commit+push approval handler lands in M2.5.
-        messages.info(request, "Validation passes — the approval handler (commit + push) lands in M2.5.")
+        # Atomic claim: double-clicks and racing tabs see 0 rows updated.
+        claimed = Feed.objects.filter(pk=feed.pk, status="pending").update(status="approving")
+        if not claimed:
+            messages.error(request, "Feed is already being applied.")
+            return
+        try:
+            from django_q.tasks import async_task
+
+            async_task("apps.feeds.services.approval.apply_feed", feed_id=feed.pk)
+        except Exception:
+            Feed.objects.filter(pk=feed.pk, status="approving").update(status="pending")
+            messages.error(request, "Could not reach the worker queue — approval not started.")
+            return
+        messages.success(
+            request,
+            f"Approved — the worker is committing feed: {feed.source_id}. Refresh for the result.",
+        )
 
     else:
         messages.error(request, "Unknown action.")

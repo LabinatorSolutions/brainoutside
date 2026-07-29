@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     # (grill A12). Pasted content over the cap is rejected; fetched
     # content is truncated at the cap with a flag.
     FEED_PAYLOAD_MAX_KB: int = 512
+    # WRITE credential for the M2.5 approval handler (grill C13: split
+    # credentials — the standing clone/sync path stays on the read-only
+    # deploy key). Set ONLY in the worker container: either the
+    # fine-grained PAT itself, or a path to a file holding it (compose
+    # secrets style; the path belongs on the SDK agents' deny list).
+    # Both empty → pushes go to `origin` with ambient credentials (dev).
+    BRAIN_GIT_WRITE_PAT: SecretStr = SecretStr("")
+    BRAIN_GIT_WRITE_PAT_PATH: str = ""
 
     # ----- Public-facing identifiers (rendered into /docs/guide/* pages) -----
     # These four feed `apps.docs.services.guides._resolve_placeholders` —

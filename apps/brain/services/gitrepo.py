@@ -113,6 +113,13 @@ def _git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
     return proc.stdout.strip()
 
 
+def run(*args: str, timeout: int = 300) -> str:
+    """Public git primitive against the clone, NO lock taken. `repo_lock()`
+    is not reentrant across instances, so multi-step sequences (the M2.5
+    approval handler) hold ONE lock and drive the steps through this."""
+    return _git(*args, cwd=repo_dir(), timeout=timeout)
+
+
 def is_valid_repo() -> bool:
     d = repo_dir()
     if not (d / ".git").is_dir():

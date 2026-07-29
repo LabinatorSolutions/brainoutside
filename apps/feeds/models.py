@@ -24,8 +24,12 @@ class Feed(models.Model):
 
     # pending covers the whole pre-decision life (including extraction —
     # the M2.2 worker fills `proposal` while status stays pending).
+    # `approving` is the transient claim between Hasan's click and the
+    # worker's commit+push — it makes double-approval impossible (the
+    # claim is an atomic pending→approving UPDATE).
     STATUSES = [
         ("pending", "pending"),
+        ("approving", "approving"),
         ("approved", "approved"),
         ("edited", "edited"),  # approved with human edits
         ("rejected", "rejected"),

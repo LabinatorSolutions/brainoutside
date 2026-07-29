@@ -210,6 +210,8 @@ BRAIN_VIEWS_DIR = (
 )
 BRAIN_GIT_SSH_KEY_PATH = _env.BRAIN_GIT_SSH_KEY_PATH.strip()
 FEED_PAYLOAD_MAX_KB = _env.FEED_PAYLOAD_MAX_KB
+BRAIN_GIT_WRITE_PAT = _env.BRAIN_GIT_WRITE_PAT
+BRAIN_GIT_WRITE_PAT_PATH = _env.BRAIN_GIT_WRITE_PAT_PATH.strip()
 GITHUB_WEBHOOK_SECRET = _env.GITHUB_WEBHOOK_SECRET.get_secret_value().strip()
 
 # ----- Cache -------------------------------------------------------------------

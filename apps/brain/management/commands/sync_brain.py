@@ -13,10 +13,16 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser) -> None:
         parser.add_argument("--trigger", default="manual", choices=["manual", "beat"])
+        parser.add_argument(
+            "--no-pull",
+            action="store_true",
+            help="Skip the git pull (credential-less local dev: the host "
+            "owns the pull; this reindexes + rebuilds snapshots only).",
+        )
 
     def handle(self, *args: object, **options: object) -> None:
         try:
-            run = sync.sync(trigger=str(options["trigger"]))
+            run = sync.sync(trigger=str(options["trigger"]), pull=not options["no_pull"])
         except (gitrepo.BrainRepoError, sync.SyncError) as exc:
             raise CommandError(str(exc)) from exc
         flag = " [DRIFT repaired]" if run.drift_detected else ""

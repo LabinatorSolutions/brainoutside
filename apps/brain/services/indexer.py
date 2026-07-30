@@ -268,31 +268,40 @@ def rebuild(trigger: str = "manual") -> SyncRun:
         run.commit_sha = gitrepo.head_sha()
         parsed = parse_repo()
         seen_paths = set()
+        existing = {o.path: o for o in Entity.objects.all()}
         added = changed = 0
         for e in parsed:
             seen_paths.add(e.path)
-            obj, created = Entity.objects.update_or_create(
-                path=e.path,
-                defaults=dict(
-                    entity_id=e.entity_id,
-                    kind=e.kind,
-                    title=e.title,
-                    description=e.description,
-                    status=e.status,
-                    superseded_by=e.superseded_by,
-                    visibility=e.visibility,
-                    topics=e.topics,
-                    projects=e.projects,
-                    source=e.source,
-                    source_url=e.source_url,
-                    date=e.date,
-                    last_verified=e.last_verified,
-                    content_hash=e.content_hash,
-                ),
+            values = dict(
+                entity_id=e.entity_id,
+                kind=e.kind,
+                title=e.title,
+                description=e.description,
+                status=e.status,
+                superseded_by=e.superseded_by,
+                visibility=e.visibility,
+                topics=e.topics,
+                projects=e.projects,
+                source=e.source,
+                source_url=e.source_url,
+                date=e.date,
+                last_verified=e.last_verified,
+                content_hash=e.content_hash,
             )
-            if created:
+            obj = existing.get(e.path)
+            if obj is None:
+                Entity.objects.create(path=e.path, **values)
                 added += 1
-            else:
+                continue
+            # Field-by-field, not content_hash: a parser change must still
+            # repair rows whose file bytes didn't move (drift self-repair
+            # rebuilds through here). Identical rows are skipped so `changed`
+            # counts real changes, not upserts.
+            dirty = [f for f, v in values.items() if getattr(obj, f) != v]
+            if dirty:
+                for f in dirty:
+                    setattr(obj, f, values[f])
+                obj.save(update_fields=dirty)
                 changed += 1
         removed, _ = Entity.objects.exclude(path__in=seen_paths).delete()
         run.added, run.changed, run.removed = added, changed, removed

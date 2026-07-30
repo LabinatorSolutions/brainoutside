@@ -22,3 +22,23 @@ class Command(BaseCommand):
                 f"brain repo {result['action']} at {result['dir']} (HEAD {result['head'][:12]})"
             )
         )
+
+        # A valid clone + an empty Entity index would come up as an
+        # "empty brain" (fresh DB, first boot) until someone manually
+        # reindexes — index it here instead. Non-empty index: the sync
+        # pipeline owns freshness, not bootstrap.
+        from apps.brain.models import Entity
+        from apps.brain.services import indexer, snapshots
+
+        if not Entity.objects.exists():
+            try:
+                run = indexer.rebuild(trigger="bootstrap")
+                snapshots.build_all()
+            except gitrepo.BrainRepoError as exc:
+                raise CommandError(str(exc)) from exc
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"first-run index: {run.added} entities at {run.commit_sha[:12]}, "
+                    "snapshots built"
+                )
+            )

@@ -31,8 +31,13 @@ def last_indexed_sha() -> str:
     return run.commit_sha if run else ""
 
 
-def sync(trigger: str = "manual") -> SyncRun:
-    """Full pipeline. Returns the SyncRun row (drift flag set when detected)."""
+def sync(trigger: str = "manual", *, pull: bool = True) -> SyncRun:
+    """Full pipeline. Returns the SyncRun row (drift flag set when detected).
+
+    pull=False skips the git pull for credential-less environments (the
+    local stack bind-mounts a host-owned clone: the host pulls, the
+    container only reindexes) — the contract check still runs.
+    """
     pre_head = gitrepo.head_sha() if gitrepo.is_valid_repo() else ""
     drift = False
     drift_reason = ""
@@ -46,7 +51,13 @@ def sync(trigger: str = "manual") -> SyncRun:
             drift_reason = "db state diverged from repo at same HEAD"
             log.warning("brain: DRIFT detected at %s — self-repairing", pre_head[:12])
 
-    pull = gitrepo.pull_rebase()
+    if pull:
+        pulled = gitrepo.pull_rebase()["changed"]
+    else:
+        if not gitrepo.is_valid_repo():
+            raise SyncError(f"No valid clone at {gitrepo.repo_dir()} — run bootstrap first.")
+        gitrepo.verify_contract()
+        pulled = "skipped"
     run = indexer.rebuild(trigger=trigger)
 
     # Post-check: the rebuilt DB must reproduce the repo exactly.
@@ -68,7 +79,7 @@ def sync(trigger: str = "manual") -> SyncRun:
         "sync",
         trigger=trigger,
         head=run.commit_sha,
-        pulled=pull["changed"],
+        pulled=pulled,
         added=run.added,
         changed=run.changed,
         removed=run.removed,

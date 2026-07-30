@@ -129,6 +129,12 @@ def graph_explorer(request):
 
 
 @staff_member_required(login_url="login")
+def timeline(request):
+    """M3.5.5 — growth by month + every supersede chain, over graph.json."""
+    return render(request, "ops/timeline.html", ops_context(request))
+
+
+@staff_member_required(login_url="login")
 def browser(request):
     qs = Entity.objects.all().order_by("kind", "entity_id")
     kind = request.GET.get("kind", "")

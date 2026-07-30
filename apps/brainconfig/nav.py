@@ -17,6 +17,7 @@ def ops_context(request) -> dict:
                     {"label": "Dashboard", "url": reverse("brainconfig:dashboard")},
                     {"label": "Brain browser", "url": reverse("brainconfig:browser")},
                     {"label": "Graph", "url": reverse("brainconfig:graph")},
+                    {"label": "Timeline", "url": reverse("brainconfig:timeline")},
                     {"label": "Feed queue", "url": reverse("brainconfig:feeds")},
                     {"label": "Chat", "url": reverse("brainconfig:chat")},
                     {"label": "Tasks", "url": reverse("brainconfig:tasks")},

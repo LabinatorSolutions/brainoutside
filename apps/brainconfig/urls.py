@@ -21,6 +21,7 @@ urlpatterns = [
     # activity overlay and timeline in M3.5.3-.5).
     path("graph.json", ops_views.graph_json, name="graph-json"),
     path("graph/", ops_views.graph_explorer, name="graph"),
+    path("timeline/", ops_views.timeline, name="timeline"),
     # Cursor over the read log — drives the live activity overlay.
     path("activity.json", events_ops.activity_json, name="activity-json"),
     path("brain/", ops_views.browser, name="browser"),

@@ -1,0 +1,100 @@
+/* ============================================================
+   M3.5.5 — belief timeline: growth bars + supersede chains.
+   ============================================================ */
+
+.tl-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.tl-bar {
+  cursor: default;
+}
+.tl-baseline {
+  stroke: rgba(26, 26, 46, 0.18);
+  stroke-width: 1;
+}
+.tl-cumulative {
+  fill: none;
+  stroke: rgba(99, 102, 241, 0.35);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.tl-month,
+.tl-value,
+.tl-axis,
+.tl-label {
+  font-family: var(--font-mono);
+  fill: var(--muted);
+}
+.tl-month {
+  font-size: 10px;
+  text-anchor: middle;
+}
+.tl-value {
+  font-size: 10px;
+  text-anchor: middle;
+  fill: var(--ink);
+}
+.tl-axis {
+  font-size: 10px;
+}
+.tl-axis-end {
+  text-anchor: end;
+}
+
+.tl-lane {
+  stroke: rgba(26, 26, 46, 0.08);
+  stroke-width: 1;
+}
+.tl-link {
+  stroke: #c0392b;
+  stroke-width: 1.4;
+  opacity: 0.7;
+}
+.tl-arrow-head {
+  fill: #c0392b;
+}
+.tl-dot {
+  cursor: pointer;
+}
+.tl-chain-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  fill: var(--ink);
+}
+
+.tl-empty {
+  padding: 18px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.tl-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tl-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.tl-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tl-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+}

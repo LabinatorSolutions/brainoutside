@@ -22,6 +22,7 @@ urlpatterns = [
     path("feeds/", feeds_ops.queue, name="feeds"),
     path("feeds/<int:pk>/", feeds_ops.feed_detail, name="feed-detail"),
     path("tasks/", events_ops.tasks, name="tasks"),
+    path("logs/", events_ops.logs, name="logs"),
     path("chat/", reader_ops.chat_home, name="chat"),
     path("chat/<int:pk>/", reader_ops.chat_session, name="chat-session"),
     path("chat/<int:pk>/send", reader_ops.chat_send, name="chat-send"),

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     # Both empty → pushes go to `origin` with ambient credentials (dev).
     BRAIN_GIT_WRITE_PAT: SecretStr = SecretStr("")
     BRAIN_GIT_WRITE_PAT_PATH: str = ""
+    # Identity on the `feed:` commits the approval handler makes. Generic
+    # defaults — each deployment sets its own (OPEN-SOURCE.md 5.1).
+    BRAIN_COMMIT_NAME: str = "brain-app"
+    BRAIN_COMMIT_EMAIL: str = "brain-app@localhost"
 
     # ----- Public-facing identifiers (rendered into /docs/guide/* pages) -----
     # These four feed `apps.docs.services.guides._resolve_placeholders` —

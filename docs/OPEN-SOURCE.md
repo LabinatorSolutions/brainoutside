@@ -12,8 +12,9 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 
 ## De-Hasanify (5.1) — continuous
 
-- [ ] Commit identity `brain-app <brain@learnwithhasan.com>` → AppSetting
-      (default `brain-app <brain@localhost>` or derived from repo owner).
+- [x] Commit identity → env settings `BRAIN_COMMIT_NAME`/`BRAIN_COMMIT_EMAIL`
+      (generic default `brain-app <brain-app@localhost>`; Hasan's value
+      lives in his .env).
 - [ ] Theme: `lwh`/learnwithhasan naming → neutral token names (the
       palette itself can stay — it's just a default theme).
 - [ ] Audit for hardcoded personal values: `learnwithhasan`,

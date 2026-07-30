@@ -212,6 +212,8 @@ BRAIN_GIT_SSH_KEY_PATH = _env.BRAIN_GIT_SSH_KEY_PATH.strip()
 FEED_PAYLOAD_MAX_KB = _env.FEED_PAYLOAD_MAX_KB
 BRAIN_GIT_WRITE_PAT = _env.BRAIN_GIT_WRITE_PAT
 BRAIN_GIT_WRITE_PAT_PATH = _env.BRAIN_GIT_WRITE_PAT_PATH.strip()
+BRAIN_COMMIT_NAME = _env.BRAIN_COMMIT_NAME.strip() or "brain-app"
+BRAIN_COMMIT_EMAIL = _env.BRAIN_COMMIT_EMAIL.strip() or "brain-app@localhost"
 GITHUB_WEBHOOK_SECRET = _env.GITHUB_WEBHOOK_SECRET.get_secret_value().strip()
 
 # ----- Cache -------------------------------------------------------------------

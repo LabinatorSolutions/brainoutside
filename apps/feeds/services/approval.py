@@ -30,8 +30,8 @@ from apps.feeds.services import validator
 log = logging.getLogger(__name__)
 
 MAX_PUSH_ATTEMPTS = 3
-COMMIT_NAME = "brain-app"
-COMMIT_EMAIL = "brain@learnwithhasan.com"
+# Commit identity comes from settings (BRAIN_COMMIT_NAME/EMAIL) — engine
+# code carries no personal defaults (OPEN-SOURCE.md 5.1).
 
 # INDEX.md section per path prefix, for appending brand-new entity lines.
 _INDEX_SECTIONS = (
@@ -253,6 +253,7 @@ def apply_feed(feed_id: int) -> str:
                 gitrepo.run("clean", "-fd")
                 try:
                     ctx = validator.context_from_repo()
+                    ctx.source_kind = str((feed.raw_payload or {}).get("source_kind") or "")
                     _apply_files(repo, proposal)
                     _apply_index_lines(repo, proposal)
                     _apply_supersedes(repo, proposal, ctx.entities)
@@ -265,8 +266,8 @@ def apply_feed(feed_id: int) -> str:
                         )
                     gitrepo.run("add", "-A")
                     gitrepo.run(
-                        "-c", f"user.name={COMMIT_NAME}",
-                        "-c", f"user.email={COMMIT_EMAIL}",
+                        "-c", f"user.name={dj_settings.BRAIN_COMMIT_NAME}",
+                        "-c", f"user.email={dj_settings.BRAIN_COMMIT_EMAIL}",
                         "commit",
                         "-m", f"feed: {feed.source_id}",
                         "-m", f"Feed-Id: {feed.pk}\nChannel: {feed.channel}",

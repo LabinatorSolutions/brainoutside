@@ -66,6 +66,9 @@ class ValidationContext:
     entities: dict[str, dict] = field(default_factory=dict)
     # Full text of every `visibility: private` entity (rule 8).
     private_texts: list[str] = field(default_factory=list)
+    # The feed's source kind — rule 2 allows a null source_url for
+    # "thought" (contract §5 rule 2 amendment, 2026-07-30).
+    source_kind: str = ""
 
 
 # ---- context builder (the only impure part, kept at the edge) ------------
@@ -257,7 +260,9 @@ def _validate_note(path, content, allowed_topics, res, proposed_note_ids, ctx):
     # -- rule 2: provenance is mandatory --
     if not str(fm.get("source") or "").strip():
         res.violations.append(Violation(2, path, "source missing — no note without provenance"))
-    if not str(fm.get("source_url") or "").strip():
+    if not str(fm.get("source_url") or "").strip() and ctx.source_kind != "thought":
+        # Direct thoughts have no URL: `source` (the feed id / raw
+        # archive) IS the provenance (contract §5 rule 2, 2026-07-30).
         res.violations.append(Violation(2, path, "source_url missing — no note without provenance"))
 
     # -- rule 3: topics ⊆ taxonomy --
@@ -335,4 +340,6 @@ def validate_feed(feed) -> ValidationResult:
         res = ValidationResult()
         res.warnings.append("no proposal to validate yet")
         return res
-    return validate(feed.proposal, context_from_repo())
+    ctx = context_from_repo()
+    ctx.source_kind = str((feed.raw_payload or {}).get("source_kind") or "")
+    return validate(feed.proposal, ctx)

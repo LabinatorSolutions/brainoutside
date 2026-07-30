@@ -16,5 +16,6 @@
   <div class="rings mt-2"
        data-rings
        data-graph-url="{% url 'brainconfig:graph-json' %}"
+       data-activity-url="{% url 'brainconfig:activity-json' %}"
        {% if rings_days %}data-days="{{ rings_days }}"{% endif %}></div>
 </div>

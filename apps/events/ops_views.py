@@ -16,6 +16,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -72,6 +73,46 @@ def tasks(request):
             **ops_context(request),
         },
     )
+
+
+ACTIVITY_LIMIT = 100
+
+
+@staff_member_required(login_url="login")
+def activity_json(request):
+    """M3.5.4 — the tail of the read log, for the live overlay.
+
+    A cursor, not a window: `?after=<id>` returns only what has happened
+    since, so a visual can poll cheaply and never replay. Called without
+    a cursor it returns no events and just hands back the current
+    `last_id`, so a page that loads doesn't fire a burst of pulses for
+    reads that happened yesterday.
+
+    Polling, not SSE: an ops page that idles all day shouldn't hold a
+    streaming connection open, and a missed poll costs nothing — the
+    cursor picks up every event on the next tick.
+    """
+    try:
+        after = int(request.GET.get("after") or 0)
+    except ValueError:
+        after = 0
+
+    latest = Event.objects.filter(type="read").order_by("-id").values_list("id", flat=True).first()
+    events = []
+    if after:
+        rows = Event.objects.filter(type="read", id__gt=after).select_related("consumer").order_by("id")
+        events = [
+            {
+                "id": e.id,
+                "at": e.created_at.isoformat(timespec="seconds"),
+                "entity_ids": e.entity_ids or [],
+                "endpoint": (e.details or {}).get("endpoint", ""),
+                "tier": (e.details or {}).get("tier", ""),
+                "consumer": str(e.consumer) if e.consumer else "ops",
+            }
+            for e in rows[:ACTIVITY_LIMIT]
+        ]
+    return JsonResponse({"last_id": events[-1]["id"] if events else (latest or 0), "events": events})
 
 
 DAY_CHOICES = (1, 7, 30, 90)

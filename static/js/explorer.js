@@ -130,7 +130,18 @@
       }
     },
     { selector: ".dim", style: { opacity: 0.07 } },
-    { selector: ".pick", style: { "border-width": 3, "border-color": "#4f46e5", opacity: 1 } }
+    { selector: ".pick", style: { "border-width": 3, "border-color": "#4f46e5", opacity: 1 } },
+    // After .dim on purpose: a note being served right now is worth
+    // seeing even when the current lens has it dimmed out.
+    {
+      selector: ".pulse",
+      style: {
+        opacity: 1,
+        "border-width": 10,
+        "border-color": "#4f46e5",
+        "border-opacity": 0.45
+      }
+    }
   ];
 
   function mount(root) {
@@ -142,6 +153,7 @@
     var status = root.querySelector("[data-graph-status]");
     var resetBtn = root.querySelector("[data-graph-reset]");
     var legend = root.querySelector("[data-graph-legend]");
+    var ticker = root.querySelector("[data-graph-ticker]");
 
     fetch(url, { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(function (r) {
@@ -304,14 +316,31 @@
         tip.classList.add("is-on");
       }
 
-      /* A live handle on the drawn graph: the activity overlay (3.5.4)
-         needs to pulse nodes on incoming read events without redrawing,
-         and it makes the lens highlight inspectable from the console. */
+      /* M3.5.4 — nodes pulse as the brain is read. The ticker beside it
+         keeps the overlay legible when a read lands off-screen or on an
+         id with no node ("INDEX", a raw/ path). */
+      var pulses = [];
+      document.addEventListener("brain:reads", function (evt) {
+        evt.detail.events.forEach(function (read) {
+          (read.entity_ids || []).forEach(function (id) {
+            var n = cy.getElementById(id);
+            if (n.nonempty()) {
+              pulses.push(id);
+              n.flashClass("pulse", 1100);
+            }
+          });
+          addTick(ticker, read);
+        });
+      });
+
+      /* A live handle on the drawn graph: it makes the lens highlight
+         and the activity overlay inspectable from the console. */
       window.brainExplorer = {
         cy: cy,
         data: data,
         applyLens: applyLens,
         clear: clearHighlight,
+        pulses: pulses,
         highlighted: function () {
           return cy
             .nodes()
@@ -346,6 +375,18 @@
       n.position({ x: box.x2 + 110, y: top + i * 34 });
     });
     cy.fit(undefined, 22);
+  }
+
+  function addTick(host, read) {
+    if (!host) return;
+    var line = document.createElement("div");
+    line.className = "gx-tick";
+    var n = (read.entity_ids || []).length;
+    line.textContent =
+      read.at.slice(11, 19) + "  " + (read.endpoint || "read") + " · " + read.tier +
+      " · " + n + (n === 1 ? " note" : " notes") + " · " + read.consumer;
+    host.insertBefore(line, host.firstChild);
+    while (host.children.length > 8) host.removeChild(host.lastChild);
   }
 
   function buildLegend(host, data) {

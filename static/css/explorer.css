@@ -99,6 +99,36 @@
   font-size: 12px;
   color: var(--muted);
 }
+/* M3.5.4 — live read ticker */
+.gx-ticker {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.gx-ticker-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.gx-live {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--signal, #4db8a8);
+  animation: gx-blink 2.4s ease-in-out infinite;
+}
+@keyframes gx-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.gx-tick {
+  padding-top: 2px;
+  overflow-wrap: anywhere;
+}
+
 .gx-key-item {
   display: inline-flex;
   align-items: center;

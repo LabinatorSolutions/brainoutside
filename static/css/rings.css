@@ -71,6 +71,28 @@
   fill: var(--ink);
 }
 
+/* M3.5.4 — a halo that expands and fades when the note behind it is
+   served. `transform-box: fill-box` makes the scale happen around the
+   dot rather than the SVG origin. */
+.rings-ping {
+  fill: none;
+  stroke-width: 2;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rings-ping 1100ms ease-out forwards;
+}
+@keyframes rings-ping {
+  from {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  to {
+    transform: scale(4.5);
+    opacity: 0;
+  }
+}
+
 .rings-tip {
   position: absolute;
   z-index: 20;

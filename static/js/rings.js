@@ -191,6 +191,46 @@
     root.appendChild(figure);
     root.appendChild(tip);
     root.appendChild(legend(entities, data));
+    watchActivity(root, figure);
+  }
+
+  /* M3.5.4 — a served note pings its dot. The rings then show not just
+     what the brain holds but what it is actually being asked for. */
+  function watchActivity(root, figure) {
+    root.pulses = [];
+    document.addEventListener("brain:reads", function (evt) {
+      evt.detail.events.forEach(function (read) {
+        (read.entity_ids || []).forEach(function (id) {
+          var dot = findDot(figure, id);
+          if (!dot) return; // "INDEX", a raw/ path — nothing to light up
+          root.pulses.push(id);
+          ping(figure, dot);
+        });
+      });
+    });
+  }
+
+  function findDot(figure, id) {
+    var dots = figure.querySelectorAll("circle.rings-dot");
+    for (var i = 0; i < dots.length; i++) {
+      var t = dots[i].querySelector("title");
+      if (t && t.textContent.indexOf(id + " (") === 0) return dots[i];
+    }
+    return null;
+  }
+
+  function ping(figure, dot) {
+    var halo = svg("circle", {
+      "class": "rings-ping",
+      cx: dot.getAttribute("cx"),
+      cy: dot.getAttribute("cy"),
+      r: dot.getAttribute("r"),
+      stroke: dot.getAttribute("stroke")
+    });
+    figure.appendChild(halo);
+    setTimeout(function () {
+      if (halo.parentNode) halo.parentNode.removeChild(halo);
+    }, 1200);
   }
 
   function showTip(tip, root, node, event) {

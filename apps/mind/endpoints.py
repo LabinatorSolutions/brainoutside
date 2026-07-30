@@ -8,7 +8,8 @@ Every endpoint (REST + MCP, one class each — the vendored registry):
    (existence is never revealed downward),
 4. emits a `read` Event with the entity ids served.
 
-The smart layer (`assemble-context`) arrives in M3.
+`assemble-context` (M3.2) is the smart layer: same tier resolution and
+snapshot boundary, but a reader agent selects and assembles the context.
 """
 from __future__ import annotations
 
@@ -268,3 +269,67 @@ class GetRaw(Endpoint):
             raise ValueError(f"unknown path: {inp.path}") from None
         emit("read", consumer=_cred(ctx), entity_ids=[inp.path], endpoint="get-raw", tier=tier)
         return self.Output(tier=tier, path=inp.path, content=content)
+
+
+@endpoint(
+    slug="assemble-context",
+    description=(
+        "Smart reader: a Claude agent assembles a task-shaped context pack "
+        "from the mind at your tier — identity, the right notes, VERBATIM "
+        "quotes preserved. Returns the pack, exact entity ids used, gaps, "
+        "and token counts. Honest latency: 5-30 s per call; never retried "
+        "automatically."
+    ),
+)
+class AssembleContext(Endpoint):
+    class Input(BaseModel):
+        task: str = Field(
+            min_length=1,
+            max_length=8000,
+            description="What the consumer is about to do — the reader selects context for THIS, not a search query.",
+        )
+        lens: str = Field("", max_length=100, description="Optional lens name, e.g. 'self-hosting'.")
+
+    class Output(BaseModel):
+        tier: str
+        context_pack: str
+        entity_ids_used: list[str]
+        gaps: list[str]
+        tokens: dict
+        model: str
+        duration_ms: int | None
+
+    async def run(self, inp: Input, ctx: Ctx) -> Output:
+        from apps.reader.services import reader, sdk_runner
+
+        tier = await sync_to_async(_tier, thread_sensitive=True)(ctx)
+        try:
+            result = await reader.assemble_context(
+                task=inp.task, lens=inp.lens, tier=tier, subject=_cred(ctx)
+            )
+        except reader.ReaderError as exc:
+            raise ValueError(str(exc)) from exc
+        except sdk_runner.SdkRunnerError as exc:
+            raise ValueError(f"reader unavailable: {exc}") from exc
+        except reader.ReaderFailed as exc:
+            raise ValueError(
+                f"reader run failed ({exc}) — degraded mode, not retried automatically; try again"
+            ) from exc
+        await sync_to_async(emit, thread_sensitive=True)(
+            "read",
+            consumer=_cred(ctx),
+            entity_ids=result["entity_ids_used"],
+            endpoint="assemble-context",
+            tier=tier,
+            lens=inp.lens or "",
+            operation_id=result["operation_id"],
+        )
+        return self.Output(
+            tier=tier,
+            context_pack=result["context_pack"],
+            entity_ids_used=result["entity_ids_used"],
+            gaps=result["gaps"],
+            tokens=result["tokens"],
+            model=result["model"],
+            duration_ms=result["duration_ms"],
+        )

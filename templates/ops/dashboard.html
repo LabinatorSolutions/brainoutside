@@ -1,9 +1,15 @@
 {% extends "ops/_layout.html" %}
+{% load static %}
 
 {% block page_title_tag %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block page_subtitle %}
   <p class="mt-1 text-sm" style="color: var(--muted);">The brain server at a glance.</p>
+{% endblock %}
+
+{% block head_extra %}
+  <link rel="stylesheet" href="{% static 'css/rings.css' %}" />
+  <script defer src="{% static 'js/rings.js' %}" nonce="{{ csp_nonce }}"></script>
 {% endblock %}
 
 {% block content %}
@@ -47,6 +53,11 @@
         ${{ spend_week.cost|floatformat:2 }} / week
       </div>
     </div>
+  </div>
+
+  {# --- the brain, drawn (M3.5.2) --------------------------------------- #}
+  <div class="mt-6">
+    {% include "ops/_rings.html" %}
   </div>
 
   <div class="mt-6 grid gap-6 lg:grid-cols-2">

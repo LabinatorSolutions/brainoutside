@@ -1,0 +1,143 @@
+/* ============================================================
+   M3.5.2 — visibility rings. Concentric tiers (private core →
+   agents-only → public rim), one dot per entity, coloured by kind
+   and sized by how often it was actually served.
+
+   Styles live in a file, not in `style=` attributes: the prod CSP
+   ships `style-src 'self' 'nonce-…'` with no 'unsafe-inline'.
+   ============================================================ */
+
+.rings {
+  position: relative;
+  width: 100%;
+}
+
+.rings-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 640px;
+  margin: 0 auto;
+  overflow: visible;
+}
+
+.rings-dot {
+  cursor: pointer;
+  transition: opacity 0.12s ease;
+}
+.rings-dot:hover {
+  opacity: 1 !important;
+}
+
+/* Everything dims while one dot is hovered, so the hovered entity and
+   its ring read instantly even at 40+ dots. */
+.rings-figure.is-focused .rings-dot {
+  opacity: 0.25;
+}
+
+/* Zones are drawn outermost-first and stack, so each step inward is
+   visibly deeper — public teal, agents-only indigo, private ink. The
+   tiers are what the server enforces; the picture should say so. */
+.rings-band-public {
+  fill: rgba(77, 184, 168, 0.07);
+  stroke: rgba(77, 184, 168, 0.28);
+  stroke-width: 1;
+}
+.rings-band-agents-only {
+  fill: rgba(99, 102, 241, 0.07);
+  stroke: rgba(99, 102, 241, 0.22);
+  stroke-width: 1;
+}
+.rings-band-private {
+  fill: rgba(26, 26, 46, 0.07);
+  stroke: rgba(26, 26, 46, 0.18);
+  stroke-width: 1;
+}
+.rings-guide {
+  fill: none;
+  stroke: rgba(26, 26, 46, 0.14);
+  stroke-width: 1;
+  stroke-dasharray: 2 6;
+}
+.rings-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  fill: var(--muted);
+  text-anchor: middle;
+  dominant-baseline: middle;
+  letter-spacing: 0.02em;
+}
+.rings-label-count {
+  fill: var(--ink);
+}
+
+.rings-tip {
+  position: absolute;
+  z-index: 20;
+  min-width: 180px;
+  max-width: 300px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+}
+.rings-tip.is-on {
+  opacity: 1;
+}
+.rings-tip-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+.rings-tip-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.rings-tip-meta {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.rings-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rings-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rings-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  display: inline-block;
+}
+.rings-legend-n {
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.rings-note {
+  font-size: 11px;
+  color: var(--muted);
+}
+.rings-status {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}

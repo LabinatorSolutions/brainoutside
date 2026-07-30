@@ -11,6 +11,11 @@ python-dotenv>=1.0
 fastmcp>=2.0
 httpx>=0.27
 redis>=5.0
+# config/cache.py selects django_redis.cache.RedisCache whenever the
+# boot-time PING succeeds — without this package that path raises
+# InvalidCacheBackendError at startup. Only the LocMem fallback (no
+# reachable Redis) hid it.
+django-redis>=5.4
 django-q2>=1.7
 croniter>=2.0
 whitenoise>=6.7

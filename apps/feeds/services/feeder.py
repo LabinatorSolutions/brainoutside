@@ -28,6 +28,7 @@ from django.utils import timezone
 from apps.brain.services import gitrepo
 from apps.events.models import emit
 from apps.feeds.models import Feed
+from apps.feeds.services import validator
 from apps.reader.services import sdk_runner
 
 log = logging.getLogger(__name__)
@@ -100,6 +101,47 @@ class ExtractionError(RuntimeError):
     """Composition failed before the SDK was touched (missing contract files)."""
 
 
+def normalize_index_lines(proposal: dict) -> dict:
+    """Recompose each INDEX line's mechanical tokens from the proposed
+    file's own frontmatter. The model authors the editorial head
+    (`- [kind] title — hook`); trusted code owns everything rule 7
+    checks (status / visibility / trailing path). Necessary, not just
+    nice: the feeder agent can only ever read the snapshot's GENERATED
+    index, whose display dialect omits `status: current` and all
+    `visibility:` tokens — a model-composed tail is structurally
+    unreliable no matter how good the prompt is (M2.6 finding).
+    Unknown middle tokens (e.g. `last-verified:`) pass through.
+    """
+    by_id: dict[str, tuple[str, dict]] = {}
+    for f in proposal.get("files") or []:
+        fm, _ = validator._split_frontmatter(str(f.get("content", "")))
+        if fm:
+            by_id[str(fm.get("id") or "")] = (str(f.get("path", "")), fm)
+
+    for entry in proposal.get("index_lines") or []:
+        found = by_id.get(str(entry.get("entity_id") or ""))
+        if found is None:
+            continue  # no proposed file to trust — the validator judges it
+        path, fm = found
+        segments = [s.strip() for s in str(entry.get("line", "")).split("|")]
+        head = segments[0] if segments and segments[0] else f"- {path}"
+        kept = [
+            s
+            for s in segments[1:]
+            if s and s != path and not s.startswith(("status:", "visibility:"))
+        ]
+        parts = [head]
+        if path.startswith("knowledge/"):
+            parts.append(f"status: {fm.get('status') or 'current'}")
+        parts.extend(kept)
+        vis = str(fm.get("visibility") or "agents-only")
+        if vis != "public":
+            parts.append(f"visibility: {vis}")
+        parts.append(path)
+        entry["line"] = " | ".join(parts)
+    return proposal
+
+
 def _strip_frontmatter(text: str) -> str:
     if text.startswith("---\n"):
         end = text.find("\n---\n", 4)
@@ -129,7 +171,16 @@ def compose_system_append() -> str:
             "Your entire response is one proposal object matching the JSON "
             "schema enforced by the harness. Empty arrays are valid — a thin "
             "or contract-violating source yields files=[] plus an "
-            "explanatory entry in issues.",
+            "explanatory entry in issues.\n\n"
+            "INDEX line format — the TRACKED repo INDEX.md, not the "
+            "generated index you can read in your snapshot (different "
+            "display dialect):\n"
+            "`- [<kind>] <title — hook> | status: <status> | "
+            "visibility: <visibility> | <path>`\n"
+            "knowledge notes always carry `status:`; non-public entities "
+            "always carry `visibility:`; the line always ends with the "
+            "repo-relative path. (Trusted code re-derives these tokens "
+            "from your frontmatter either way — focus on the head.)",
         ]
     )
 
@@ -214,7 +265,7 @@ def run_extraction(feed_id: int, attempt: int = 1) -> str:
 
     feed.sdk_operation_id = run.operation_id
     if run.ok and isinstance(run.structured_output, dict):
-        feed.proposal = run.structured_output
+        feed.proposal = normalize_index_lines(run.structured_output)
         feed.error = ""
         feed.save(update_fields=["sdk_operation_id", "proposal", "error"])
         emit(

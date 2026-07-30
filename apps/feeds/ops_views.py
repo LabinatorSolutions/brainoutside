@@ -137,6 +137,9 @@ def _handle_action(request, feed: Feed) -> None:
             proposal["summary"] = summary.strip()
         proposal["files"] = files
         proposal["index_lines"] = lines
+        # Same trusted-code pass as extraction: mechanical INDEX tokens
+        # follow the (possibly just-edited) frontmatter automatically.
+        proposal = feeder.normalize_index_lines(proposal)
         if proposal != feed.proposal:
             feed.proposal = proposal
             feed.proposal_edited = True

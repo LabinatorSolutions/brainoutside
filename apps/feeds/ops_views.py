@@ -122,7 +122,9 @@ def _handle_action(request, feed: Feed) -> None:
         return
 
     if action == "extract":
-        if feeder.enqueue_extraction(feed):
+        if feed.extraction_in_flight:
+            messages.info(request, "Extraction is already running — see Tasks for progress.")
+        elif feeder.enqueue_extraction(feed):
             messages.success(request, "Extraction queued — the worker will fill the proposal.")
         else:
             messages.error(request, "Could not reach the worker queue — see the error on the feed.")

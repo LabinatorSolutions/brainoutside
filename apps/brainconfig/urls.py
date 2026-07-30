@@ -7,6 +7,7 @@ so the whole ops surface shares one prefix and one nav.
 from django.urls import path
 
 from apps.brain import ops_views
+from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
 
 from . import views
@@ -19,5 +20,6 @@ urlpatterns = [
     path("brain/<str:entity_id>/", ops_views.entity_detail, name="entity"),
     path("feeds/", feeds_ops.queue, name="feeds"),
     path("feeds/<int:pk>/", feeds_ops.feed_detail, name="feed-detail"),
+    path("tasks/", events_ops.tasks, name="tasks"),
     path("settings/", views.settings_page, name="settings"),
 ]

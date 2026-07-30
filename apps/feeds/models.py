@@ -12,7 +12,9 @@ policy (PLAN.md §10).
 """
 from __future__ import annotations
 
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Feed(models.Model):
@@ -69,6 +71,11 @@ class Feed(models.Model):
     sdk_operation = models.ForeignKey(
         "events.SdkOperation", null=True, blank=True, on_delete=models.SET_NULL, related_name="feeds"
     )
+    # Set when an extraction is enqueued, cleared on every terminal
+    # outcome (proposal stored / refused / composition failure / final
+    # retry). Powers the in-flight button guard and the Tasks page —
+    # a second Extract click while set is a double SDK spend.
+    extract_queued_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -80,3 +87,12 @@ class Feed(models.Model):
     @property
     def payload_bytes(self) -> int:
         return len((self.raw_payload.get("content") or "").encode("utf-8"))
+
+    @property
+    def extraction_in_flight(self) -> bool:
+        """Queued or running, with a staleness horizon (all retry attempts
+        + backoffs) so a dead worker can't wedge the Extract button forever."""
+        if not self.extract_queued_at:
+            return False
+        horizon = int(settings.Q_CLUSTER["timeout"]) * 3 + 15 * 60
+        return (timezone.now() - self.extract_queued_at).total_seconds() < horizon

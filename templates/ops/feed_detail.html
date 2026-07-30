@@ -35,6 +35,13 @@
     {% if feed.commit_hash %}<div><span style="color: var(--muted);">Commit:</span> <span style="font-family: var(--font-mono);">{{ feed.commit_hash }}</span></div>{% endif %}
   </div>
 
+  {% if feed.status == "approving" %}
+    <div class="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
+      <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
+      Approval running — the worker is applying, committing, and pushing this feed. This page refreshes itself.
+    </div>
+  {% endif %}
+
   {% if content %}
     <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Captured content ({{ feed.payload_bytes|filesizeformat }})</h2>
     {# Rendered as plain preformatted text on purpose: fed content is untrusted #}
@@ -158,10 +165,27 @@
     <form method="post" class="flex items-center gap-3">
       {% csrf_token %}
       <input type="hidden" name="action" value="extract" />
-      <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">
-        {% if feed.error %}Retry extraction{% else %}Run extraction{% endif %}
-      </button>
-      <span class="text-sm" style="color: var(--muted);">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
+      {% if feed.extraction_in_flight %}
+        <button type="submit" disabled title="Extraction is running"
+                class="rounded-lg px-4 py-2 text-sm font-medium text-white opacity-40"
+                style="background: var(--accent, #6366f1); cursor: not-allowed;">
+          Extracting…
+        </button>
+        <span class="text-sm" style="color: var(--muted);">
+          The feeder agent is running (queued {{ feed.extract_queued_at|date:"H:i:s" }}) —
+          this page refreshes itself until the proposal lands. Progress:
+          <a href="{% url 'brainconfig:tasks' %}" style="color: var(--accent, #6366f1);">Tasks</a>.
+        </span>
+      {% else %}
+        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">
+          {% if feed.error %}Retry extraction{% else %}Run extraction{% endif %}
+        </button>
+        <span class="text-sm" style="color: var(--muted);">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
+      {% endif %}
     </form>
+  {% endif %}
+
+  {% if feed.extraction_in_flight or feed.status == "approving" %}
+    <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
   {% endif %}
 {% endblock %}

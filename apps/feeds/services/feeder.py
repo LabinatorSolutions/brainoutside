@@ -222,11 +222,19 @@ async def extract_async(feed: Feed) -> sdk_runner.RunResult:
 def enqueue_extraction(feed: Feed) -> bool:
     """Fire-and-forget hand-off to the Q2 worker. Returns False (and
     records the problem on the Feed) when the broker is unreachable —
-    the capture is already safe in the DB either way."""
+    the capture is already safe in the DB either way.
+
+    Idempotent while a run is in flight: a second call is a no-op, not a
+    second SDK spend (callers show their own "already running" notice)."""
+    if feed.extraction_in_flight:
+        log.info("feed %s: extraction already in flight — not re-enqueueing", feed.pk)
+        return True
     try:
+        from django.utils import timezone
         from django_q.tasks import async_task
 
         async_task("apps.feeds.services.feeder.run_extraction", feed_id=feed.pk)
+        Feed.objects.filter(pk=feed.pk).update(extract_queued_at=timezone.now())
         return True
     except Exception as exc:
         log.exception("feed %s: could not enqueue extraction", feed.pk)
@@ -246,6 +254,7 @@ def run_extraction(feed_id: int, attempt: int = 1) -> str:
     if feed is None:
         return f"feed {feed_id} gone"
     if feed.status != "pending":
+        Feed.objects.filter(pk=feed.pk).update(extract_queued_at=None)
         return f"feed {feed_id} is {feed.status} — not extracting"
 
     try:
@@ -255,19 +264,22 @@ def run_extraction(feed_id: int, attempt: int = 1) -> str:
     except sdk_runner.SdkRunnerError as exc:
         # Not configured / daily cap: deterministic refusals — no retry.
         feed.error = f"extraction refused: {exc}"
-        feed.save(update_fields=["error"])
+        feed.extract_queued_at = None
+        feed.save(update_fields=["error", "extract_queued_at"])
         emit("degraded", surface="feed_extraction", feed_id=feed.pk, reason=exc.__class__.__name__)
         return f"refused: {exc.__class__.__name__}"
     except ExtractionError as exc:
         feed.error = str(exc)
-        feed.save(update_fields=["error"])
+        feed.extract_queued_at = None
+        feed.save(update_fields=["error", "extract_queued_at"])
         return f"composition failed: {exc}"
 
     feed.sdk_operation_id = run.operation_id
     if run.ok and isinstance(run.structured_output, dict):
         feed.proposal = normalize_index_lines(run.structured_output)
         feed.error = ""
-        feed.save(update_fields=["sdk_operation_id", "proposal", "error"])
+        feed.extract_queued_at = None
+        feed.save(update_fields=["sdk_operation_id", "proposal", "error", "extract_queued_at"])
         emit(
             "feed",
             action="extracted",
@@ -282,7 +294,9 @@ def run_extraction(feed_id: int, attempt: int = 1) -> str:
     # Failed run (transport, timeout, schema miss). Retry with backoff.
     label = run.error_class or "NoStructuredOutput"
     feed.error = f"extraction attempt {attempt}/{MAX_ATTEMPTS} failed: {label}"
-    feed.save(update_fields=["sdk_operation_id", "error"])
+    if attempt >= MAX_ATTEMPTS:
+        feed.extract_queued_at = None  # terminal — release the button
+    feed.save(update_fields=["sdk_operation_id", "error", "extract_queued_at"])
     emit("degraded", surface="feed_extraction", feed_id=feed.pk, reason=label, attempt=attempt)
     if attempt < MAX_ATTEMPTS:
         _schedule_retry(feed.pk, attempt + 1)

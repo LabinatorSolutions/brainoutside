@@ -461,29 +461,43 @@ Each step small, verifiable, committed on its own. DONE = check passes.
 - **3.4** Dashboards: event stream, ledger aggregates, most-served,
   spend-vs-cap. *Check: numbers reconcile with raw queries.*
 
-### M3.5 — Brain visuals (the mind, visible; decided 2026-07-30)
+### M3.5 — Brain visuals (the mind, visible) ✅ DONE 2026-07-30
 One shared data source, four views, staged by when their data exists.
 Behind ops login; a public showcase mode is a post-M5 option, not now.
-JS lib vendored/self-hosted (Cytoscape.js or D3) — no CDN.
+JS lib vendored/self-hosted — Cytoscape 3.34.0 (MIT) for the force
+layout only; rings and timeline are plain SVG. No CDN.
 
-- **3.5.1** `graph.json` endpoint off the Entity + Events tables: nodes
-  (kind, tier, status, topics, staleness, read-count) + edges
-  (topic/project links, `superseded_by`, shared `source`). *Check: node
-  and edge counts reconcile with raw Entity queries.*
-- **3.5.2** Visibility rings — concentric private/agents-only/public
-  dashboard centerpiece; dots colored by kind, sized by read-count.
-  The signature visual (tiers are enforced here, not decorative).
-  *Check: every entity renders in its resolved ring; a visibility change
-  moves the dot on next reindex.*
-- **3.5.3** Graph explorer — force layout clustered by topic; selecting
-  a lens highlights its subgraph; click-through to the note view.
-  *Check: lens highlight matches the lens definition exactly.*
-- **3.5.4** Live activity overlay — nodes pulse on read events (poll or
-  SSE over Events). Needs M3 traffic to mean anything. *Check: one chat
-  run lights up exactly its sources panel entities.*
-- **3.5.5** Belief timeline — supersede chains as position-over-time +
-  brain growth by month/kind. *Check: renders the M2.6 synthetic pair
-  correctly; degrades gracefully at zero chains.*
+- **3.5.1** ✅ `GET /ops/graph.json` off Entity + Events: entity nodes
+  (kind, tier, status, topics, staleness, read-count) + **topic hub
+  nodes**, edges typed topic/project/superseded/source. Topics are hubs
+  rather than pairwise links — 124 edges instead of ~590, and the force
+  layout gets real cluster centres. `?days=N` scopes the read counts.
+  Also carries resolved **lens definitions** (see 3.5.3).
+  *Checked: 12/12 counts reconcile with independent raw ORM queries.*
+- **3.5.2** ✅ Visibility rings — concentric private/agents-only/public
+  dashboard centrepiece; dots by kind, sized by read-count, hollow when
+  superseded. The signature visual (tiers are enforced here, not
+  decorative). No library: polar layout of ~50 circles is plain SVG.
+  *Checked in-browser: all 49 entities in their resolved ring; flipping
+  a note to private moved its dot on the next reindex.*
+- **3.5.3** ✅ Graph explorer (`/ops/graph/`) — cose force layout,
+  isolated entities parked in a labelled column so they don't squash the
+  core; lens picker highlights its subgraph; click-through to the note.
+  **Lens membership is resolved server-side** (`graph.lens_definitions`)
+  from the lens file's `topics`/`types`/`visibility-ceiling`/`identity`,
+  so the picture and any future reader-side lens filter are one
+  computation. *Checked: highlight == a membership set recomputed
+  independently from the lens frontmatter, 35/35, nothing above ceiling.*
+- **3.5.4** ✅ Live activity overlay — `GET /ops/activity.json` is a
+  **cursor** over the read log (`?after=<id>`), polled every 4s and
+  re-broadcast as a `brain:reads` DOM event; rings ping, graph nodes
+  flash, ticker names endpoint/tier/consumer. *Checked: one real chat
+  run lit exactly its 7 sources-panel entities, in both visuals.*
+- **3.5.5** ✅ Belief timeline (`/ops/timeline/`) — growth per month
+  stacked by kind with a running total, plus every supersede chain as
+  position-over-time. *Checked: bars reconcile with an independent
+  recount; a synthetic pair fed through the clone rendered as
+  hollow→arrow→filled; zero chains degrades to an explanatory state.*
 
 ### M4 — Prove accuracy, migrate consumers
 Runs AFTER the M5 beta release (decided 2026-07-30) — the eval happens

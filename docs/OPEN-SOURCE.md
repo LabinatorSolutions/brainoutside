@@ -46,7 +46,8 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 ## Cross-platform + docs (5.4)
 
 - [ ] bash/Makefile twin of `dev.ps1`.
-- [ ] README: what/why, rings hero GIF (from M3.5.2), quickstart.
+- [ ] README: what/why, rings hero GIF (rings shipped in M3.5.2 — the
+      dashboard centrepiece is the shot to capture), quickstart.
 - [ ] INSTALL (Coolify/compose), SECURITY (the §9 honest truths —
       "private notes are only as private as your VPS").
 - [ ] Verify clean setup on a fresh Linux/macOS box.
@@ -83,6 +84,9 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 - [ ] LICENSE (MIT), CONTRIBUTING, issue templates.
 - [ ] Vendored template code (mcp-api-starter-template) license header —
       Hasan's own code, confirm relicensing under MIT is clean.
-- [ ] Vendor the graph JS lib (Cytoscape/D3) — no CDN anywhere.
-      Rings (3.5.2) need none: a polar layout of ~50 circles is plain
-      SVG geometry. Only the 3.5.3 force layout justifies the dependency.
+- [x] Vendor the graph JS lib — no CDN anywhere. Cytoscape 3.34.0 (MIT)
+      for the 3.5.3 force layout only; rings (3.5.2) and timeline
+      (3.5.5) are plain SVG, since a polar layout of ~50 circles and a
+      bar chart don't justify a dependency someone self-hosting has to
+      trust. `static/vendor/README.md` records version + license per lib
+      and documents the refresh procedure.

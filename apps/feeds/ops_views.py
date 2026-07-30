@@ -85,7 +85,14 @@ def feed_detail(request, pk: int):
         return redirect(request.path)
 
     payload = feed.raw_payload or {}
-    validation = validator.validate_feed(feed) if feed.proposal else None
+    # Validate only while the decision is still open: an applied proposal
+    # re-validated against the post-apply repo self-collides (its `create`
+    # files exist now — rule 5) and the stale violations read as failure.
+    validation = (
+        validator.validate_feed(feed)
+        if feed.proposal and feed.status in ("pending", "approving")
+        else None
+    )
     diffs = diffview.build(feed.proposal, gitrepo.repo_dir()) if feed.proposal else []
     return render(
         request,

@@ -58,12 +58,8 @@ def _write_pat() -> str:
     return ""
 
 
-def _push_target(branch: str) -> list[str]:
-    """`git push` argv tail. With a PAT: a one-shot tokenized https URL
-    (never written to git config). Without: plain origin (dev)."""
-    pat = _write_pat()
-    if not pat:
-        return ["origin", f"HEAD:{branch}"]
+def _tokenized_origin_url(pat: str) -> str:
+    """One-shot tokenized https URL for origin (never written to git config)."""
     origin = gitrepo.run("remote", "get-url", "origin")
     m = re.match(r"^git@([^:]+):(.+?)(\.git)?$", origin) or re.match(
         r"^(?:ssh|https?)://(?:[^@/]+@)?([^/]+)/(.+?)(\.git)?$", origin
@@ -71,7 +67,32 @@ def _push_target(branch: str) -> list[str]:
     if not m:
         raise ApplyFailure(f"cannot derive an https push URL from origin {origin!r}")
     host, repo_path = m.group(1), m.group(2)
-    return [f"https://x-access-token:{pat}@{host}/{repo_path}.git", f"HEAD:{branch}"]
+    return f"https://x-access-token:{pat}@{host}/{repo_path}.git"
+
+
+def _push_target(branch: str) -> list[str]:
+    """`git push` argv tail. With a PAT: tokenized https. Without: plain
+    origin (dev)."""
+    pat = _write_pat()
+    if not pat:
+        return ["origin", f"HEAD:{branch}"]
+    return [_tokenized_origin_url(pat), f"HEAD:{branch}"]
+
+
+def _fetch_args(branch: str) -> list[str]:
+    """`git fetch` argv tail for the replay-safe reset. Plain origin works
+    in prod (SSH deploy key via GIT_SSH_COMMAND); a private https origin
+    with no key — the local stack — has no read credential in the worker,
+    so with a PAT we fetch through the tokenized URL, explicitly updating
+    the same origin/<branch> tracking ref that reset/rollback depend on."""
+    pat = _write_pat()
+    if not pat:
+        return ["origin"]
+    try:
+        url = _tokenized_origin_url(pat)
+    except ApplyFailure:
+        return ["origin"]
+    return [url, f"+refs/heads/{branch}:refs/remotes/origin/{branch}"]
 
 
 # ---- proposal application (plain file edits, no agent) -------------------
@@ -227,7 +248,7 @@ def apply_feed(feed_id: int) -> str:
             while True:
                 attempts += 1
                 # Start every attempt from exact origin state — replay-safe.
-                gitrepo.run("fetch", "origin", timeout=120)
+                gitrepo.run("fetch", *_fetch_args(branch), timeout=120)
                 gitrepo.run("reset", "--hard", f"origin/{branch}")
                 gitrepo.run("clean", "-fd")
                 try:

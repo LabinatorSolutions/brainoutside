@@ -461,7 +461,35 @@ Each step small, verifiable, committed on its own. DONE = check passes.
 - **3.4** Dashboards: event stream, ledger aggregates, most-served,
   spend-vs-cap. *Check: numbers reconcile with raw queries.*
 
+### M3.5 — Brain visuals (the mind, visible; decided 2026-07-30)
+One shared data source, four views, staged by when their data exists.
+Behind ops login; a public showcase mode is a post-M5 option, not now.
+JS lib vendored/self-hosted (Cytoscape.js or D3) — no CDN.
+
+- **3.5.1** `graph.json` endpoint off the Entity + Events tables: nodes
+  (kind, tier, status, topics, staleness, read-count) + edges
+  (topic/project links, `superseded_by`, shared `source`). *Check: node
+  and edge counts reconcile with raw Entity queries.*
+- **3.5.2** Visibility rings — concentric private/agents-only/public
+  dashboard centerpiece; dots colored by kind, sized by read-count.
+  The signature visual (tiers are enforced here, not decorative).
+  *Check: every entity renders in its resolved ring; a visibility change
+  moves the dot on next reindex.*
+- **3.5.3** Graph explorer — force layout clustered by topic; selecting
+  a lens highlights its subgraph; click-through to the note view.
+  *Check: lens highlight matches the lens definition exactly.*
+- **3.5.4** Live activity overlay — nodes pulse on read events (poll or
+  SSE over Events). Needs M3 traffic to mean anything. *Check: one chat
+  run lights up exactly its sources panel entities.*
+- **3.5.5** Belief timeline — supersede chains as position-over-time +
+  brain growth by month/kind. *Check: renders the M2.6 synthetic pair
+  correctly; degrades gracefully at zero chains.*
+
 ### M4 — Prove accuracy, migrate consumers
+Runs AFTER the M5 beta release (decided 2026-07-30) — the eval happens
+in public, build-in-public style. Sequence: M3 → M3.5 (.1–.3) → M5 →
+M4, with 3.5.4–.5 landing whenever their data exists.
+
 - **4.1** Build the eval it needs (grill B10 — `eval/` is one manual
   protocol, no dataset): assemble the 15-post X-reply set + a harness that
   runs local-Claude-Code vs `assemble-context` blind; Hasan scores.
@@ -470,6 +498,31 @@ Each step small, verifiable, committed on its own. DONE = check passes.
   keys. *Check: one real task per consumer from online context only.*
 - **4.3** Feed this app's project card into the brain (via mind-feeder,
   gated as always). *Check: card indexed and served.*
+
+### M5 — Open-source beta (decided 2026-07-30: after M3/M3.5, MIT)
+The project goes public as a self-hosted "build your own brain" tool:
+single-user, single-brain by design — multi-user is a different product.
+Running checklist lives in `docs/OPEN-SOURCE.md` (updated as we build;
+de-Hasanify happens continuously from now, not as a big-bang at M5).
+
+- **5.1** De-Hasanify the engine: commit identity/email → setting, theme
+  naming generic, no personal URLs/paths in code. *Check: grep for
+  `learnwithhasan`/`hassancs91`/`lwh` finds only docs and history.*
+- **5.2** Public `brain-template` repo: folder skeleton, generalized
+  CLAUDE.md contract, `_TEMPLATE.md`s, both skills, one example lens,
+  placeholder identity files. The app's startup contract check is the
+  template validator. *Check: fresh template clone boots the app clean.*
+- **5.3** First-run wizard: create admin → connect brain repo → paste
+  Anthropic key OR subscription token (`sk-ant-oat` — the no-API-billing
+  path is a headline feature) → bootstrap. *Check: blank instance to
+  working brain without touching DEPLOY.md.*
+- **5.4** Cross-platform: bash/Makefile twin of `dev.ps1`; README with
+  the rings hero GIF; INSTALL; honest SECURITY posture (§9 truths).
+  *Check: setup succeeds on a clean Linux/macOS box.*
+- **5.5** History audit — if anything personal ever landed in git
+  history, publish with fresh history from a chosen commit. LICENSE
+  (MIT) + CONTRIBUTING. *Check: public repo contains no personal data,
+  no secrets, in any commit.*
 
 ## 12. Grill log (what changed and why)
 
@@ -510,3 +563,6 @@ into §§3–11 where they land.
 3. ~~Public-voice subset~~ — resolved: deferred until a public clone exists
    (see M0.3).
 4. Postgres stays (settled — worker queue + events benefit; SQLite dropped).
+5. ~~Open source?~~ — **resolved 2026-07-30: yes, MIT, beta release after
+   M3/M3.5 (M5); M4 eval runs in public. Visuals: all four M3.5 views,
+   staged. Checklist: `docs/OPEN-SOURCE.md`.**

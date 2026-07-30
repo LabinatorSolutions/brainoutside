@@ -1,13 +1,13 @@
 /* ============================================================
-   BRAIN SERVER THEME TOKENS — derived from learnwithhasan.com's
-   theme contract (static/css/theme/tokens.css, "studio" theme).
-   Same palette + type so the brain app reads as a sibling of the
-   main site. Brain-app pages style against the semantic layer
-   (--surface, --ink, --accent...); never against raw primitives.
+   THEME TOKENS — the default "paper" theme: warm paper/cream
+   surfaces, ink text, indigo accent, dark terminal scale for logs.
+   Swap the primitives below to re-theme the whole app; pages style
+   against the SEMANTIC layer (--surface, --ink, --accent...) and
+   never against raw primitives, so a palette swap is one edit here.
    ============================================================ */
 
 :root {
-  /* ---- Shared primitives (lwh palette) ---- */
+  /* ---- Palette primitives (swap these to re-theme) ---- */
   --c-paper:   #fffef7;
   --c-cream:   #faf8f5;
   --c-ink:     #1a1a2e;

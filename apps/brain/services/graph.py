@@ -25,7 +25,7 @@ Edges are entity→entity except for `topic`:
 | `source` | two entities compiled from the same source id |
 
 Nothing here filters by visibility: this is the ops view, which is
-Hasan-only behind the network boundary and deliberately sees all three
+operator-only behind the network boundary and deliberately sees all three
 tiers — the rings are *about* the tiers. A public showcase mode would
 have to build a tier-filtered payload (post-M5, PLAN.md §11).
 """

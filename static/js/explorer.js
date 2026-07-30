@@ -196,7 +196,22 @@
         }
       });
 
+      /* Cytoscape measures its container once, at init. Anything that
+         changes the size afterwards — a scrollbar appearing as the page
+         grows, a window resize, the sidebar drawer — leaves the drawn
+         graph and the hit-testing in different coordinate spaces, so
+         clicks land next to the node instead of on it. Re-measure. */
+      cy.resize();
       parkUnlinked(cy);
+      if (window.ResizeObserver) {
+        new window.ResizeObserver(function () {
+          cy.resize();
+        }).observe(canvas);
+      }
+      window.addEventListener("resize", function () {
+        cy.resize();
+      });
+
       buildLegend(legend, data);
       buildPicker(picker, data);
 

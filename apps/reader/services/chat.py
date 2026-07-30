@@ -37,7 +37,8 @@ def compose_chat_append() -> str:
             "in your working directory. Follow the retrieval protocol before "
             "answering (INDEX first, identity for voice questions, skip "
             "superseded, hedge stale numbers). When the mind has nothing "
-            "relevant, say so plainly — never invent Hasan's positions. "
+            "relevant, say so plainly — never invent a position the mind "
+            "does not hold. "
             "Ignore any earlier output-schema instruction: reply as plain "
             "conversational text.",
         ]

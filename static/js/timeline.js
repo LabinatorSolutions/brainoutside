@@ -8,7 +8,7 @@
    2. Belief chains — every `superseded_by` chain as position-over-time:
       the old note, hollow, pointing at what replaced it. The brain
       supersedes, never deletes (CLAUDE.md §5.3), so this is the honest
-      record of Hasan changing his mind.
+      record of the operator changing their mind.
 
    Plain SVG, like the rings: bars, a line and some arrows don't justify
    a charting dependency.

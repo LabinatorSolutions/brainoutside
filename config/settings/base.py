@@ -102,7 +102,7 @@ DATABASES = {
 }
 
 # ----- Auth --------------------------------------------------------------------
-# Django's default auth.User — single human operator (Hasan). The vendored
+# Django's default auth.User — a single human operator. The vendored
 # api_keys app FKs settings.AUTH_USER_MODEL, which resolves to auth.User here.
 # Custom branded login page at /login/ (templates/login.html); the Django
 # admin at DJANGO_ADMIN_URL_PATH keeps its own login as a fallback.

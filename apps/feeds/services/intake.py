@@ -11,7 +11,7 @@ Failure policy (grill C21 — capture must never lose data):
   private-address host) → `FeedRejected`, no row created;
 - a fetch that legitimately FAILS (network error, HTTP error, non-text
   body) still creates the pending Feed with the error recorded in
-  `raw_payload["fetch"]` — Hasan can paste content or the M2.2
+  `raw_payload["fetch"]` — the operator can paste content or the M2.2
   extraction can re-fetch.
 """
 from __future__ import annotations

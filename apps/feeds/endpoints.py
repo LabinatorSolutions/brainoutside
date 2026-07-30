@@ -2,13 +2,13 @@
 
 One endpoint, auto-registered as REST + MCP + docs. It only creates a
 pending Feed — the repo is written exclusively by the M2.5 approval
-handler after Hasan approves in the ops UI. Per-key rate limiting comes
-from the registry pipeline (apps.mind.throttle); the payload cap and
-trusted URL fetch live in apps.feeds.services.intake.
+handler after the operator approves in the ops UI. Per-key rate limiting
+comes from the registry pipeline (apps.mind.throttle); the payload cap
+and trusted URL fetch live in apps.feeds.services.intake.
 
-Tier gate: public-tier keys are refused. The write door is for Hasan's
-own agents (least privilege — a future audience-facing key must never be
-able to spam the approval queue).
+Tier gate: public-tier keys are refused. The write door is for the
+operator's own agents (least privilege — a future audience-facing key
+must never be able to spam the approval queue).
 """
 from __future__ import annotations
 
@@ -25,10 +25,10 @@ from apps.mind import tiers
 @endpoint(
     slug="propose-feed",
     description=(
-        "Propose a new source for Hasan's mind (a URL, a transcript, a raw "
+        "Propose a new source for the mind (a URL, a transcript, a raw "
         "thought). Lands in the human approval queue as a pending feed — "
-        "nothing is written to the brain until Hasan approves. Requires an "
-        "agents-only key or above."
+        "nothing is written to the brain until the operator approves. "
+        "Requires an agents-only key or above."
     ),
 )
 class ProposeFeed(Endpoint):

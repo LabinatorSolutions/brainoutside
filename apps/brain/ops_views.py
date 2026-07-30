@@ -2,7 +2,7 @@
 
 Staff-only pages over the Entity index and event/ledger tables. The
 browser reads note bodies from the server's clone (full private view —
-this UI is Hasan-only, behind the network boundary); consumers never see
+this UI is operator-only, behind the network boundary); consumers never see
 these pages, they get tier snapshots via the API.
 """
 from __future__ import annotations

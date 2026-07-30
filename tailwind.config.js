@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// Vendored from mcp-api-starter-template, palette swapped for the lwh
+// Vendored from mcp-api-starter-template, palette swapped for the app
 // "studio" theme (see static/css/tokens.css): `brand` aliases Tailwind's
 // indigo scale — brand-500 = #6366f1 (--c-indigo), brand-600 = #4f46e5
 // (--c-indigo-strong) — so templates keep the template's brand-* classes.

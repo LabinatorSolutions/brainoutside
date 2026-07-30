@@ -2,7 +2,7 @@
 
 A Feed is a captured source waiting for the gated write path: proposed
 (M2.1, here) → extracted into `proposal` by the feeder agent (M2.2) →
-validated (M2.3) → approved/edited/rejected by Hasan in the ops UI
+validated (M2.3) → approved/edited/rejected by the operator in the ops UI
 (M2.4) → committed + pushed by the approval handler (M2.5). Creating or
 deciding a Feed row NEVER touches the brain repo; only the approval
 handler writes there.
@@ -26,7 +26,7 @@ class Feed(models.Model):
 
     # pending covers the whole pre-decision life (including extraction —
     # the M2.2 worker fills `proposal` while status stays pending).
-    # `approving` is the transient claim between Hasan's click and the
+    # `approving` is the transient claim between the approve click and the
     # worker's commit+push — it makes double-approval impossible (the
     # claim is an atomic pending→approving UPDATE).
     STATUSES = [
@@ -55,7 +55,7 @@ class Feed(models.Model):
     raw_payload = models.JSONField(default=dict)
     # The feeder agent's schema-valid extraction (M2.2). NULL until then.
     proposal = models.JSONField(null=True, blank=True)
-    # True once Hasan has edited the proposal — approval then lands as
+    # True once the operator has edited the proposal — approval then lands as
     # status "edited" instead of "approved" (M2.4).
     proposal_edited = models.BooleanField(default=False)
     status = models.CharField(max_length=12, choices=STATUSES, default="pending", db_index=True)

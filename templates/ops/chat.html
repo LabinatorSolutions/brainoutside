@@ -1,0 +1,52 @@
+{% extends "ops/_layout.html" %}
+
+{% block page_title_tag %}Chat{% endblock %}
+{% block page_title %}Chat with the mind{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    The reader agent over one tier's snapshot per session — a public-tier session behaves exactly like a public clone would.
+  </p>
+{% endblock %}
+
+{% block content %}
+  <form method="post" class="mb-6 flex flex-wrap items-end gap-3 rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
+    {% csrf_token %}
+    <label class="text-sm">
+      <span class="block text-xs" style="color: var(--muted);">Tier for the new session</span>
+      <select name="tier" class="mt-1 rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">
+        {% for t in tiers %}<option value="{{ t }}" {% if t == "agents-only" %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">New session</button>
+    <span class="text-xs" style="color: var(--muted);">The tier is fixed per session — that's the point of the test bench.</span>
+  </form>
+
+  <div class="overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+          <th class="px-4 py-3 font-medium">Session</th>
+          <th class="px-4 py-3 font-medium">Tier</th>
+          <th class="px-4 py-3 font-medium">Tokens in/out</th>
+          <th class="px-4 py-3 font-medium">Updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in sessions %}
+          <tr class="border-b" style="border-color: var(--line);">
+            <td class="px-4 py-2.5">
+              <a href="{% url 'brainconfig:chat-session' s.pk %}" style="color: var(--accent, #6366f1);">
+                {{ s.title|default:"(empty session)"|truncatechars:80 }}
+              </a>
+            </td>
+            <td class="px-4 py-2.5"><span class="rounded-full px-2 py-0.5 text-xs" style="background: {% if s.tier == 'public' %}#e7f6f2{% elif s.tier == 'agents-only' %}#fff4d6{% else %}#fdecec{% endif %};">{{ s.tier }}</span></td>
+            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ s.total_input_tokens }} / {{ s.total_output_tokens }}</td>
+            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ s.updated_at|date:"Y-m-d H:i" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="px-4 py-6 text-center" style="color: var(--muted);">No sessions yet — create one above.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

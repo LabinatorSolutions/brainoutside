@@ -1,0 +1,173 @@
+{% extends "ops/_layout.html" %}
+
+{% block page_title_tag %}Chat · {{ session.tier }}{% endblock %}
+{% block page_title %}{{ session.title|default:"New session"|truncatechars:60 }}{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    tier <span class="rounded-full px-2 py-0.5 text-xs" style="background: {% if session.tier == 'public' %}#e7f6f2{% elif session.tier == 'agents-only' %}#fff4d6{% else %}#fdecec{% endif %};">{{ session.tier }}</span>
+    · {{ session.total_input_tokens }} / {{ session.total_output_tokens }} tokens
+    · every answer comes from this tier's snapshot only
+  </p>
+{% endblock %}
+
+{% block content %}
+  <div class="mb-4 flex items-center justify-between">
+    <a href="{% url 'brainconfig:chat' %}" class="text-sm" style="color: var(--muted);">← all sessions</a>
+    <form method="post" onsubmit="return confirm('Delete this session and its messages?');">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete" />
+      <button type="submit" class="text-xs" style="color: var(--danger, #ff6b6b);">delete session</button>
+    </form>
+  </div>
+
+  <div id="thread" class="mb-4 grid gap-3">
+    {% for m in chat_messages %}
+      <div class="rounded-xl border p-4 text-sm {% if m.role == 'user' %}ml-12{% else %}mr-12{% endif %}"
+           style="border-color: var(--line); background: {% if m.role == 'user' %}var(--surface-2){% else %}var(--surface){% endif %}; white-space: pre-wrap; overflow-wrap: anywhere;">{{ m.content }}{% if m.error %}
+        <div class="mt-2 text-xs" style="color: #a33;">run error: {{ m.error }}</div>{% endif %}
+        {% if m.sources %}
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            {% for s in m.sources %}
+              <a href="{% url 'brainconfig:entity' s.entity_id %}" class="rounded-full border px-2 py-0.5 text-xs"
+                 style="border-color: var(--line); font-family: var(--font-mono); color: var(--muted);"
+                 title="visibility: {{ s.visibility }}{% if s.stale %} · STALE >45d{% endif %}">
+                {{ s.entity_id }}{% if s.stale %} ⚠{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <form id="send-form" class="flex items-end gap-3">
+    {% csrf_token %}
+    <textarea id="message" rows="3" placeholder="Ask the mind… (Ctrl/Cmd+Enter to send)"
+              class="grow rounded-xl border px-3 py-2 text-sm"
+              style="border-color: var(--line); background: var(--surface-2);"></textarea>
+    <button id="send-btn" type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+            style="background: var(--accent, #6366f1);">Send</button>
+  </form>
+  <p class="mt-2 text-xs" style="color: var(--muted);">Each turn runs the reader agent (5–30 s). Sources under each answer are the files the agent actually opened.</p>
+
+  <script>
+    (function () {
+      const thread = document.getElementById("thread");
+      const form = document.getElementById("send-form");
+      const input = document.getElementById("message");
+      const btn = document.getElementById("send-btn");
+      const csrf = form.querySelector("[name=csrfmiddlewaretoken]").value;
+      const sendUrl = "{% url 'brainconfig:chat-send' session.pk %}";
+      const entityUrlTpl = "{% url 'brainconfig:entity' 'EID' %}";
+
+      function bubble(role) {
+        const d = document.createElement("div");
+        d.className = "rounded-xl border p-4 text-sm " + (role === "user" ? "ml-12" : "mr-12");
+        d.style.borderColor = "var(--line)";
+        d.style.background = role === "user" ? "var(--surface-2)" : "var(--surface)";
+        d.style.whiteSpace = "pre-wrap";
+        d.style.overflowWrap = "anywhere";
+        thread.appendChild(d);
+        d.scrollIntoView({ block: "end" });
+        return d;
+      }
+
+      function sources(el, list) {
+        if (!list || !list.length) return;
+        const wrap = document.createElement("div");
+        wrap.className = "mt-3 flex flex-wrap gap-1.5";
+        list.forEach(function (s) {
+          const a = document.createElement("a");
+          a.href = entityUrlTpl.replace("EID", encodeURIComponent(s.entity_id));
+          a.className = "rounded-full border px-2 py-0.5 text-xs";
+          a.style.borderColor = "var(--line)";
+          a.style.fontFamily = "var(--font-mono)";
+          a.style.color = "var(--muted)";
+          a.title = "visibility: " + s.visibility + (s.stale ? " · STALE >45d" : "");
+          a.textContent = s.entity_id + (s.stale ? " ⚠" : "");
+          wrap.appendChild(a);
+        });
+        el.appendChild(wrap);
+      }
+
+      function note(el, text, isError) {
+        const d = document.createElement("div");
+        d.className = "mt-2 text-xs";
+        d.style.color = isError ? "#a33" : "var(--muted)";
+        d.textContent = text;
+        el.appendChild(d);
+      }
+
+      async function send(text) {
+        btn.disabled = true;
+        btn.textContent = "Streaming…";
+        btn.style.opacity = "0.4";
+        input.disabled = true;
+
+        bubble("user").textContent = text;
+        const out = bubble("assistant");
+        out.textContent = "";
+
+        try {
+          const body = new URLSearchParams({ message: text });
+          const resp = await fetch(sendUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrf, "Content-Type": "application/x-www-form-urlencoded" },
+            body: body.toString(),
+          });
+          if (!resp.ok || !resp.body) throw new Error("HTTP " + resp.status);
+
+          const dec = new TextDecoder();
+          const rd = resp.body.getReader();
+          let buf = "";
+          for (;;) {
+            const { value, done } = await rd.read();
+            if (done) break;
+            buf += dec.decode(value, { stream: true });
+            let idx;
+            while ((idx = buf.indexOf("\n\n")) !== -1) {
+              const frame = buf.slice(0, idx);
+              buf = buf.slice(idx + 2);
+              let ev = "message", data = "";
+              frame.split("\n").forEach(function (l) {
+                if (l.startsWith("event: ")) ev = l.slice(7);
+                else if (l.startsWith("data: ")) data = l.slice(6);
+              });
+              if (!data) continue;
+              const p = JSON.parse(data);
+              if (ev === "delta") {
+                out.textContent += p.text;
+                out.scrollIntoView({ block: "end" });
+              } else if (ev === "done") {
+                sources(out, p.sources);
+                note(out, (p.model || "") + " · " + (p.tokens.input ?? "?") + "/" + (p.tokens.output ?? "?") + " tokens · " + Math.round((p.duration_ms || 0) / 1000) + "s", false);
+              } else if (ev === "error") {
+                if (p.partial && !out.textContent) out.textContent = p.partial;
+                note(out, p.message, true);
+              }
+            }
+          }
+        } catch (e) {
+          note(out, "stream failed: " + e.message, true);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Send";
+          btn.style.opacity = "";
+          input.disabled = false;
+          input.focus();
+        }
+      }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text || btn.disabled) return;
+        input.value = "";
+        send(text);
+      });
+      input.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") form.requestSubmit();
+      });
+    })();
+  </script>
+{% endblock %}

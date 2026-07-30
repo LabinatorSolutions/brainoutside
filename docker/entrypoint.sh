@@ -29,13 +29,15 @@ case "$ROLE" in
         --timeout "${WEB_TIMEOUT:-60}"
     ;;
   dev)
-    # Local full-stack role (docker-compose.local.yml + dev.ps1). runserver
-    # so a source edit reloads the web container with no restart, and the
-    # clone is verified at boot instead of silently serving a broken brain.
+    # Local full-stack role (docker-compose.local.yml + dev.ps1). uvicorn
+    # --reload, NOT runserver: SSE (chat streaming, M3.1) buffers under
+    # runserver's WSGI handler — uvicorn matches the prod server. Reload
+    # must poll: inotify doesn't cross the Windows bind mount reliably.
     python manage.py migrate --noinput
     python manage.py brain_bootstrap \
         || echo "entrypoint: brain_bootstrap failed — /readyz stays red until the clone is valid" >&2
-    exec python manage.py runserver 0.0.0.0:8000
+    export WATCHFILES_FORCE_POLLING=true
+    exec python -m uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --reload
     ;;
   mcp)
     # FastMCP loopback subprocess; the web container's /mcp proxy targets

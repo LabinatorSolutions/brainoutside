@@ -74,6 +74,9 @@ class RunResult:
     operation_id: int | None = None
     # Schema-validated object when the run used `output_format` (C9).
     structured_output: object = None
+    # Snapshot files the agent actually opened (observed Read tool calls,
+    # streaming runs only) — the honest source list for chat (M3.3).
+    read_paths: list[str] = field(default_factory=list)
 
 
 def today_cost_usd() -> float:
@@ -115,7 +118,9 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
     return api_key
 
 
-def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str, output_format=None):
+def _snapshot_options(
+    tier: str, api_key: str, kind: str, append_prompt: str, output_format=None, streaming: bool = False
+):
     """ClaudeAgentOptions locked to one tier snapshot (§7 'the real config')."""
     from claude_agent_sdk import ClaudeAgentOptions
 
@@ -134,7 +139,7 @@ def _snapshot_options(tier: str, api_key: str, kind: str, append_prompt: str, ou
         max_turns=config.max_turns(kind),
         max_budget_usd=config.max_budget_usd(kind),
         env=_auth_env(api_key),
-        include_partial_messages=False,
+        include_partial_messages=streaming,
         output_format=output_format,
     )
 
@@ -296,6 +301,124 @@ def run_sync(coro: Awaitable[RunResult]) -> RunResult:
 def test_connection(**kwargs) -> RunResult:
     """Sync facade for classic Django views."""
     return run_sync(test_connection_async(**kwargs))
+
+
+async def stream_agent(
+    *,
+    kind: str,
+    tier: str,
+    prompt: str,
+    append_system: str,
+    subject=None,
+):
+    """Tier-locked STREAMING run (M3.1/M3.3): an async generator that
+    yields `("delta", text)` as tokens arrive and finally `("result",
+    RunResult)` exactly once. Same gates, lockdown, and row-before-run
+    ledger as `run_agent_async`; the wall-clock timeout is enforced
+    between events (the SDK cleans its subprocess up on generator close).
+    Observed `Read` tool calls land in RunResult.read_paths — the honest
+    source list, not agent self-report."""
+    import time as _time
+
+    from claude_agent_sdk import (
+        AssistantMessage,
+        ResultMessage,
+        StreamEvent,
+        TextBlock,
+        ToolUseBlock,
+        query,
+    )
+
+    api_key = await sync_to_async(_check_gates)(exempt_daily_cap=False)
+    options = await sync_to_async(_snapshot_options)(
+        tier, api_key, kind, append_system, None, True
+    )
+    timeout_s = await sync_to_async(config.sdk_timeout_seconds)()
+    ledger_kind = "chat" if kind == "reader" else "feed_extraction"
+
+    def _create_op():
+        extra = {}
+        if subject is not None:
+            from django.contrib.contenttypes.models import ContentType
+
+            extra = {
+                "subject_type": ContentType.objects.get_for_model(subject),
+                "subject_id": str(subject.pk),
+            }
+        return SdkOperation.objects.create(
+            kind=ledger_kind,
+            prompt_hash=hashlib.sha256(f"{kind}|{tier}|{append_system}|{prompt}".encode()).hexdigest(),
+            **extra,
+        )
+
+    op = await sync_to_async(_create_op)()
+    run = RunResult(ok=False, text="", error_class="Unknown")
+    chunks: list[str] = []
+    read_paths: list[str] = []
+    model = ""
+    started = _time.monotonic()
+    try:
+        async for message in query(prompt=prompt, options=options):
+            if _time.monotonic() - started > timeout_s:
+                run = RunResult(ok=False, text="".join(chunks), error_class="Timeout")
+                break
+            if isinstance(message, StreamEvent):
+                ev = message.event or {}
+                if ev.get("type") == "content_block_delta":
+                    delta = ev.get("delta") or {}
+                    if delta.get("type") == "text_delta" and delta.get("text"):
+                        yield ("delta", delta["text"])
+                continue
+            if isinstance(message, AssistantMessage):
+                model = message.model or model
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        chunks.append(block.text)
+                    elif isinstance(block, ToolUseBlock) and block.name == "Read":
+                        p = str((block.input or {}).get("file_path") or "")
+                        if p:
+                            read_paths.append(p)
+            elif isinstance(message, ResultMessage):
+                usage = message.usage or {}
+                if message.model_usage:
+                    model = ", ".join(sorted(message.model_usage))
+                run = RunResult(
+                    ok=not message.is_error,
+                    text="".join(chunks).strip() or str(message.result or ""),
+                    model=model,
+                    duration_ms=message.duration_ms,
+                    num_turns=message.num_turns,
+                    cost_usd=message.total_cost_usd,
+                    usage=usage,
+                    error_class="" if not message.is_error else (message.subtype or "sdk_error"),
+                )
+    except GeneratorExit:
+        # Client disconnected mid-stream: finalize the ledger row in the
+        # finally below, re-raise, and NEVER yield again.
+        run = RunResult(ok=False, text="".join(chunks), error_class="ClientDisconnected")
+        raise
+    except Exception as exc:  # SDK/transport errors → degraded, never raise raw
+        log.exception("sdk runner: streaming %s run failed", kind)
+        label = exc.__class__.__name__
+        if label == "Exception":
+            label = f"CliError: {str(exc)[:100]}"
+        run = RunResult(ok=False, text="".join(chunks), error_class=label)
+    finally:
+        run.read_paths = read_paths
+        op.finished_at = timezone.now()
+        op.ok = run.ok
+        op.error_class = run.error_class
+        op.model = run.model
+        op.duration_ms = run.duration_ms
+        op.num_turns = run.num_turns
+        op.cost_usd = run.cost_usd
+        op.input_tokens = run.usage.get("input_tokens")
+        op.output_tokens = run.usage.get("output_tokens")
+        op.cache_read_tokens = run.usage.get("cache_read_input_tokens")
+        op.cache_write_tokens = run.usage.get("cache_creation_input_tokens")
+        await sync_to_async(op.save)()
+    run.operation_id = op.id
+    yield ("result", run)
 
 
 async def run_agent_async(

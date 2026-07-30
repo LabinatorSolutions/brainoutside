@@ -6,8 +6,8 @@
 #   - config.settings.docker — DEBUG + autoreload, still Postgres + Redis
 #     so local behaviour matches the VPS.
 #   - the repo is bind-mounted at /app: an edit lands without a rebuild.
-#     web self-reloads (runserver); mcp + worker don't, hence
-#     `dev.ps1 reload`.
+#     web self-reloads (uvicorn --reload, polling — real SSE, prod-same
+#     server); mcp + worker don't, hence `dev.ps1 reload`.
 #   - data/brain-repo + data/brain-views are bind-mounted from the host
 #     instead of named volumes, so the stack reuses the clone you already
 #     have and needs no git credential to boot.
@@ -36,7 +36,7 @@ x-local: &local
 services:
   web:
     <<: *local
-    # entrypoint role: migrate + brain_bootstrap + runserver (autoreload).
+    # entrypoint role: migrate + brain_bootstrap + uvicorn --reload.
     command: [dev]
     ports: !override
       - "8000:8000"

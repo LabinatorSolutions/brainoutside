@@ -9,6 +9,7 @@ from django.urls import path
 from apps.brain import ops_views
 from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
+from apps.reader import ops_views as reader_ops
 
 from . import views
 
@@ -21,5 +22,9 @@ urlpatterns = [
     path("feeds/", feeds_ops.queue, name="feeds"),
     path("feeds/<int:pk>/", feeds_ops.feed_detail, name="feed-detail"),
     path("tasks/", events_ops.tasks, name="tasks"),
+    path("chat/", reader_ops.chat_home, name="chat"),
+    path("chat/<int:pk>/", reader_ops.chat_session, name="chat-session"),
+    path("chat/<int:pk>/send", reader_ops.chat_send, name="chat-send"),
+    path("chat/message/<int:pk>/", reader_ops.chat_message, name="chat-message"),
     path("settings/", views.settings_page, name="settings"),
 ]

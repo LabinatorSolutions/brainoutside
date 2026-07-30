@@ -17,6 +17,7 @@ Design contract (PLAN.md §4):
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -89,8 +90,19 @@ def _git_env() -> dict[str, str] | None:
     return env
 
 
+#: Credentials embedded in URLs (tokenized push/fetch, M2.5) must never
+#: reach error strings — they land in Feed.error, Events, logs, and the
+#: ops UI. Scrub `scheme://ANYTHING@` down to the token marker.
+_URL_CRED_RE = re.compile(r"(?<=://)[^@/\s]+@")
+
+
+def _redact(text: str) -> str:
+    return _URL_CRED_RE.sub("***@", text)
+
+
 def _git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
-    """Run a git command; raise BrainRepoError with stderr on failure."""
+    """Run a git command; raise BrainRepoError with REDACTED stderr on
+    failure — argv may carry a one-shot tokenized URL."""
     cmd = ["git", *args]
     try:
         proc = subprocess.run(
@@ -104,11 +116,13 @@ def _git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
     except FileNotFoundError as exc:
         raise BrainRepoError("git binary not found in this container/image.") from exc
     except subprocess.TimeoutExpired as exc:
-        raise BrainRepoError(f"git {' '.join(args)} timed out after {timeout}s.") from exc
+        raise BrainRepoError(f"git {_redact(' '.join(args))} timed out after {timeout}s.") from exc
     if proc.returncode != 0:
         raise BrainRepoError(
-            f"git {' '.join(args)} failed (exit {proc.returncode}): "
-            f"{proc.stderr.strip() or proc.stdout.strip()}"
+            _redact(
+                f"git {' '.join(args)} failed (exit {proc.returncode}): "
+                f"{proc.stderr.strip() or proc.stdout.strip()}"
+            )
         )
     return proc.stdout.strip()
 

@@ -25,12 +25,18 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 
 ## Starter template (5.2)
 
-- [ ] Public `brain-template` repo: folder skeleton, generalized
-      CLAUDE.md contract, `_TEMPLATE.md`s, mind-feeder + mind-reader
-      skills, one example lens, placeholder identity files.
-- [ ] Generalize the contract text (remove Hasan-specific projects,
-      taxonomy stays an editable example).
-- [ ] App's startup contract check = template validator (already loud).
+- [x] `brain-template/` — folder skeleton, generalized CLAUDE.md contract,
+      `_TEMPLATE.md` per note kind, mind-feeder + mind-reader skills
+      (both with server-mode), one example lens, placeholder identity
+      files with writing guidance inside, seed INDEX.md.
+      Lives in this repo for now; split out to its own public repo at
+      release.
+- [x] Generalize the contract text: "the owner" throughout, scope rule
+      replaces the Arabic-corpus rule, taxonomy is an editable example.
+- [x] App's startup contract check = template validator (already loud) —
+      verified by booting the app against a fresh clone of the template.
+- [ ] Decide whether the example project card ships or the template
+      starts fully empty (it currently ships one, marked DELETE THIS).
 
 ## Setup experience (5.3)
 
@@ -75,6 +81,20 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
        `sk-ant-oat` vs API key, Coolify empty-env-var trap.
 8. [ ] **API reference** — auto-generated from the endpoint registry;
        link, don't write.
+
+## Known issues to close before the beta
+
+- [ ] **Graph explorer: click-through breaks after using the lens picker.**
+      Clicking a node opens its note reliably on a fresh page load (6/6),
+      but once a lens has been applied the click lands on the canvas
+      background instead of the node (0/6) — Cytoscape reports the tap on
+      the core while the node is drawn under the cursor with an identical
+      bounding box, `opacity: 1` and `events: yes`. Ruled out: toolbar
+      reflow from the scope caption (fixed anyway, `.gx-scope` now
+      reserves its line), and `cy.batch()` around the class changes
+      (reverted, made no difference). Not root-caused. Ops-only surface
+      and the note view is reachable from the brain browser, so it is not
+      a release blocker — but it should not ship in a demo GIF.
 
 ## Repo hygiene (5.5)
 

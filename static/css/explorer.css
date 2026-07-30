@@ -48,9 +48,14 @@
   border-color: var(--accent);
 }
 
+/* Reserve the caption's line even when empty. Otherwise picking a lens
+   grows the toolbar, which shrinks the canvas, which makes the whole
+   graph jump under the cursor at the exact moment you're aiming at it. */
 .gx-scope {
   font-family: var(--font-mono);
   font-size: 12px;
+  line-height: 1.4;
+  min-height: 1.4em;
   color: var(--accent-strong);
 }
 .gx-status {

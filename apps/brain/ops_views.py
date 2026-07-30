@@ -13,7 +13,7 @@ from collections import Counter
 import markdown as md
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Sum
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -23,19 +23,8 @@ from apps.feeds.models import Feed
 
 from .models import Entity, SyncRun
 from .services import gitrepo
-
-STALE_AFTER_DAYS = 45  # reader rule 3 (CLAUDE.md §6)
-
-
-def _stale_cutoff() -> dt.date:
-    return timezone.localdate() - dt.timedelta(days=STALE_AFTER_DAYS)
-
-
-def _is_stale(entity: Entity) -> bool:
-    """Staleness applies to project cards: last-verified missing or >45d old."""
-    if entity.kind != "project":
-        return False
-    return entity.last_verified is None or entity.last_verified < _stale_cutoff()
+from .services.graph import DEFAULT_WINDOW_DAYS, build_graph
+from .services.staleness import STALE_AFTER_DAYS, is_stale as _is_stale
 
 
 @staff_member_required(login_url="login")
@@ -110,6 +99,22 @@ def dashboard(request):
             **ops_context(request),
         },
     )
+
+
+@staff_member_required(login_url="login")
+def graph_json(request):
+    """M3.5.1 — the shared data source for every brain visual.
+
+    `?days=N` scopes the read counts (default 30); `?days=0` means all
+    time. Staff-only and un-cached: it is a live view of the index, and
+    it deliberately carries all three tiers (see services/graph.py).
+    """
+    try:
+        days = int(request.GET.get("days", DEFAULT_WINDOW_DAYS))
+    except ValueError:
+        days = DEFAULT_WINDOW_DAYS
+    days = max(0, min(days, 3650)) or None
+    return JsonResponse(build_graph(days=days))
 
 
 @staff_member_required(login_url="login")

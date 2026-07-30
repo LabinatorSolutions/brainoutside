@@ -28,24 +28,13 @@
   var ZONE = { "private": 132, "agents-only": 244, "public": 352 }; // zone outer radius
   var DOT_RING = { "private": 82, "agents-only": 192, "public": 302 }; // where dots sit
 
-  var KIND_COLOR = {
-    identity: "#1a1a2e",
-    project: "#e8a07a",
-    take: "#6366f1",
-    story: "#9b7cc4",
-    lesson: "#4db8a8",
-    fact: "#3f8fbf",
-    lens: "#d99b00",
-    catalog: "#8a8a99"
-  };
-  var KIND_ORDER = ["identity", "project", "take", "story", "lesson", "fact", "lens", "catalog"];
-  var FALLBACK_COLOR = "#8a8a99";
+  // Kind colours and the read-count size curve are shared with the
+  // explorer (brain-viz.js) — the same note must look the same in both.
+  var VIZ = window.BrainViz;
 
   var LABEL_GAP = 0.42; // radians left free at the bottom of each ring for its label
   var MIN_ARC = 26;     // arc length one dot wants before a second lane opens
   var LANE_GAP = 24;    // radial distance between lanes
-  var DOT_MIN = 3.6;
-  var DOT_MAX = 11;
 
   function svg(name, attrs) {
     var node = document.createElementNS(SVG_NS, name);
@@ -58,16 +47,15 @@
   }
 
   function color(kind) {
-    return KIND_COLOR[kind] || FALLBACK_COLOR;
+    return VIZ.color(kind);
   }
 
   function dotRadius(reads) {
-    return Math.min(DOT_MAX, DOT_MIN + 2.4 * Math.sqrt(reads || 0));
+    return VIZ.dotRadius(reads);
   }
 
   function kindRank(kind) {
-    var i = KIND_ORDER.indexOf(kind);
-    return i === -1 ? KIND_ORDER.length : i;
+    return VIZ.kindRank(kind);
   }
 
   /* Dots are laid out clockwise from just past the bottom, so the

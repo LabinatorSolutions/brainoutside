@@ -20,6 +20,7 @@ urlpatterns = [
     # Shared data source for the brain visuals (rings now; explorer,
     # activity overlay and timeline in M3.5.3-.5).
     path("graph.json", ops_views.graph_json, name="graph-json"),
+    path("graph/", ops_views.graph_explorer, name="graph"),
     path("brain/", ops_views.browser, name="browser"),
     path("brain/<str:entity_id>/", ops_views.entity_detail, name="entity"),
     path("feeds/", feeds_ops.queue, name="feeds"),

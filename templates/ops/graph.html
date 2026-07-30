@@ -1,0 +1,49 @@
+{% extends "ops/_layout.html" %}
+{% load static %}
+
+{% block page_title_tag %}Graph{% endblock %}
+{% block page_title %}Graph explorer{% endblock %}
+{% block page_subtitle %}
+  <p class="mt-1 text-sm" style="color: var(--muted);">
+    The whole brain as a force layout — notes cluster around the topics they carry.
+    Pick a lens to see exactly what that lens scopes; click a note to open it.
+  </p>
+{% endblock %}
+
+{% block head_extra %}
+  <link rel="stylesheet" href="{% static 'css/explorer.css' %}" />
+  <script defer src="{% static 'vendor/cytoscape.min.js' %}" nonce="{{ csp_nonce }}"></script>
+  <script defer src="{% static 'js/brain-viz.js' %}" nonce="{{ csp_nonce }}"></script>
+  <script defer src="{% static 'js/explorer.js' %}" nonce="{{ csp_nonce }}"></script>
+{% endblock %}
+
+{% block content %}
+  <div class="gx" data-graph-explorer data-graph-url="{% url 'brainconfig:graph-json' %}">
+    <div class="gx-bar">
+      <label class="gx-field">
+        <span class="gx-field-label">Lens</span>
+        <select class="gx-select" data-lens-picker>
+          <option value="">no lens — whole brain</option>
+        </select>
+      </label>
+      <button type="button" class="gx-button" data-graph-reset>Reset view</button>
+      <div class="gx-field">
+        <span class="gx-field-label">Scope</span>
+        <div class="gx-scope" data-lens-scope></div>
+      </div>
+      <div class="ms-auto gx-status" data-graph-status>Reading the index…</div>
+    </div>
+
+    <div class="gx-canvas" data-graph-canvas></div>
+    <div class="gx-tip" data-graph-tip role="status"></div>
+
+    <div class="mt-3 gx-key" data-graph-legend></div>
+    <div class="mt-2 gx-key">
+      <span class="gx-key-item"><span class="gx-edge-swatch gx-edge-topic"></span> topic</span>
+      <span class="gx-key-item"><span class="gx-edge-swatch gx-edge-project"></span> project</span>
+      <span class="gx-key-item"><span class="gx-edge-swatch gx-edge-source"></span> same source</span>
+      <span class="gx-key-item"><span class="gx-edge-swatch gx-edge-superseded"></span> superseded by</span>
+      <span class="gx-key-item">hollow = superseded · size = reads · boxes are topics (click one to isolate it)</span>
+    </div>
+  </div>
+{% endblock %}

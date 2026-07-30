@@ -118,6 +118,17 @@ def graph_json(request):
 
 
 @staff_member_required(login_url="login")
+def graph_explorer(request):
+    """M3.5.3 — force layout over the whole brain, lens highlighting.
+
+    The page is a shell: all of it is drawn client-side from
+    graph.json, so there is exactly one server-side definition of what
+    the brain contains and what a lens scopes.
+    """
+    return render(request, "ops/graph.html", ops_context(request))
+
+
+@staff_member_required(login_url="login")
 def browser(request):
     qs = Entity.objects.all().order_by("kind", "entity_id")
     kind = request.GET.get("kind", "")

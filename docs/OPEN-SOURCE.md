@@ -84,3 +84,5 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 - [ ] Vendored template code (mcp-api-starter-template) license header —
       Hasan's own code, confirm relicensing under MIT is clean.
 - [ ] Vendor the graph JS lib (Cytoscape/D3) — no CDN anywhere.
+      Rings (3.5.2) need none: a polar layout of ~50 circles is plain
+      SVG geometry. Only the 3.5.3 force layout justifies the dependency.

@@ -41,6 +41,9 @@ from django.utils import timezone
 from apps.brain.models import Entity
 from apps.events.models import Event
 
+from . import gitrepo
+from .indexer import as_list, split_frontmatter
+from .snapshots import TIER_ORDER
 from .staleness import STALE_AFTER_DAYS, is_stale
 
 DEFAULT_WINDOW_DAYS = 30
@@ -84,6 +87,85 @@ def _project_index(entities: list[Entity]) -> dict[str, str]:
         index[e.entity_id] = e.entity_id
         index.setdefault(stem, e.entity_id)
     return index
+
+
+# A lens's `types:` field scopes *note* types ("note types: all" in the
+# lens contract), so it is applied to knowledge notes only — it must not
+# quietly drop project cards or catalogs.
+KNOWLEDGE_KINDS = frozenset({"take", "story", "lesson", "fact"})
+
+
+def _within(ceiling: str, visibility: str) -> bool:
+    return TIER_ORDER.get(visibility, 2) <= TIER_ORDER.get(ceiling, 0)
+
+
+def lens_definitions(entities: list[Entity]) -> list[dict]:
+    """Resolve each lens to the exact set of entities it scopes.
+
+    A lens is a named retrieval scope, and its full definition lives in
+    frontmatter that the Entity row doesn't carry (`types`,
+    `visibility-ceiling`, `identity`) — so it's read from the clone, the
+    same canonical copy the browser renders notes from.
+
+    Membership, in the lens's own terms:
+    - never above the lens's `visibility-ceiling`;
+    - the identity files it names explicitly (`identity: [core, beliefs]`
+      → `identity-core`, `identity-beliefs`) — those carry no topics and
+      would otherwise never match;
+    - otherwise: shares at least one topic with the lens, and (for
+      knowledge notes) has a type the lens admits.
+
+    Resolving this server-side means the explorer's highlight and any
+    future reader-side lens filter are the same computation, not two
+    implementations that can drift.
+    """
+    repo = gitrepo.repo_dir()
+    out: list[dict] = []
+
+    for lens in [e for e in entities if e.kind == "lens"]:
+        fm: dict = {}
+        error = ""
+        try:
+            fm, _body = split_frontmatter((repo / lens.path).read_text(encoding="utf-8"))
+        except OSError as exc:
+            error = f"{exc.__class__.__name__}: could not read {lens.path}"
+
+        topics = set(as_list(fm.get("topics")) or list(lens.topics or []))
+        types = {t.lower() for t in as_list(fm.get("types"))}
+        ceiling = str(fm.get("visibility-ceiling") or "private").strip()
+        identity = as_list(fm.get("identity"))
+        # Lens files name identity files bare (`core`), the index keys
+        # them `identity-core`; accept either spelling.
+        identity_ids = {f"identity-{n}" for n in identity} | set(identity)
+
+        def member(e: Entity) -> bool:
+            if e.entity_id == lens.entity_id or not _within(ceiling, e.visibility):
+                return False
+            if e.entity_id in identity_ids:
+                return True
+            if not topics or not (set(e.topics or []) & topics):
+                return False
+            if types and "all" not in types and e.kind in KNOWLEDGE_KINDS:
+                return e.kind in types
+            return True
+
+        members = [e.entity_id for e in entities if member(e)]
+        out.append(
+            {
+                "id": lens.entity_id,
+                "name": lens.entity_id.removeprefix("lens-"),
+                "title": lens.title or lens.entity_id,
+                "url": reverse("brainconfig:entity", args=[lens.entity_id]),
+                "topics": sorted(topics),
+                "types": sorted(types) or ["all"],
+                "ceiling": ceiling,
+                "identity": sorted(identity_ids & {e.entity_id for e in entities}),
+                "members": members,
+                "member_count": len(members),
+                "error": error,
+            }
+        )
+    return out
 
 
 def build_graph(*, days: int | None = DEFAULT_WINDOW_DAYS) -> dict:
@@ -160,6 +242,7 @@ def build_graph(*, days: int | None = DEFAULT_WINDOW_DAYS) -> dict:
             edges.append({"source": a, "target": b, "type": "source", "via": source})
 
     edge_counts: Counter = Counter(edge["type"] for edge in edges)
+    lenses = lens_definitions(entities)
     return {
         "generated_at": timezone.now().isoformat(timespec="seconds"),
         "window_days": days or None,
@@ -175,7 +258,9 @@ def build_graph(*, days: int | None = DEFAULT_WINDOW_DAYS) -> dict:
             "by_tier": dict(Counter(e.visibility for e in entities)),
             "reads_counted": sum(reads.get(e.entity_id, 0) for e in entities),
             "source_clusters_starred": starred,
+            "lenses": len(lenses),
         },
+        "lenses": lenses,
         "nodes": nodes,
         "edges": edges,
     }

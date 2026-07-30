@@ -63,7 +63,7 @@ class ParsedEntity:
     content_hash: str = ""
 
 
-def _split_frontmatter(text: str) -> tuple[dict, str]:
+def split_frontmatter(text: str) -> tuple[dict, str]:
     m = _FRONTMATTER_RE.match(text)
     if not m:
         return {}, text
@@ -81,7 +81,7 @@ def _title_of(body: str, fallback: str) -> str:
     return m.group(1).strip() if m else fallback
 
 
-def _as_list(v: object) -> list[str]:
+def as_list(v: object) -> list[str]:
     if isinstance(v, list):
         return [str(x) for x in v]
     if isinstance(v, str) and v.strip():
@@ -137,7 +137,7 @@ def parse_repo() -> list[ParsedEntity]:
 
     def read(p: Path) -> tuple[dict, str, str]:
         raw = p.read_bytes()
-        fm, body = _split_frontmatter(raw.decode("utf-8", errors="replace"))
+        fm, body = split_frontmatter(raw.decode("utf-8", errors="replace"))
         return fm, body, _sha256(raw)
 
     # --- knowledge notes ---
@@ -157,8 +157,8 @@ def parse_repo() -> list[ParsedEntity]:
                     status=str(fm.get("status") or "current"),
                     superseded_by=str(fm.get("superseded_by") or "") if fm.get("superseded_by") else "",
                     visibility=_resolve_visibility(fm.get("visibility"), "agents-only"),
-                    topics=_as_list(fm.get("topics")),
-                    projects=_as_list(fm.get("projects")),
+                    topics=as_list(fm.get("topics")),
+                    projects=as_list(fm.get("projects")),
                     source=str(fm.get("source") or ""),
                     source_url=str(fm.get("source_url") or ""),
                     date=str(fm.get("date") or ""),
@@ -181,7 +181,7 @@ def parse_repo() -> list[ParsedEntity]:
                 description=descriptions.get(rel, ""),
                 status="current",
                 visibility=_resolve_visibility(fm.get("visibility"), "agents-only"),
-                topics=_as_list(fm.get("topics")),
+                topics=as_list(fm.get("topics")),
                 last_verified=_parse_date(fm.get("last-verified")),
                 content_hash=digest,
             )
@@ -220,7 +220,7 @@ def parse_repo() -> list[ParsedEntity]:
                 title=_title_of(body, p.stem),
                 description=descriptions.get(rel, ""),
                 visibility=_resolve_visibility(fm.get("visibility"), "public"),
-                topics=_as_list(fm.get("topics")),
+                topics=as_list(fm.get("topics")),
                 content_hash=digest,
             )
         )

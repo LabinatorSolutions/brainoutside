@@ -18,7 +18,14 @@ from .env import settings as _env
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ----- Core --------------------------------------------------------------------
-APP_NAME = _env.APP_NAME or "BrainOutside"
+# The vendored env schema defaults APP_NAME to the scaffold token
+# "{{APP_NAME}}", which is truthy — so an install that never set it would
+# render the literal token in every browser tab. Now that this value is
+# also the fallback behind the /ops/settings/ override, reject it here.
+_app_name_env = (_env.APP_NAME or "").strip()
+if _app_name_env.startswith("{{"):
+    _app_name_env = ""
+APP_NAME = _app_name_env or "BrainOutside"
 SECRET_KEY = _env.SECRET_KEY.get_secret_value()
 DEBUG = False  # overridden in dev.py
 ALLOWED_HOSTS: list[str] = list(_env.ALLOWED_HOSTS)

@@ -255,10 +255,21 @@ tell us they were broken.** Three cheap, permanent checks:
   internal tool, not a component library. The style guide is a review aid;
   it is not a deliverable to polish for its own sake.
 
-## Open question
+## Visual direction — decided 2026-07-31 (Hasan)
 
-**Visual direction.** The default assumption is: keep the paper/ink/indigo
-palette and the Space Grotesk / Inter / JetBrains Mono type stack, and
-spend the effort on layout, hierarchy, density and consistency. If a
-different look is wanted, that decision belongs before 5.6.1, not after —
-the component layer encodes it.
+**Keep the look, fix the craft.** The paper/ink/indigo palette and the
+Space Grotesk / Inter / JetBrains Mono type stack stay. Every hour goes
+into layout, hierarchy, density and consistency instead of hue.
+
+That is a real constraint, not a shrug: it means a change is only worth
+making if it improves how fast the page can be *read*. Reviewers of 5.6.3
+should be able to point at what a change made clearer.
+
+**Dark mode ships.** So `tokens.css` grows a dark block, every component
+is checked in both themes on the style guide, and the existing theme
+toggle stops being a dead control. Practically this means one extra rule
+during the conversion: components style against semantic tokens only
+(`bg-surface`, `text-muted`), never against a palette primitive or a
+literal hex — a hardcoded `#0d1117` is invisible in light mode review and
+wrong in dark. The terminal/log panes are the deliberate exception; they
+are dark in both themes by design.

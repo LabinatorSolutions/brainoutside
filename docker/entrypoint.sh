@@ -7,7 +7,7 @@ set -euo pipefail
 ROLE="${1:-web}"
 
 if [ "$(id -u)" = "0" ]; then
-    mkdir -p /data/brain-repo /data/brain-views
+    mkdir -p /data/brain-repo /data/brain-views /data/state
     # Named volumes need the chown; the local stack bind-mounts host dirs
     # whose ownership the container can't (and needn't) change.
     chown -R app:app /data 2>/dev/null || true

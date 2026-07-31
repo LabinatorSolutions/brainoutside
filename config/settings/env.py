@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     BRAIN_REPO_URL: str = ""
     BRAIN_REPO_DIR: str = ""
     BRAIN_VIEWS_DIR: str = ""
+    # Small persisted volume for state the app generates and must never
+    # lose — today just the boot secrets (see `boot_secrets.py`). Kept
+    # separate from the clone (git-managed) and the snapshots
+    # (rebuildable) precisely because this one is neither.
+    BRAIN_STATE_DIR: str = ""
     # When set, git talks to origin via this SSH key (the server's
     # read-only deploy key). Empty in dev — git uses the local credential
     # helper for the https URL.
@@ -373,6 +378,36 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
+    def _derive_public_origin(self) -> Settings:
+        """Fill `OAUTH_ISSUER` / `PUBLIC_BASE_URL` in from the domain.
+
+        Both are "what host am I?" values, and the operator already told us
+        that in `ALLOWED_HOSTS`. Making them derive keeps the required-env
+        list at two entries (SETUP-DESIGN.md) instead of four, and the
+        derived value beats the shipped placeholder in every case — a docs
+        page that says `https://api.example.com` is wrong for every
+        deployment that exists.
+
+        Only shipped defaults are replaced; an explicit value always wins.
+        """
+        host = next(
+            (
+                h
+                for h in self.ALLOWED_HOSTS
+                if h.strip() and h.strip() not in ("localhost", "127.0.0.1", "::1", "*")
+            ),
+            "",
+        )
+        if not host:
+            return self
+        origin = f"https://{host.strip().lstrip('.')}"
+        if not self.OAUTH_ISSUER.strip() or self.OAUTH_ISSUER.strip() == "http://localhost:8000":
+            self.OAUTH_ISSUER = origin
+        if not self.PUBLIC_BASE_URL.strip() or self.PUBLIC_BASE_URL.strip() == "https://api.example.com":
+            self.PUBLIC_BASE_URL = origin
+        return self
+
+    @model_validator(mode="after")
     def _q_ack_gt_timeout(self) -> Settings:
         """Refuse boot when Q_ACK_TIMEOUT_SECONDS ≤ Q_TASK_TIMEOUT_SECONDS.
 
@@ -442,31 +477,43 @@ class Settings(BaseSettings):
                 "and is a local-dev convenience only. Remove it from your prod "
                 "environment before deploying."
             )
-        # OAUTH_ISSUER is the base for EVERY URL in the OAuth discovery
-        # documents (/.well-known/oauth-authorization-server + -protected-
-        # resource). Left on the localhost default, a prod deploy advertises
-        # http://localhost:8000 for the authorize/token/DCR endpoints — MCP
-        # clients (Claude.ai) follow those URLs, can't reach them, and hang
-        # on token refresh. Tool calls keep working while a cached token is
-        # valid, so the failure looks intermittent. Refuse boot instead.
+        # OAUTH_ISSUER is the base for every URL in the OAuth discovery
+        # documents. In the TEMPLATE this was a boot-refusal: a localhost
+        # issuer makes MCP OAuth clients hang on token refresh, and the
+        # failure looks intermittent because cached tokens keep working.
+        #
+        # This app does not vendor the OAuth flows (`MCP_OAUTH_DCR_MODE` is
+        # forced to "off" and `MCP_URL_AUTH_ENABLED` to False in base.py);
+        # MCP clients authenticate with an API key. The issuer only appears
+        # in 401 hints, so a wrong value is cosmetic, not a hang — and
+        # `_derive_public_origin` fills it in from ALLOWED_HOSTS anyway.
+        # Refusing to boot over it would add a third required env var
+        # (SETUP-DESIGN.md: the target is two), so it warns instead.
         from urllib.parse import urlparse
 
         issuer = (self.OAUTH_ISSUER or "").strip()
         issuer_host = urlparse(issuer).hostname or ""
         if not issuer or issuer_host in ("localhost", "127.0.0.1", "::1"):
-            raise ImproperlyConfigured(
-                "OAUTH_ISSUER must be set to your public origin in production "
-                "(e.g. https://api.example.com). It is currently "
-                f"{issuer or 'unset'!r} — MCP OAuth clients would try to reach "
-                "localhost for authorization/token/registration and hang."
-            )
-        if not issuer.startswith("https://"):
-            raise ImproperlyConfigured(
-                "OAUTH_ISSUER must be an https:// URL in production "
-                f"(got {issuer!r}). OAuth 2.1 requires TLS on the issuer, and "
-                "MCP clients refuse plaintext authorization servers."
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "OAUTH_ISSUER is %r in production. Harmless here (the OAuth "
+                "flows are not vendored — MCP uses API keys), but it means "
+                "ALLOWED_HOSTS carries no public hostname to derive it from; "
+                "check that ALLOWED_HOSTS is your real domain.",
+                issuer or "unset",
             )
 
 
 # Module-level singleton — settings/* modules read attributes from here.
 settings = Settings()  # type: ignore[call-arg]
+
+# Fill in SECRET_KEY / FIELD_ENCRYPTION_KEY / MCP_LOOPBACK_SECRET / the admin
+# slug from the persisted state file when the operator hasn't supplied them,
+# generating (once) if the file doesn't have them yet. This runs BEFORE
+# `assert_prod_safe()` — which is the point: a stock deploy passes those
+# checks without a human writing a single secret by hand. Explicit env always
+# wins, so an infrastructure-as-code setup is unaffected.
+from .boot_secrets import apply_generated_secrets  # noqa: E402
+
+apply_generated_secrets(settings, base_dir=REPO_ROOT)

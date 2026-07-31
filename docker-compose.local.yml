@@ -8,9 +8,10 @@
 #   - the repo is bind-mounted at /app: an edit lands without a rebuild.
 #     web self-reloads (uvicorn --reload, polling — real SSE, prod-same
 #     server); mcp + worker don't, hence `dev.ps1 reload`.
-#   - data/brain-repo + data/brain-views are bind-mounted from the host
-#     instead of named volumes, so the stack reuses the clone you already
-#     have and needs no git credential to boot.
+#   - data/brain-repo + data/brain-views + data/state are bind-mounted from
+#     the host instead of named volumes, so the stack reuses the clone you
+#     already have and needs no git credential to boot, and any generated
+#     boot secret survives `dev.ps1 rebuild` (and is inspectable on the host).
 #   - fixed host ports, and `restart: no` so a crash stops instead of
 #     looping in the background.
 
@@ -32,6 +33,7 @@ x-local: &local
     - .:/app
     - ./data/brain-repo:/data/brain-repo
     - ./data/brain-views:/data/brain-views
+    - ./data/state:/data/state
 
 services:
   web:
@@ -73,6 +75,7 @@ services:
       - .:/app
       - ./data/brain-repo:/data/brain-repo
       - ./data/brain-views:/data/brain-views
+      - ./data/state:/data/state
       - ./secrets/brain_write_pat:/run/secrets/brain_write_pat:ro
     depends_on:
       web:

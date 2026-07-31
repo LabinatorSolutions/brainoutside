@@ -139,9 +139,10 @@ function Initialize-Environment {
         Write-Warn ".env is missing - containers fall back to built-in defaults."
     }
 
-    # The clone and the materialized views are bind-mounted; when the host dir
-    # doesn't exist Docker creates it root-owned and the app can't write to it.
-    foreach ($dir in @('data\brain-repo', 'data\brain-views')) {
+    # The clone, the materialized views and the generated-secrets state dir are
+    # bind-mounted; when the host dir doesn't exist Docker creates it root-owned
+    # and the app can't write to it.
+    foreach ($dir in @('data\brain-repo', 'data\brain-views', 'data\state')) {
         $full = Join-Path $Root $dir
         if (-not (Test-Path $full)) { $null = New-Item -ItemType Directory -Force -Path $full }
     }

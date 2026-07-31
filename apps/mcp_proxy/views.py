@@ -668,6 +668,11 @@ async def mcp_proxy_view(
             user=principal.user,
             endpoint_slug=log_slug,
             ip=ip,
+            # Without this the checker sees no credential and took its
+            # unlimited branch, so every tools/call went unthrottled and
+            # the 429 handling below was unreachable. REST has always
+            # passed it (rest.py); the MCP path was simply missed.
+            credential=principal.credential,
         )
         if not throttle.allowed:
             resp = JsonResponse(

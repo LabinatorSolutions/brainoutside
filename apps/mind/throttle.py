@@ -4,41 +4,126 @@ rest). Fixed one-minute window in cache (Redis in prod; LocMem dev).
 
 Registered into apps.core.throttling from MindConfig.ready(); rest.py
 passes `credential=` through (marked divergence).
+
+**The no-credential branch used to return unlimited**, on the reasoning
+that only session/UI callers reach it and they are all the operator.
+That reasoning had two holes:
+
+- It was fail-OPEN by construction. Any caller that reaches the throttle
+  without a credential — because a new view is anonymous, or because a
+  call site simply forgets to pass `credential=` — silently gets no limit
+  at all. `apps.mcp_proxy.views` did exactly that, so every MCP
+  `tools/call` was unthrottled while the 429 handling right below the
+  call sat there as dead code.
+- It conflates "no API key" with "trusted". Those are the same thing only
+  while the app has no public surface. The moment an unauthenticated
+  endpoint exists, the unlimited branch is the one the internet reaches.
+
+So the fallback is now keyed on the caller instead of the absence of a
+credential: the authenticated operator stays unlimited, and everyone else
+gets a per-IP bucket. That per-IP bucket is only meaningful because
+`apps.core.security.client_ip` resolves the real caller behind a proxy —
+before that, every anonymous caller shared one bucket keyed on the
+proxy's address, which is a shared-fate DoS rather than a rate limit.
 """
 from __future__ import annotations
 
 import time
 
+from django.conf import settings
 from django.core.cache import cache
 
 from apps.core.throttling import ThrottleResult
 from apps.mind.models import DEFAULT_RATE_LIMIT_PER_MIN, Consumer
 
+#: Fallback for callers with no API key and no operator session. Modest
+#: on purpose: it is a backstop for paths nobody has explicitly sized,
+#: not a considered budget for a public endpoint. An endpoint meant to
+#: serve the public should be given its own Consumer key and limit.
+DEFAULT_ANONYMOUS_RATE_LIMIT_PER_MIN = 20
 
-def check(*, user=None, endpoint_slug: str = "", ip: str | None = None, cost: int = 1, credential=None, **_: object) -> ThrottleResult:
-    if credential is None:
-        # Session/UI callers (no API key) are not throttled here.
-        return ThrottleResult(allowed=True, remaining=10**6, retry_after_s=0, limit_per_min=10**6)
+_WINDOW_SECONDS = 60
+#: Two windows, so a counter created at the end of a window survives long
+#: enough to be read by requests still inside it.
+_COUNTER_TTL = 2 * _WINDOW_SECONDS
 
-    profile = Consumer.objects.filter(api_key=credential).first()
-    limit = profile.rate_limit_per_min if profile else DEFAULT_RATE_LIMIT_PER_MIN
+_UNLIMITED = ThrottleResult(
+    allowed=True, remaining=10**6, retry_after_s=0, limit_per_min=10**6
+)
 
-    window = int(time.time() // 60)
-    key = f"brainrl:{getattr(credential, 'pk', 'x')}:{window}"
+
+def _anonymous_limit() -> int:
+    return int(
+        getattr(
+            settings,
+            "ANONYMOUS_RATE_LIMIT_PER_MIN",
+            DEFAULT_ANONYMOUS_RATE_LIMIT_PER_MIN,
+        )
+    )
+
+
+def _is_operator(user) -> bool:
+    """Staff with a real session — the ops UI driving chat, sync, etc.
+
+    Deliberately narrow. A merely-authenticated non-staff user is treated
+    as anonymous: this product has no such users today, so if one appears
+    it is a surface nobody has sized a limit for, and the backstop should
+    apply rather than the unlimited path.
+    """
+    return bool(
+        getattr(user, "is_authenticated", False) and getattr(user, "is_staff", False)
+    )
+
+
+def _consume(key: str, limit: int, reason: str) -> ThrottleResult:
+    """Fixed-window counter shared by both buckets."""
+    window = int(time.time() // _WINDOW_SECONDS)
+    cache_key = f"{key}:{window}"
     try:
-        count = cache.incr(key)
+        count = cache.incr(cache_key)
     except ValueError:
-        cache.add(key, 1, timeout=120)
+        cache.add(cache_key, 1, timeout=_COUNTER_TTL)
         count = 1
 
     if count > limit:
         return ThrottleResult(
             allowed=False,
             remaining=0,
-            retry_after_s=60 - int(time.time() % 60),
+            retry_after_s=_WINDOW_SECONDS - int(time.time() % _WINDOW_SECONDS),
             limit_per_min=limit,
-            reason="per-key limit exceeded",
+            reason=reason,
         )
     return ThrottleResult(
         allowed=True, remaining=max(0, limit - count), retry_after_s=0, limit_per_min=limit
+    )
+
+
+def check(
+    *,
+    user=None,
+    endpoint_slug: str = "",
+    ip: str | None = None,
+    cost: int = 1,
+    credential=None,
+    **_: object,
+) -> ThrottleResult:
+    if credential is not None:
+        profile = Consumer.objects.filter(api_key=credential).first()
+        limit = profile.rate_limit_per_min if profile else DEFAULT_RATE_LIMIT_PER_MIN
+        return _consume(
+            f"brainrl:{getattr(credential, 'pk', 'x')}",
+            limit,
+            "per-key limit exceeded",
+        )
+
+    if _is_operator(user):
+        return _UNLIMITED
+
+    # Anonymous. Bucket per resolved caller address; callers whose address
+    # we could not determine share one bucket, which is the fail-closed
+    # direction — an unknown address must not mean an unmetered one.
+    return _consume(
+        f"brainrl:anon:{ip or 'unknown'}",
+        _anonymous_limit(),
+        "per-ip limit exceeded",
     )

@@ -189,6 +189,11 @@ IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/", "login/", "logout/", "setup/"]
 TRUSTED_PROXY_IP_HEADER = _env.TRUSTED_PROXY_IP_HEADER.strip()
 TRUSTED_PROXY_IPS = list(_env.TRUSTED_PROXY_IPS)
 
+# Backstop limit for anonymous callers (apps.mind.throttle). Only
+# meaningful once the setting above resolves real callers — otherwise
+# every anonymous caller shares the proxy's bucket.
+ANONYMOUS_RATE_LIMIT_PER_MIN = _env.ANONYMOUS_RATE_LIMIT_PER_MIN
+
 DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
 DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL
 

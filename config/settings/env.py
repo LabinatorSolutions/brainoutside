@@ -114,6 +114,12 @@ class Settings(BaseSettings):
     TRUSTED_PROXY_IP_HEADER: str = ""
     TRUSTED_PROXY_IPS: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
+    # Per-minute cap for callers with no API key and no operator session,
+    # bucketed on the resolved client IP. A backstop for paths nobody has
+    # explicitly sized — an endpoint intended to serve the public should
+    # get its own Consumer key and limit rather than lean on this.
+    ANONYMOUS_RATE_LIMIT_PER_MIN: int = 20
+
     # ----- Dev-only direct-login shortcut (NEVER enable in prod) -----
     # When True AND DEBUG is True, exposes GET /auth/dev-login/ which logs you
     # straight in as a staff superuser AND pre-clears the staff-2FA gate for

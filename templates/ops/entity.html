@@ -11,15 +11,15 @@
       {{ e.visibility }}
     </span>
     <span class="rounded-full px-2 py-0.5" style="background: var(--surface); border: 1px solid var(--line);">{{ e.status }}</span>
-    {% for t in e.topics %}<span class="rounded-full px-2 py-0.5" style="background: var(--surface-2);">#{{ t }}</span>{% endfor %}
-    {% for p in e.projects %}<span class="rounded-full px-2 py-0.5" style="background: var(--surface-2);">@{{ p }}</span>{% endfor %}
-    {% if e.date %}<span style="color: var(--muted); font-family: var(--font-mono);">{{ e.date }}</span>{% endif %}
-    {% if e.last_verified %}<span style="color: var(--muted); font-family: var(--font-mono);">verified {{ e.last_verified }}</span>{% endif %}
+    {% for t in e.topics %}<span class="rounded-full px-2 py-0.5 bg-surface-2">#{{ t }}</span>{% endfor %}
+    {% for p in e.projects %}<span class="rounded-full px-2 py-0.5 bg-surface-2">@{{ p }}</span>{% endfor %}
+    {% if e.date %}<span class="text-muted font-mono" >{{ e.date }}</span>{% endif %}
+    {% if e.last_verified %}<span class="text-muted font-mono" >verified {{ e.last_verified }}</span>{% endif %}
   </div>
 {% endblock %}
 
 {% block content %}
-  <div class="mb-4 text-sm"><a href="{% url 'brainconfig:browser' %}" style="color: var(--muted);">← back to browser</a></div>
+  <div class="mb-4 text-sm"><a class="text-muted" href="{% url 'brainconfig:browser' %}">← back to browser</a></div>
 
   {% if stale %}
     <div class="mb-4 rounded-xl border p-3 text-sm" style="border-color: #e2c465; background: #fff8e6;">
@@ -32,16 +32,16 @@
   {% if e.status == "superseded" %}
     <div class="mb-4 rounded-xl border p-3 text-sm" style="border-color: #e2c465; background: #fff8e6;">
       <strong>Superseded</strong>
-      {% if superseded_by %} by <a href="{% url 'brainconfig:entity' superseded_by.entity_id %}" style="color: var(--accent, #6366f1);">{{ superseded_by.entity_id }}</a>
+      {% if superseded_by %} by <a class="text-accent" href="{% url 'brainconfig:entity' superseded_by.entity_id %}">{{ superseded_by.entity_id }}</a>
       {% elif e.superseded_by %} by {{ e.superseded_by }} (not in index){% endif %}
       — history, never a current position.
     </div>
   {% endif %}
 
   {% if e.source or e.source_url %}
-    <div class="mb-4 text-sm" style="color: var(--muted);">
+    <div class="mb-4 text-sm text-muted">
       Source: {{ e.source|default:"—" }}
-      {% if e.source_url %} · <a href="{{ e.source_url }}" rel="noopener noreferrer" target="_blank" style="color: var(--accent, #6366f1);">{{ e.source_url|truncatechars:60 }}</a>{% endif %}
+      {% if e.source_url %} · <a class="text-accent" href="{{ e.source_url }}" rel="noopener noreferrer" target="_blank">{{ e.source_url|truncatechars:60 }}</a>{% endif %}
     </div>
   {% endif %}
 
@@ -50,20 +50,19 @@
       {{ read_error }} — the index row exists but the clone file is unreadable (drift?).
     </div>
   {% else %}
-    <article class="prose prose-zinc max-w-none rounded-xl border p-6"
-             style="border-color: var(--line); background: var(--surface);">
+    <article class="prose prose-zinc max-w-none rounded-xl border p-6 border-line bg-surface">
       {{ body_html|safe }}
     </article>
 
     {% if frontmatter %}
-      <details class="mt-4 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
-        <summary style="color: var(--muted); cursor: pointer;">Raw frontmatter</summary>
+      <details class="mt-4 rounded-xl border p-4 text-sm border-line bg-surface">
+        <summary class="text-muted cursor-pointer" >Raw frontmatter</summary>
         <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs" style="background: #0d1117; color: #c9d1d9;">{{ frontmatter }}</pre>
       </details>
     {% endif %}
   {% endif %}
 
-  <div class="mt-4 text-xs" style="color: var(--muted); font-family: var(--font-mono);">
+  <div class="mt-4 text-xs text-muted font-mono">
     {{ e.path }} · indexed {{ e.indexed_at|date:"Y-m-d H:i" }} · sha {{ e.content_hash|slice:":12" }}
   </div>
 {% endblock %}

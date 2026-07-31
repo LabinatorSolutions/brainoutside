@@ -4,7 +4,7 @@
 {% block page_title_tag %}Dashboard{% endblock %}
 {% block page_title %}Dashboard{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">The brain server at a glance.</p>
+  <p class="mt-1 text-sm text-muted">The brain server at a glance.</p>
 {% endblock %}
 
 {% block head_extra %}
@@ -15,26 +15,30 @@
 {% endblock %}
 
 {% block content %}
-  {# --- setup health --------------------------------------------------
-       Only problems, and only above the fold. An operator who has finished
-       setting up should see nothing here; one who hasn't should not be
-       able to miss it. Details and the fix buttons live on /ops/health/.
-  #}
+  {% comment %}--- setup health ---
+    Only problems, and only above the fold. An operator who has finished
+    setting up should see nothing here; one who hasn't should not be
+    able to miss it. Details and the fix buttons live on /ops/health/.
+
+    NOTE: keep this as a comment TAG. Django's hash-style comment is
+    single-line ONLY, so this block — which used to be written that way —
+    rendered verbatim at the top of the dashboard, the first thing anyone
+    saw on the main page.
+  {% endcomment %}
   {% if health_problems %}
-    <div class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
-      <div class="flex items-center justify-between border-b px-4 py-3" style="border-color: var(--line);">
+    <div class="mb-6 rounded-xl border border-line bg-surface">
+      <div class="flex items-center justify-between border-b px-4 py-3 border-line">
         <span class="text-sm font-medium">Setup &amp; health</span>
-        <a href="{% url 'brainconfig:health' %}" class="text-xs underline"
-           style="color: var(--accent, #6366f1);">Review and fix &rarr;</a>
+        <a href="{% url 'brainconfig:health' %}" class="text-xs underline text-accent">Review and fix &rarr;</a>
       </div>
       {% for c in health_problems %}
-        <div class="flex items-start gap-2.5 border-b px-4 py-3 last:border-0" style="border-color: var(--line);">
+        <div class="flex items-start gap-2.5 border-b px-4 py-3 last:border-0 border-line">
           <span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full"
                 style="background: {% if c.level == 'danger' %}#ff6b6b{% else %}#b7791f{% endif %};"></span>
           <div>
             <div class="text-sm font-medium"
                  style="{% if c.level == 'danger' %}color: #c0392b;{% endif %}">{{ c.title }}</div>
-            <div class="mt-0.5 max-w-3xl text-xs" style="color: var(--muted);">{{ c.detail }}</div>
+            <div class="mt-0.5 max-w-3xl text-xs text-muted">{{ c.detail }}</div>
           </div>
         </div>
       {% endfor %}
@@ -43,14 +47,14 @@
 
   {# --- tiles row ------------------------------------------------------ #}
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">Sync</div>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">Sync</div>
       {% if probe.valid and probe.contract_ok %}
         <div class="mt-1 text-lg font-semibold" style="color: #2c8577;">healthy</div>
       {% else %}
         <div class="mt-1 text-lg font-semibold" style="color: #c0392b;">degraded</div>
       {% endif %}
-      <div class="mt-1 text-xs" style="color: var(--muted); font-family: var(--font-mono);">
+      <div class="mt-1 text-xs text-muted font-mono">
         {% if last_sync %}
           {{ last_sync.trigger }} · {{ last_sync.commit_sha|slice:":8" }} ·
           {{ last_sync.started_at|timesince }} ago
@@ -59,24 +63,24 @@
       </div>
     </div>
 
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">Entities</div>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">Entities</div>
       <div class="mt-1 text-lg font-semibold">{{ entity_total }}</div>
-      <div class="mt-1 text-xs" style="color: var(--muted);">
+      <div class="mt-1 text-xs text-muted">
         {{ vis_public }} public · {{ vis_agents }} agents-only · {{ vis_private }} private · {{ superseded }} superseded
       </div>
     </div>
 
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">Reads</div>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">Reads</div>
       <div class="mt-1 text-lg font-semibold">{{ reads_day }}</div>
-      <div class="mt-1 text-xs" style="color: var(--muted);">today · {{ reads_week }} this week</div>
+      <div class="mt-1 text-xs text-muted">today · {{ reads_week }} this week</div>
     </div>
 
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">SDK spend</div>
-      <div class="mt-1 text-lg font-semibold" style="font-family: var(--font-mono);">${{ spend_day.cost|floatformat:4 }}</div>
-      <div class="mt-1 text-xs" style="color: var(--muted);">
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">SDK spend</div>
+      <div class="mt-1 text-lg font-semibold font-mono">${{ spend_day.cost|floatformat:4 }}</div>
+      <div class="mt-1 text-xs text-muted">
         today ({{ spend_day.runs }} runs{% if spend_day.errors %}, {{ spend_day.errors }} failed{% endif %}) ·
         ${{ spend_week.cost|floatformat:2 }} / week
       </div>
@@ -90,78 +94,78 @@
 
   <div class="mt-6 grid gap-6 lg:grid-cols-2">
     {# --- staleness ---------------------------------------------------- #}
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">
-        Stale project cards <span class="text-sm font-normal" style="color: var(--muted);">(last-verified &gt; {{ stale_after }}d)</span>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">
+        Stale project cards <span class="text-sm font-normal text-muted">(last-verified &gt; {{ stale_after }}d)</span>
       </h2>
       {% if stale_projects %}
         <ul class="mt-3 space-y-2 text-sm">
           {% for e in stale_projects %}
             <li class="flex items-center justify-between">
-              <a href="{% url 'brainconfig:entity' e.entity_id %}" style="color: var(--accent, #6366f1);">{{ e.entity_id }}</a>
-              <span style="color: var(--muted); font-family: var(--font-mono);">
+              <a class="text-accent" href="{% url 'brainconfig:entity' e.entity_id %}">{{ e.entity_id }}</a>
+              <span class="text-muted font-mono" >
                 {% if e.last_verified %}{{ e.last_verified }}{% else %}never verified{% endif %}
               </span>
             </li>
           {% endfor %}
         </ul>
       {% else %}
-        <p class="mt-3 text-sm" style="color: var(--muted);">All project cards fresh.</p>
+        <p class="mt-3 text-sm text-muted">All project cards fresh.</p>
       {% endif %}
     </div>
 
     {# --- most served --------------------------------------------------- #}
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">Most-served notes <span class="text-sm font-normal" style="color: var(--muted);">(30d)</span></h2>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">Most-served notes <span class="text-sm font-normal text-muted">(30d)</span></h2>
       {% if most_served %}
         <ul class="mt-3 space-y-2 text-sm">
           {% for eid, n in most_served %}
             <li class="flex items-center justify-between">
-              <a href="{% url 'brainconfig:entity' eid %}" style="color: var(--accent, #6366f1);">{{ eid }}</a>
-              <span style="font-family: var(--font-mono);">{{ n }}</span>
+              <a class="text-accent" href="{% url 'brainconfig:entity' eid %}">{{ eid }}</a>
+              <span class="font-mono" >{{ n }}</span>
             </li>
           {% endfor %}
         </ul>
       {% else %}
-        <p class="mt-3 text-sm" style="color: var(--muted);">No reads yet.</p>
+        <p class="mt-3 text-sm text-muted">No reads yet.</p>
       {% endif %}
     </div>
 
     {# --- entity mix ---------------------------------------------------- #}
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">Entity mix</h2>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">Entity mix</h2>
       <table class="mt-3 w-full text-sm">
         {% for row in kind_counts %}
           <tr>
-            <td class="py-1"><a href="{% url 'brainconfig:browser' %}?kind={{ row.kind }}" style="color: var(--accent, #6366f1);">{{ row.kind }}</a></td>
-            <td class="py-1 text-right" style="font-family: var(--font-mono);">{{ row.n }}</td>
+            <td class="py-1"><a class="text-accent" href="{% url 'brainconfig:browser' %}?kind={{ row.kind }}">{{ row.kind }}</a></td>
+            <td class="py-1 text-right font-mono">{{ row.n }}</td>
           </tr>
         {% endfor %}
       </table>
-      <div class="mt-2 text-xs" style="color: var(--muted);">
-        <a href="{% url 'brainconfig:feeds' %}" style="color: var(--accent, #6366f1);">pending feeds: {{ pending_feeds }}</a>
+      <div class="mt-2 text-xs text-muted">
+        <a class="text-accent" href="{% url 'brainconfig:feeds' %}">pending feeds: {{ pending_feeds }}</a>
       </div>
     </div>
 
     {# --- recent activity ------------------------------------------------ #}
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">Recent activity</h2>
-      <ul class="mt-3 space-y-1.5 text-xs" style="font-family: var(--font-mono);">
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">Recent activity</h2>
+      <ul class="mt-3 space-y-1.5 text-xs font-mono">
         {% for ev in recent_events %}
           <li>
-            <span style="color: var(--muted);">{{ ev.created_at|date:"m-d H:i" }}</span>
+            <span class="text-muted" >{{ ev.created_at|date:"m-d H:i" }}</span>
             {{ ev.type }}{% if ev.consumer %} · {{ ev.consumer }}{% endif %}
           </li>
         {% empty %}
-          <li style="color: var(--muted);">no events yet</li>
+          <li class="text-muted" >no events yet</li>
         {% endfor %}
       </ul>
       {% if recent_ops %}
         <h3 class="mt-4 text-sm font-medium">SDK runs</h3>
-        <ul class="mt-1 space-y-1.5 text-xs" style="font-family: var(--font-mono);">
+        <ul class="mt-1 space-y-1.5 text-xs font-mono">
           {% for op in recent_ops %}
             <li>
-              <span style="color: var(--muted);">{{ op.created_at|date:"m-d H:i" }}</span>
+              <span class="text-muted" >{{ op.created_at|date:"m-d H:i" }}</span>
               {{ op.kind }} ·
               {% if op.ok is None %}<span style="color:#b58900;">running</span>
               {% elif op.ok %}<span style="color:#2c8577;">ok</span>

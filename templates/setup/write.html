@@ -9,7 +9,7 @@
 
 {% block step_body %}
   {% if configured and source != "settings" %}
-    <div class="mb-5 rounded-lg border px-4 py-3 text-sm" style="border-color: var(--line);">
+    <div class="mb-5 rounded-lg border px-4 py-3 text-sm border-line">
       A write credential is already supplied by this deployment's
       {% if source == "env" %}environment{% else %}mounted secret file{% endif %},
       which takes precedence over anything saved here. Nothing to do.
@@ -30,9 +30,8 @@
     <label for="id_pat" class="block text-sm font-medium">Token</label>
     <input type="password" name="pat" id="id_pat" autocomplete="off"
            placeholder="{% if configured %}stored — paste a new one to replace{% else %}github_pat_…{% endif %}"
-           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm"
-           style="font-family: var(--font-mono);" />
-    <p class="mt-1.5 text-xs" style="color: var(--muted);">
+           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm font-mono" />
+    <p class="mt-1.5 text-xs text-muted">
       Stored encrypted in this server's database. To keep it out of the
       database entirely, mount it as a file and set
       <code>BRAIN_GIT_WRITE_PAT_PATH</code> instead — see docs/SECURITY.md.
@@ -44,12 +43,11 @@
         Save and continue
       </button>
       <button type="submit" name="action" value="skip" :disabled="busy"
-              class="rounded-lg border px-4 py-2 text-sm"
-              style="border-color: var(--line); color: var(--muted);">
+              class="rounded-lg border px-4 py-2 text-sm border-line text-muted">
         Skip for now
       </button>
     </div>
-    <p class="mt-2 text-xs" style="color: var(--muted);">
+    <p class="mt-2 text-xs text-muted">
       Skipping is fine. Approvals still commit to the clone on this server;
       the dashboard will tell you the brain is ahead of GitHub until you add
       a token.

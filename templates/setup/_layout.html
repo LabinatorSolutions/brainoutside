@@ -11,24 +11,23 @@
 {% block title %}Set up {{ APP_NAME }}{% endblock %}
 
 {% block body %}
-<main class="min-h-screen px-6 py-10" style="background: var(--surface-2); color: var(--ink);">
+<main class="min-h-screen px-6 py-10 bg-surface-2 text-ink">
   <div class="mx-auto max-w-3xl">
 
     <div class="flex items-center gap-3">
       <img src="{% static 'img/brain-hero.svg' %}" alt="" class="h-10 w-10" draggable="false" />
-      <h1 class="text-2xl font-bold tracking-tight" style="font-family: var(--font-display);">
+      <h1 class="text-2xl font-bold tracking-tight font-display">
         Set up {{ APP_NAME }}
       </h1>
     </div>
 
     <ol class="mt-6 flex flex-wrap gap-x-2 gap-y-2 text-xs">
       {% for s in steps %}
-        <li class="flex items-center gap-1.5 rounded-full px-3 py-1"
-            style="border: 1px solid var(--line);
-                   {% if s.slug == current %}background: var(--ink); color: var(--surface);
-                   {% elif s.done %}color: #2c8577;{% elif s.skipped %}color: var(--muted);
-                   {% else %}color: var(--muted);{% endif %}">
-          <span style="font-family: var(--font-mono);">{{ forloop.counter }}</span>
+        <li class="flex items-center gap-1.5 rounded-pill border border-line px-3 py-1
+                   {% if s.slug == current %}bg-ink text-surface
+                   {% elif s.done %}text-signal
+                   {% else %}text-muted{% endif %}">
+          <span class="font-mono">{{ forloop.counter }}</span>
           <span>{{ s.title }}</span>
           {% if s.done %}<span aria-label="done">&check;</span>
           {% elif s.skipped %}<span aria-label="skipped">&ndash;</span>{% endif %}
@@ -38,17 +37,16 @@
 
     {% include "partials/_flash.html" %}
 
-    <section class="mt-6 rounded-xl border p-6"
-             style="border-color: var(--line); background: var(--surface);">
-      <h2 class="text-lg font-semibold" style="font-family: var(--font-display);">
+    <section class="mt-6 rounded-xl border p-6 border-line bg-surface">
+      <h2 class="text-lg font-semibold font-display">
         {% block step_title %}{% endblock %}
       </h2>
-      <p class="mt-1 text-sm" style="color: var(--muted);">{% block step_blurb %}{% endblock %}</p>
+      <p class="mt-1 text-sm text-muted">{% block step_blurb %}{% endblock %}</p>
 
       <div class="mt-5">{% block step_body %}{% endblock %}</div>
     </section>
 
-    <p class="mt-6 text-xs" style="color: var(--muted);">
+    <p class="mt-6 text-xs text-muted">
       Step {{ current_index|add:1 }} of {{ total_steps }}.
       {% if not setup_complete %}You can leave and come back — nothing is lost.{% endif %}
     </p>

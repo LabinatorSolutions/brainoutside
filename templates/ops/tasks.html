@@ -3,7 +3,7 @@
 {% block page_title_tag %}Tasks{% endblock %}
 {% block page_title %}Background tasks{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">
+  <p class="mt-1 text-sm text-muted">
     {% if busy %}Work is running — this page refreshes itself every 5s.{% else %}Nothing running right now.{% endif %}
     {% if queue_depth is not None %} · queue depth {{ queue_depth }}{% endif %}
   </p>
@@ -11,13 +11,13 @@
 
 {% block content %}
   {% if ops_jobs %}
-    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Setup &amp; repair jobs</h2>
-    <div class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    <h2 class="mb-2 text-sm font-medium text-muted">Setup &amp; repair jobs</h2>
+    <div class="mb-6 rounded-xl border border-line bg-surface">
       {% for j in ops_jobs %}
-        <div class="border-b px-4 py-3 text-sm last:border-0" style="border-color: var(--line);">
+        <div class="border-b px-4 py-3 text-sm last:border-0 border-line">
           <div class="flex items-center gap-2">
             {% if j.state == "running" %}
-              <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
+              <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
             {% endif %}
             <span>{{ j.label|default:j.spec.label }}</span>
             <span class="text-xs"
@@ -26,7 +26,7 @@
             </span>
           </div>
           {% if j.result %}
-            <div class="mt-1 text-xs" style="color: var(--muted); font-family: var(--font-mono);">{{ j.result }}</div>
+            <div class="mt-1 text-xs text-muted font-mono">{{ j.result }}</div>
           {% endif %}
           {% if j.error %}
             <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
@@ -38,11 +38,11 @@
   {% endif %}
 
   {% if extracting or approving %}
-    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Feeds in flight</h2>
-    <div class="mb-6 overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    <h2 class="mb-2 text-sm font-medium text-muted">Feeds in flight</h2>
+    <div class="mb-6 overflow-x-auto rounded-xl border border-line bg-surface">
       <table class="w-full text-sm">
         <thead>
-          <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+          <tr class="border-b text-left border-line text-muted">
             <th class="px-4 py-3 font-medium">Feed</th>
             <th class="px-4 py-3 font-medium">Doing</th>
             <th class="px-4 py-3 font-medium">Since</th>
@@ -50,17 +50,17 @@
         </thead>
         <tbody>
           {% for f in extracting %}
-            <tr class="border-b" style="border-color: var(--line);">
-              <td class="px-4 py-2.5"><a href="{% url 'brainconfig:feed-detail' f.pk %}" style="color: var(--accent, #6366f1); font-family: var(--font-mono);">{{ f.source_id }}</a></td>
-              <td class="px-4 py-2.5"><span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span> extracting</td>
-              <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ f.extract_queued_at|timesince }} ago</td>
+            <tr class="border-b border-line">
+              <td class="px-4 py-2.5"><a class="text-accent font-mono" href="{% url 'brainconfig:feed-detail' f.pk %}">{{ f.source_id }}</a></td>
+              <td class="px-4 py-2.5"><span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span> extracting</td>
+              <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ f.extract_queued_at|timesince }} ago</td>
             </tr>
           {% endfor %}
           {% for f in approving %}
-            <tr class="border-b" style="border-color: var(--line);">
-              <td class="px-4 py-2.5"><a href="{% url 'brainconfig:feed-detail' f.pk %}" style="color: var(--accent, #6366f1); font-family: var(--font-mono);">{{ f.source_id }}</a></td>
-              <td class="px-4 py-2.5"><span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--success, #4db8a8);"></span> applying + pushing</td>
-              <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ f.decided_at|timesince }} ago</td>
+            <tr class="border-b border-line">
+              <td class="px-4 py-2.5"><a class="text-accent font-mono" href="{% url 'brainconfig:feed-detail' f.pk %}">{{ f.source_id }}</a></td>
+              <td class="px-4 py-2.5"><span class="inline-block h-2 w-2 animate-pulse rounded-full bg-signal"></span> applying + pushing</td>
+              <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ f.decided_at|timesince }} ago</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -68,11 +68,11 @@
     </div>
   {% endif %}
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">SDK operations running</h2>
-  <div class="mb-6 overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 text-sm font-medium text-muted">SDK operations running</h2>
+  <div class="mb-6 overflow-x-auto rounded-xl border border-line bg-surface">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+        <tr class="border-b text-left border-line text-muted">
           <th class="px-4 py-3 font-medium">Kind</th>
           <th class="px-4 py-3 font-medium">Model</th>
           <th class="px-4 py-3 font-medium">Started</th>
@@ -81,31 +81,31 @@
       </thead>
       <tbody>
         {% for op in running %}
-          <tr class="border-b" style="border-color: var(--line);">
-            <td class="px-4 py-2.5" style="font-family: var(--font-mono);">{{ op.kind }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ op.model|default:"—" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ op.created_at|timesince }} ago</td>
+          <tr class="border-b border-line">
+            <td class="px-4 py-2.5 font-mono">{{ op.kind }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.model|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.created_at|timesince }} ago</td>
             <td class="px-4 py-2.5">
               {% if op.is_stale %}
                 <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;" title="Older than the worker timeout — the run was killed before it could finalize.">stale (likely killed)</span>
               {% else %}
-                <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
+                <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
                 <span class="text-xs">running</span>
               {% endif %}
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="4" class="px-4 py-6 text-center" style="color: var(--muted);">No SDK operations running.</td></tr>
+          <tr><td colspan="4" class="px-4 py-6 text-center text-muted">No SDK operations running.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Recent SDK operations</h2>
-  <div class="mb-6 overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 text-sm font-medium text-muted">Recent SDK operations</h2>
+  <div class="mb-6 overflow-x-auto rounded-xl border border-line bg-surface">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+        <tr class="border-b text-left border-line text-muted">
           <th class="px-4 py-3 font-medium">Kind</th>
           <th class="px-4 py-3 font-medium">Outcome</th>
           <th class="px-4 py-3 font-medium">Model</th>
@@ -117,8 +117,8 @@
       </thead>
       <tbody>
         {% for op in recent %}
-          <tr class="border-b" style="border-color: var(--line);">
-            <td class="px-4 py-2.5" style="font-family: var(--font-mono);">{{ op.kind }}</td>
+          <tr class="border-b border-line">
+            <td class="px-4 py-2.5 font-mono">{{ op.kind }}</td>
             <td class="px-4 py-2.5">
               {% if op.ok %}
                 <span class="rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">ok</span>
@@ -126,24 +126,24 @@
                 <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;" title="{{ op.error_class }}">{{ op.error_class|default:"error" }}</span>
               {% endif %}
             </td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ op.model|default:"—" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ op.input_tokens|default:"—" }} / {{ op.output_tokens|default:"—" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{% if op.cost_usd is not None %}${{ op.cost_usd|floatformat:4 }}{% else %}—{% endif %}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{% if op.duration_ms is not None %}{{ op.duration_ms }} ms{% else %}—{% endif %}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ op.finished_at|date:"Y-m-d H:i:s" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.model|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.input_tokens|default:"—" }} / {{ op.output_tokens|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{% if op.cost_usd is not None %}${{ op.cost_usd|floatformat:4 }}{% else %}—{% endif %}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{% if op.duration_ms is not None %}{{ op.duration_ms }} ms{% else %}—{% endif %}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.finished_at|date:"Y-m-d H:i:s" }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="7" class="px-4 py-6 text-center" style="color: var(--muted);">No finished operations yet.</td></tr>
+          <tr><td colspan="7" class="px-4 py-6 text-center text-muted">No finished operations yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Recent worker tasks (Q2)</h2>
-  <div class="mb-6 overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 text-sm font-medium text-muted">Recent worker tasks (Q2)</h2>
+  <div class="mb-6 overflow-x-auto rounded-xl border border-line bg-surface">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+        <tr class="border-b text-left border-line text-muted">
           <th class="px-4 py-3 font-medium">Task</th>
           <th class="px-4 py-3 font-medium">Outcome</th>
           <th class="px-4 py-3 font-medium">Started</th>
@@ -152,8 +152,8 @@
       </thead>
       <tbody>
         {% for t in q_tasks %}
-          <tr class="border-b" style="border-color: var(--line);">
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono);">{{ t.func }}</td>
+          <tr class="border-b border-line">
+            <td class="px-4 py-2.5 text-xs font-mono">{{ t.func }}</td>
             <td class="px-4 py-2.5">
               {% if t.success %}
                 <span class="rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">ok</span>
@@ -161,11 +161,11 @@
                 <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;">failed</span>
               {% endif %}
             </td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ t.started|date:"Y-m-d H:i:s" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ t.time_taken|floatformat:1 }}s</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ t.started|date:"Y-m-d H:i:s" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ t.time_taken|floatformat:1 }}s</td>
           </tr>
         {% empty %}
-          <tr><td colspan="4" class="px-4 py-6 text-center" style="color: var(--muted);">No completed worker tasks recorded.</td></tr>
+          <tr><td colspan="4" class="px-4 py-6 text-center text-muted">No completed worker tasks recorded.</td></tr>
         {% endfor %}
       </tbody>
     </table>

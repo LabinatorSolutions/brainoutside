@@ -1,28 +1,28 @@
 {% extends "ops/_layout.html" %}
 
 {% block page_title_tag %}Feed · {{ feed.source_id }}{% endblock %}
-{% block page_title %}<span style="font-family: var(--font-mono);">{{ feed.source_id }}</span>{% endblock %}
+{% block page_title %}<span class="font-mono" >{{ feed.source_id }}</span>{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">
+  <p class="mt-1 text-sm text-muted">
     {{ feed.status }} · via {{ feed.channel }} · {{ feed.created_at|date:"Y-m-d H:i" }}
     {% if feed.consumer %} · key {{ feed.consumer }}{% endif %}
   </p>
 {% endblock %}
 
 {% block content %}
-  <div class="mb-4"><a href="{% url 'brainconfig:feeds' %}" class="text-sm" style="color: var(--muted);">← back to queue</a></div>
+  <div class="mb-4"><a href="{% url 'brainconfig:feeds' %}" class="text-sm text-muted">← back to queue</a></div>
 
-  <div class="mb-4 grid gap-3 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
-    <div><span style="color: var(--muted);">Kind:</span> {{ payload.source_kind }}</div>
-    {% if payload.title %}<div><span style="color: var(--muted);">Title:</span> {{ payload.title }}</div>{% endif %}
+  <div class="mb-4 grid gap-3 rounded-xl border p-4 text-sm border-line bg-surface">
+    <div><span class="text-muted" >Kind:</span> {{ payload.source_kind }}</div>
+    {% if payload.title %}<div><span class="text-muted" >Title:</span> {{ payload.title }}</div>{% endif %}
     {% if payload.source_url %}
-      <div style="overflow-wrap: anywhere;"><span style="color: var(--muted);">URL:</span>
-        <span style="font-family: var(--font-mono);">{{ payload.source_url }}</span></div>
+      <div class="[overflow-wrap:anywhere]" ><span class="text-muted" >URL:</span>
+        <span class="font-mono" >{{ payload.source_url }}</span></div>
     {% endif %}
-    {% if payload.notes %}<div><span style="color: var(--muted);">Notes:</span> {{ payload.notes }}</div>{% endif %}
+    {% if payload.notes %}<div><span class="text-muted" >Notes:</span> {{ payload.notes }}</div>{% endif %}
     {% if fetch %}
       <div>
-        <span style="color: var(--muted);">Fetch:</span>
+        <span class="text-muted" >Fetch:</span>
         {% if fetch.ok %}
           ok · HTTP {{ fetch.status }} · {{ fetch.content_type }} · {{ fetch.bytes|filesizeformat }}{% if fetch.truncated %} · <span style="color: #a33;">truncated at cap</span>{% endif %}
         {% else %}
@@ -30,27 +30,27 @@
         {% endif %}
       </div>
     {% endif %}
-    {% if feed.error %}<div style="color: #a33;"><span style="color: var(--muted);">Error:</span> {{ feed.error }}</div>{% endif %}
-    {% if feed.decision_note %}<div><span style="color: var(--muted);">Decision:</span> {{ feed.decision_note }}{% if feed.decided_at %} <span class="text-xs" style="color: var(--muted);">({{ feed.decided_at|date:"Y-m-d H:i" }})</span>{% endif %}</div>{% endif %}
-    {% if feed.commit_hash %}<div><span style="color: var(--muted);">Commit:</span> <span style="font-family: var(--font-mono);">{{ feed.commit_hash }}</span></div>{% endif %}
+    {% if feed.error %}<div style="color: #a33;"><span class="text-muted" >Error:</span> {{ feed.error }}</div>{% endif %}
+    {% if feed.decision_note %}<div><span class="text-muted" >Decision:</span> {{ feed.decision_note }}{% if feed.decided_at %} <span class="text-xs text-muted">({{ feed.decided_at|date:"Y-m-d H:i" }})</span>{% endif %}</div>{% endif %}
+    {% if feed.commit_hash %}<div><span class="text-muted" >Commit:</span> <span class="font-mono" >{{ feed.commit_hash }}</span></div>{% endif %}
   </div>
 
   {% if feed.status == "approving" %}
-    <div class="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
-      <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
+    <div class="mb-4 flex items-center gap-2 rounded-xl border p-4 text-sm border-line bg-surface">
+      <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
       Approval running — the worker is applying, committing, and pushing this feed. This page refreshes itself.
     </div>
   {% endif %}
 
   {% if content %}
-    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Captured content ({{ feed.payload_bytes|filesizeformat }})</h2>
+    <h2 class="mb-2 text-sm font-medium text-muted">Captured content ({{ feed.payload_bytes|filesizeformat }})</h2>
     {# Rendered as plain preformatted text on purpose: fed content is untrusted #}
     {# input (grill C12d) — never render it as markdown/HTML in the ops UI. #}
-    <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ content }}</pre>
+    <pre class="mb-6 max-h-96 overflow-auto rounded-xl border p-4 text-xs border-line bg-surface whitespace-pre-wrap [overflow-wrap:anywhere]">{{ content }}</pre>
   {% endif %}
 
   {% if validation %}
-    <div class="mb-4 rounded-xl border p-4 text-sm" style="border-color: var(--line); background: var(--surface);">
+    <div class="mb-4 rounded-xl border p-4 text-sm border-line bg-surface">
       <h2 class="mb-2 font-medium">
         Validation:
         {% if validation.valid %}
@@ -60,7 +60,7 @@
         {% endif %}
       </h2>
       {% for v in validation.violations %}
-        <div class="text-xs" style="color: #a33;">rule {{ v.rule }} · <span style="font-family: var(--font-mono);">{{ v.path }}</span> — {{ v.message }}</div>
+        <div class="text-xs" style="color: #a33;">rule {{ v.rule }} · <span class="font-mono" >{{ v.path }}</span> — {{ v.message }}</div>
       {% endfor %}
       {% for w in validation.warnings %}
         <div class="text-xs" style="color: #8a6d1a;">warn — {{ w }}</div>
@@ -69,25 +69,25 @@
   {% endif %}
 
   {% if diffs %}
-    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">
+    <h2 class="mb-2 text-sm font-medium text-muted">
       Proposed changes — rendered as diff, on purpose (fed content is untrusted)
     </h2>
     {% if feed.proposal.summary %}
       <p class="mb-3 text-sm">{{ feed.proposal.summary }}</p>
     {% endif %}
     {% for d in diffs %}
-      <div class="mb-3 overflow-hidden rounded-xl border" style="border-color: var(--line); background: var(--surface);">
-        <div class="flex items-center gap-2 border-b px-4 py-2 text-xs" style="border-color: var(--line);">
-          <span style="font-family: var(--font-mono);">{{ d.path }}</span>
+      <div class="mb-3 overflow-hidden rounded-xl border border-line bg-surface">
+        <div class="flex items-center gap-2 border-b px-4 py-2 text-xs border-line">
+          <span class="font-mono" >{{ d.path }}</span>
           <span class="rounded-full px-2 py-0.5" style="background: {% if d.action == 'create' %}#e7f6f2{% else %}#eef0ff{% endif %};">{{ d.action }}</span>
-          <span style="color: var(--muted);">+{{ d.added }} −{{ d.removed }}</span>
+          <span class="text-muted" >+{{ d.added }} −{{ d.removed }}</span>
         </div>
         <pre class="max-h-96 overflow-auto p-0 text-xs" style="background: #0d1117; color: #c9d1d9;">{% for kind, text in d.lines %}<div style="padding: 0 1rem; {% if kind == 'add' %}background: rgba(46,160,67,.2);{% elif kind == 'del' %}background: rgba(248,81,73,.2);{% elif kind == 'hunk' %}color: #8b949e;{% endif %}">{% if kind == 'add' %}+{% elif kind == 'del' %}-{% else %} {% endif %}{{ text }}</div>{% endfor %}</pre>
       </div>
     {% endfor %}
 
     {% if feed.proposal.index_lines %}
-      <div class="mb-3 rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface);">
+      <div class="mb-3 rounded-xl border p-4 text-xs border-line bg-surface">
         <div class="mb-1 font-medium">INDEX lines (applied by trusted code on approve)</div>
         {% for l in feed.proposal.index_lines %}
           <div style="font-family: var(--font-mono); color: #1a7f37;">+ {{ l.line }}</div>
@@ -95,10 +95,10 @@
       </div>
     {% endif %}
     {% if feed.proposal.supersedes %}
-      <div class="mb-3 rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface);">
+      <div class="mb-3 rounded-xl border p-4 text-xs border-line bg-surface">
         <div class="mb-1 font-medium">Supersedes (frontmatter edited by trusted code)</div>
         {% for s in feed.proposal.supersedes %}
-          <div style="font-family: var(--font-mono);">{{ s.old_entity_id }} → superseded_by: {{ s.new_entity_id }}</div>
+          <div class="font-mono" >{{ s.old_entity_id }} → superseded_by: {{ s.new_entity_id }}</div>
         {% endfor %}
       </div>
     {% endif %}
@@ -110,40 +110,39 @@
     {% endif %}
 
     {% if feed.status == "pending" %}
-      <details class="mb-3 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+      <details class="mb-3 rounded-xl border border-line bg-surface">
         <summary class="cursor-pointer px-4 py-3 text-sm font-medium">Edit proposal (re-validates on save)</summary>
-        <form method="post" class="grid gap-3 border-t px-4 py-4" style="border-color: var(--line);">
+        <form method="post" class="grid gap-3 border-t px-4 py-4 border-line">
           {% csrf_token %}
           <input type="hidden" name="action" value="save_edits" />
           <label class="text-sm">
-            <span class="block text-xs" style="color: var(--muted);">Summary</span>
-            <textarea name="summary" rows="2" class="mt-1 w-full rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">{{ feed.proposal.summary }}</textarea>
+            <span class="block text-xs text-muted">Summary</span>
+            <textarea name="summary" rows="2" class="mt-1 w-full rounded-lg border px-2 py-1.5 border-line bg-surface-2">{{ feed.proposal.summary }}</textarea>
           </label>
           {% for i, f in edit_files %}
             <label class="text-sm">
-              <span class="block text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ f.path }}</span>
-              <textarea name="file_content__{{ i }}" rows="10" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs" style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);">{{ f.content }}</textarea>
+              <span class="block text-xs font-mono text-muted">{{ f.path }}</span>
+              <textarea name="file_content__{{ i }}" rows="10" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs border-line bg-surface-2 font-mono">{{ f.content }}</textarea>
             </label>
           {% endfor %}
           {% for i, l in edit_lines %}
             <label class="text-sm">
-              <span class="block text-xs" style="color: var(--muted);">INDEX line — {{ l.entity_id }}</span>
-              <input type="text" name="index_line__{{ i }}" value="{{ l.line }}" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs" style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);" />
+              <span class="block text-xs text-muted">INDEX line — {{ l.entity_id }}</span>
+              <input type="text" name="index_line__{{ i }}" value="{{ l.line }}" class="mt-1 w-full rounded-lg border px-2 py-1.5 text-xs border-line bg-surface-2 font-mono" />
             </label>
           {% endfor %}
           <div>
-            <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">Save + re-validate</button>
+            <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Save + re-validate</button>
           </div>
         </form>
       </details>
 
-      <div class="mb-6 flex flex-wrap items-center gap-3 rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
+      <div class="mb-6 flex flex-wrap items-center gap-3 rounded-xl border p-4 border-line bg-surface">
         <form method="post">
           {% csrf_token %}
           <input type="hidden" name="action" value="approve" />
           <button type="submit" {% if not can_approve %}disabled title="Validation must pass first"{% endif %}
-                  class="rounded-lg px-4 py-2 text-sm font-medium text-white {% if not can_approve %}opacity-40{% endif %}"
-                  style="background: var(--success, #4db8a8);">
+                  class="rounded-lg px-4 py-2 text-sm font-medium text-white {% if not can_approve %}opacity-40{% endif %} bg-signal">
             Approve{% if feed.proposal_edited %} (edited){% endif %}
           </button>
         </form>
@@ -151,15 +150,15 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="reject" />
           <input type="text" name="reason" required placeholder="Reject reason (required)"
-                 class="grow rounded-lg border px-2 py-1.5 text-sm" style="border-color: var(--line); background: var(--surface-2);" />
-          <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--danger, #ff6b6b);">Reject</button>
+                 class="grow rounded-lg border px-2 py-1.5 text-sm border-line bg-surface-2" />
+          <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-danger">Reject</button>
         </form>
       </div>
     {% endif %}
 
     <details class="mb-6">
-      <summary class="cursor-pointer text-xs" style="color: var(--muted);">Raw proposal JSON</summary>
-      <pre class="mt-2 max-h-96 overflow-auto rounded-xl border p-4 text-xs" style="border-color: var(--line); background: var(--surface); white-space: pre-wrap; overflow-wrap: anywhere;">{{ proposal_json }}</pre>
+      <summary class="cursor-pointer text-xs text-muted">Raw proposal JSON</summary>
+      <pre class="mt-2 max-h-96 overflow-auto rounded-xl border p-4 text-xs border-line bg-surface whitespace-pre-wrap [overflow-wrap:anywhere]">{{ proposal_json }}</pre>
     </details>
   {% elif feed.status == "pending" %}
     <form method="post" class="flex items-center gap-3">
@@ -171,16 +170,16 @@
                 style="background: var(--accent, #6366f1); cursor: not-allowed;">
           Extracting…
         </button>
-        <span class="text-sm" style="color: var(--muted);">
+        <span class="text-sm text-muted">
           The feeder agent is running (queued {{ feed.extract_queued_at|date:"H:i:s" }}) —
           this page refreshes itself until the proposal lands. Progress:
-          <a href="{% url 'brainconfig:tasks' %}" style="color: var(--accent, #6366f1);">Tasks</a>.
+          <a class="text-accent" href="{% url 'brainconfig:tasks' %}">Tasks</a>.
         </span>
       {% else %}
-        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--accent, #6366f1);">
+        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">
           {% if feed.error %}Retry extraction{% else %}Run extraction{% endif %}
         </button>
-        <span class="text-sm" style="color: var(--muted);">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
+        <span class="text-sm text-muted">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
       {% endif %}
     </form>
   {% endif %}

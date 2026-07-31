@@ -3,7 +3,7 @@
 {% block page_title_tag %}Setup &amp; health{% endblock %}
 {% block page_title %}Setup &amp; health{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">
+  <p class="mt-1 text-sm text-muted">
     What this server knows about its own configuration, and the actions that
     fix it. Failures show the underlying error, not a summary of it.
   </p>
@@ -14,17 +14,15 @@
 
   {# ---- running / recent repair jobs ---- #}
   <template x-if="Object.keys(jobs).length">
-    <div class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+    <div class="mb-6 rounded-xl border border-line bg-surface">
       <template x-for="(j, name) in jobs" :key="name">
-        <div class="border-b px-4 py-3 text-sm" style="border-color: var(--line);">
+        <div class="border-b px-4 py-3 text-sm border-line">
           <div class="flex items-center gap-2">
-            <span x-show="j.state === 'running'" class="inline-block h-2 w-2 animate-pulse rounded-full"
-                  style="background: var(--accent, #6366f1);"></span>
+            <span x-show="j.state === 'running'" class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
             <span class="font-medium" x-text="j.label"></span>
-            <span class="text-xs" style="color: var(--muted); font-family: var(--font-mono);" x-text="j.state"></span>
+            <span class="text-xs text-muted font-mono" x-text="j.state"></span>
           </div>
-          <div x-show="j.result" class="mt-1 text-xs"
-               style="color: var(--muted); font-family: var(--font-mono);" x-text="j.result"></div>
+          <div x-show="j.result" class="mt-1 text-xs text-muted font-mono" x-text="j.result"></div>
           <pre x-show="j.error" class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
                style="background: #0d1117; color: #c9d1d9;" x-text="j.error"></pre>
         </div>
@@ -44,7 +42,7 @@
                   style="background: {% if c.level == 'danger' %}#ff6b6b{% elif c.level == 'warn' %}#b7791f{% elif c.level == 'ok' %}#4db8a8{% else %}var(--muted){% endif %};"></span>
             <span class="font-medium">{{ c.title }}</span>
           </div>
-          <p class="mt-1 max-w-2xl text-sm" style="color: var(--muted);">{{ c.detail }}</p>
+          <p class="mt-1 max-w-2xl text-sm text-muted">{{ c.detail }}</p>
         </div>
 
         <div class="shrink-0">
@@ -61,19 +59,17 @@
             <form method="post" @submit="defer()">
               {% csrf_token %}
               <button type="submit" name="action" value="generate_webhook_secret"
-                      class="rounded-lg px-4 py-2 text-sm font-medium text-white"
-                      style="background: var(--accent, #6366f1);">Generate a secret</button>
+                      class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Generate a secret</button>
             </form>
           {% elif c.action == "ack_backup" %}
             <form method="post" @submit="defer()">
               {% csrf_token %}
               <button type="submit" name="action" value="ack_backup"
-                      class="rounded-lg border px-4 py-2 text-sm"
-                      style="border-color: var(--line); color: var(--muted);">I have a backup</button>
+                      class="rounded-lg border px-4 py-2 text-sm border-line text-muted">I have a backup</button>
             </form>
           {% elif c.link_step %}
             <a href="{% url 'setup:step' slug=c.link_step %}"
-               class="rounded-lg border px-4 py-2 text-sm" style="border-color: var(--line);">Set it up</a>
+               class="rounded-lg border px-4 py-2 text-sm border-line">Set it up</a>
           {% endif %}
         </div>
       </div>
@@ -81,38 +77,36 @@
   {% endfor %}
 
   {# ---- the brain repo, its credentials, and the actions ---- #}
-  <h2 class="mb-2 mt-8 text-sm font-medium" style="color: var(--muted);">Brain repository</h2>
-  <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 mt-8 text-sm font-medium text-muted">Brain repository</h2>
+  <div class="rounded-xl border p-4 border-line bg-surface">
     <dl class="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
       <div>
-        <dt style="color: var(--muted);">Configured remote</dt>
-        <dd style="font-family: var(--font-mono);">{{ repo_url|default:"unset" }}</dd>
+        <dt class="text-muted" >Configured remote</dt>
+        <dd class="font-mono" >{{ repo_url|default:"unset" }}</dd>
       </div>
       <div>
-        <dt style="color: var(--muted);">Read credential</dt>
-        <dd style="font-family: var(--font-mono);">{{ git_status.read.source }}</dd>
+        <dt class="text-muted" >Read credential</dt>
+        <dd class="font-mono" >{{ git_status.read.source }}</dd>
       </div>
       <div>
-        <dt style="color: var(--muted);">Write credential</dt>
-        <dd style="font-family: var(--font-mono);">{{ git_status.write.source }}</dd>
+        <dt class="text-muted" >Write credential</dt>
+        <dd class="font-mono" >{{ git_status.write.source }}</dd>
       </div>
       <div>
-        <dt style="color: var(--muted);">Webhook endpoint</dt>
-        <dd style="font-family: var(--font-mono);">{{ webhook_url }}</dd>
+        <dt class="text-muted" >Webhook endpoint</dt>
+        <dd class="font-mono" >{{ webhook_url }}</dd>
       </div>
     </dl>
 
     {% if deploy_key %}
       <div class="mt-4" x-data="{copied: false, shown: false}">
-        <button type="button" class="text-sm underline" style="color: var(--accent, #6366f1);"
+        <button type="button" class="text-sm underline text-accent"
                 @click="shown = !shown" x-text="shown ? 'Hide deploy key' : 'Show deploy key'">Show deploy key</button>
         <div x-show="shown" x-cloak class="mt-2">
           <textarea readonly rows="3" x-ref="key"
-                    class="block w-full rounded-lg border px-3 py-2 text-xs"
-                    style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);"
+                    class="block w-full rounded-lg border px-3 py-2 text-xs border-line bg-surface-2 font-mono"
                     >{{ deploy_key }}</textarea>
-          <button type="button" class="mt-2 rounded-lg border px-3 py-1.5 text-xs"
-                  style="border-color: var(--line);"
+          <button type="button" class="mt-2 rounded-lg border px-3 py-1.5 text-xs border-line"
                   @click="navigator.clipboard.writeText($refs.key.value).then(() => {copied = true; setTimeout(() => copied = false, 2000)})"
                   x-text="copied ? 'Copied' : 'Copy'">Copy</button>
         </div>
@@ -121,13 +115,12 @@
 
     {% if webhook_set %}
       <div class="mt-4" x-data="{secret: '', shown: false}">
-        <button type="button" class="text-sm underline" style="color: var(--accent, #6366f1);"
+        <button type="button" class="text-sm underline text-accent"
                 @click="if (!shown) { fetch('{% url 'brainconfig:webhook-secret' %}', {method: 'POST', headers: {'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''}}).then(r => r.json()).then(d => secret = d.secret) } ; shown = !shown"
                 x-text="shown ? 'Hide webhook secret' : 'Show webhook secret'">Show webhook secret</button>
-        <div x-show="shown" x-cloak class="mt-2 rounded-lg border px-3 py-2 text-xs"
-             style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);"
+        <div x-show="shown" x-cloak class="mt-2 rounded-lg border px-3 py-2 text-xs border-line bg-surface-2 font-mono"
              x-text="secret || 'loading…'"></div>
-        <p class="mt-1 text-xs" style="color: var(--muted);">
+        <p class="mt-1 text-xs text-muted">
           Paste into your repository &rarr; Settings &rarr; Webhooks, with the payload
           URL above and content type <code>application/json</code>.
         </p>
@@ -137,14 +130,13 @@
     <form method="post" class="mt-5 flex flex-wrap gap-2" @submit="defer($event.submitter?.value)">
       {% csrf_token %}
       <button type="submit" name="action" value="verify_read" :disabled="busy('verify_read')"
-              class="rounded-lg px-4 py-2 text-sm font-medium text-white"
-              style="background: var(--accent, #6366f1);">Verify read access</button>
+              class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Verify read access</button>
       <button type="submit" name="action" value="pull_now" :disabled="busy('pull_now')"
-              class="rounded-lg border px-4 py-2 text-sm" style="border-color: var(--line);">Pull now</button>
+              class="rounded-lg border px-4 py-2 text-sm border-line">Pull now</button>
       <button type="submit" name="action" value="rebuild_index" :disabled="busy('rebuild_index')"
-              class="rounded-lg border px-4 py-2 text-sm" style="border-color: var(--line);">Rebuild index</button>
+              class="rounded-lg border px-4 py-2 text-sm border-line">Rebuild index</button>
       <button type="submit" name="action" value="rotate_deploy_key"
-              class="rounded-lg border px-4 py-2 text-sm" style="border-color: var(--line); color: var(--muted);">
+              class="rounded-lg border px-4 py-2 text-sm border-line text-muted">
         Rotate deploy key</button>
     </form>
   </div>

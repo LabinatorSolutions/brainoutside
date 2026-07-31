@@ -4,7 +4,7 @@
 {% block page_title_tag %}Timeline{% endblock %}
 {% block page_title %}Belief timeline{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">
+  <p class="mt-1 text-sm text-muted">
     What the brain gained each month, and every position it has revised.
     Notes are superseded, never deleted — so changing your mind leaves a trace.
   </p>
@@ -18,15 +18,15 @@
 
 {% block content %}
   <div data-timeline data-graph-url="{% url 'brainconfig:graph-json' %}?days=0">
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">Brain growth</h2>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">Brain growth</h2>
       <div class="mt-3" data-tl-growth></div>
       <p class="mt-2 tl-note" data-tl-growth-note>Reading the index…</p>
       <div class="mt-2 tl-key" data-tl-legend></div>
     </div>
 
-    <div class="mt-6 rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <h2 class="font-semibold" style="font-family: var(--font-display);">Superseded positions</h2>
+    <div class="mt-6 rounded-xl border p-4 border-line bg-surface">
+      <h2 class="font-semibold font-display">Superseded positions</h2>
       <div class="mt-2" data-tl-beliefs></div>
       <p class="mt-2 tl-note" data-tl-belief-note></p>
     </div>

@@ -8,17 +8,17 @@
 
 {% block step_body %}
   <div class="mb-5 grid gap-3 sm:grid-cols-2 text-sm">
-    <div class="rounded-lg border p-4" style="border-color: var(--line);">
+    <div class="rounded-lg border p-4 border-line">
       <div class="font-medium">Claude subscription</div>
-      <p class="mt-1" style="color: var(--muted);">
+      <p class="mt-1 text-muted">
         Run <code>claude setup-token</code> on your own machine and paste the
         <code>sk-ant-oat…</code> token. Uses your existing subscription — no
         API billing.
       </p>
     </div>
-    <div class="rounded-lg border p-4" style="border-color: var(--line);">
+    <div class="rounded-lg border p-4 border-line">
       <div class="font-medium">API key</div>
-      <p class="mt-1" style="color: var(--muted);">
+      <p class="mt-1 text-muted">
         A workspace-scoped <code>sk-ant-api…</code> key from the Anthropic
         console. Set a spend limit there.
       </p>
@@ -26,17 +26,16 @@
   </div>
 
   {% if result %}
-    <div class="mb-5 rounded-lg border px-4 py-3 text-sm"
-         style="border-color: {% if result.ok %}#4db8a8{% else %}#ff6b6b{% endif %};">
+    <div class="notice mb-5 {% if result.ok %}notice-ok{% else %}notice-danger{% endif %}">
       {% if result.ok %}
-        <div class="font-semibold" style="color: #2c8577;">Connection OK</div>
-        <div class="mt-1" style="color: var(--muted); font-family: var(--font-mono);">
+        <div class="font-semibold text-signal">Connection OK</div>
+        <div class="mt-1 text-muted font-mono">
           {{ result.model }} · {{ result.duration_ms }} ms ·
           {{ result.input_tokens }}/{{ result.output_tokens }} tokens
         </div>
       {% else %}
-        <div class="font-semibold" style="color: #c0392b;">Connection failed</div>
-        <div class="mt-1" style="font-family: var(--font-mono);">{{ result.error }}</div>
+        <div class="font-semibold text-danger">Connection failed</div>
+        <div class="mt-1 font-mono">{{ result.error }}</div>
       {% endif %}
     </div>
   {% endif %}
@@ -47,22 +46,20 @@
     <label for="id_key" class="block text-sm font-medium">Credential</label>
     <input type="password" name="key" id="id_key" autocomplete="off"
            placeholder="{% if key_set %}stored — paste a new one to replace{% else %}sk-ant-oat… or sk-ant-api…{% endif %}"
-           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm"
-           style="font-family: var(--font-mono);" />
-    <p class="mt-1.5 text-xs" style="color: var(--muted);">
+           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm font-mono" />
+    <p class="mt-1.5 text-xs text-muted">
       Stored encrypted. The type is detected automatically.
     </p>
 
     <div class="mt-5 flex flex-wrap items-center gap-2">
       <button type="submit" name="action" value="test" :disabled="busy"
-              class="rounded-lg px-5 py-2.5 text-sm font-medium text-white"
-              style="background: var(--accent, #6366f1);"
-              :style="busy ? 'opacity:.6; pointer-events:none' : ''">
+              class="btn-primary px-5 py-2.5"
+              {# :class, not :style — see the note in setup/read.html. #}
+              :class="busy ? 'opacity-60 pointer-events-none' : ''">
         <span x-text="busy ? 'Testing…' : 'Test connection'">Test connection</span>
       </button>
       <button type="submit" name="action" value="continue" :disabled="busy"
-              class="rounded-lg px-6 py-2.5 text-sm font-medium text-white"
-              style="background: var(--ink);">
+              class="rounded-lg px-6 py-2.5 text-sm font-medium text-white bg-ink">
         Continue
       </button>
     </div>

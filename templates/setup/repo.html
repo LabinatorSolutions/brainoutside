@@ -11,7 +11,7 @@
      class="home-cta inline-flex items-center justify-center px-6 py-3 text-sm font-semibold">
     Create my brain repo &rarr;
   </a>
-  <p class="mt-2 text-xs" style="color: var(--muted);">
+  <p class="mt-2 text-xs text-muted">
     Opens GitHub's "create from template" page in a new tab. No token needed —
     name it, choose private, click Create. Already have one? Just fill the box
     below.
@@ -23,21 +23,19 @@
     <input type="text" name="repo" id="id_repo" required
            placeholder="your-name/brain"
            value="{{ current }}"
-           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm"
-           style="font-family: var(--font-mono);" />
-    <p class="mt-1.5 text-xs" style="color: var(--muted);">
+           class="login-input mt-1 block w-full max-w-md px-4 py-2.5 text-sm font-mono" />
+    <p class="mt-1.5 text-xs text-muted">
       <code>owner/name</code>, or paste the full URL from the repository page.
       GitHub repositories are stored as an <code>ssh</code> remote, because the
       key this server uses in the next step is an ssh key.
     </p>
 
     {% if error %}
-      <p class="mt-3 text-sm" style="color: #c0392b;">{{ error }}</p>
+      <p class="mt-3 text-sm text-danger">{{ error }}</p>
     {% endif %}
 
     {% if env_pinned %}
-      <p class="mt-3 rounded-lg border px-4 py-3 text-sm"
-         style="border-color: #b7791f; color: #b7791f;">
+      <p class="notice notice-warn mt-3">
         <code>BRAIN_REPO_URL</code> is set in this deployment's environment, so
         it wins over anything saved here. Remove it from your env/compose to
         manage the repository from this page.
@@ -45,8 +43,7 @@
     {% endif %}
 
     <button type="submit"
-            class="mt-5 rounded-lg px-6 py-2.5 text-sm font-medium text-white"
-            style="background: var(--ink);">
+            class="mt-5 rounded-lg px-6 py-2.5 text-sm font-medium text-white bg-ink">
       Save and continue
     </button>
   </form>

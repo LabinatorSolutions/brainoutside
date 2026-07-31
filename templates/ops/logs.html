@@ -3,44 +3,44 @@
 {% block page_title_tag %}Logs{% endblock %}
 {% block page_title %}Logs & ledger{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm" style="color: var(--muted);">Event stream, SDK ledger aggregates, and spend vs cap — the last {{ days }} day{{ days|pluralize }}.</p>
+  <p class="mt-1 text-sm text-muted">Event stream, SDK ledger aggregates, and spend vs cap — the last {{ days }} day{{ days|pluralize }}.</p>
 {% endblock %}
 
 {% block content %}
   <div class="mb-6 grid gap-3 md:grid-cols-3">
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">Spend today vs cap</div>
-      <div class="mt-1 text-lg font-semibold" style="font-family: var(--font-mono);">
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">Spend today vs cap</div>
+      <div class="mt-1 text-lg font-semibold font-mono">
         ${{ today_cost|floatformat:4 }}{% if cap %} / ${{ cap|floatformat:2 }}{% endif %}
       </div>
       {% if cap %}
-        <div class="mt-2 h-2 w-full overflow-hidden rounded-full" style="background: var(--surface-2);">
+        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
           <div class="h-2 rounded-full" style="width: {{ cap_pct }}%; background: {% if cap_pct >= 100 %}var(--danger, #ff6b6b){% elif cap_pct >= 75 %}#e0b000{% else %}var(--success, #4db8a8){% endif %};"></div>
         </div>
-        <div class="mt-1 text-xs" style="color: var(--muted);">
+        <div class="mt-1 text-xs text-muted">
           {% if cap_pct >= 100 %}BREAKER TRIPPED — SDK runs refused until tomorrow or a higher cap{% else %}{{ cap_pct }}% of the daily circuit breaker{% endif %}
         </div>
       {% else %}
-        <div class="mt-1 text-xs" style="color: var(--muted);">breaker disabled (cap = 0)</div>
+        <div class="mt-1 text-xs text-muted">breaker disabled (cap = 0)</div>
       {% endif %}
     </div>
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">SDK runs ({{ days }}d)</div>
-      <div class="mt-1 text-lg font-semibold" style="font-family: var(--font-mono);">{{ totals.runs }}</div>
-      <div class="mt-1 text-xs" style="color: var(--muted);">{{ totals.errors }} failed{% if totals.running %} · {{ totals.running }} running/killed{% endif %} · ${{ totals.cost|default:0|floatformat:4 }}</div>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">SDK runs ({{ days }}d)</div>
+      <div class="mt-1 text-lg font-semibold font-mono">{{ totals.runs }}</div>
+      <div class="mt-1 text-xs text-muted">{{ totals.errors }} failed{% if totals.running %} · {{ totals.running }} running/killed{% endif %} · ${{ totals.cost|default:0|floatformat:4 }}</div>
     </div>
-    <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
-      <div class="text-xs uppercase tracking-wide" style="color: var(--muted);">Tokens ({{ days }}d)</div>
-      <div class="mt-1 text-lg font-semibold" style="font-family: var(--font-mono);">{{ totals.tin|default:0 }} / {{ totals.tout|default:0 }}</div>
-      <div class="mt-1 text-xs" style="color: var(--muted);">input / output</div>
+    <div class="rounded-xl border p-4 border-line bg-surface">
+      <div class="text-xs uppercase tracking-wide text-muted">Tokens ({{ days }}d)</div>
+      <div class="mt-1 text-lg font-semibold font-mono">{{ totals.tin|default:0 }} / {{ totals.tout|default:0 }}</div>
+      <div class="mt-1 text-xs text-muted">input / output</div>
     </div>
   </div>
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Ledger by kind ({{ days }}d)</h2>
-  <div class="mb-6 overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 text-sm font-medium text-muted">Ledger by kind ({{ days }}d)</h2>
+  <div class="mb-6 overflow-x-auto rounded-xl border border-line bg-surface">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+        <tr class="border-b text-left border-line text-muted">
           <th class="px-4 py-3 font-medium">Kind</th>
           <th class="px-4 py-3 font-medium">Runs</th>
           <th class="px-4 py-3 font-medium">Failed</th>
@@ -50,56 +50,55 @@
       </thead>
       <tbody>
         {% for k in by_kind %}
-          <tr class="border-b" style="border-color: var(--line);">
-            <td class="px-4 py-2.5" style="font-family: var(--font-mono);">{{ k.kind }}</td>
-            <td class="px-4 py-2.5" style="font-family: var(--font-mono);">{{ k.runs }}</td>
+          <tr class="border-b border-line">
+            <td class="px-4 py-2.5 font-mono">{{ k.kind }}</td>
+            <td class="px-4 py-2.5 font-mono">{{ k.runs }}</td>
             <td class="px-4 py-2.5" style="font-family: var(--font-mono); {% if k.errors %}color: #a33;{% endif %}">{{ k.errors }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ k.tin|default:0 }} / {{ k.tout|default:0 }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">${{ k.cost|default:0|floatformat:4 }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ k.tin|default:0 }} / {{ k.tout|default:0 }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">${{ k.cost|default:0|floatformat:4 }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="px-4 py-6 text-center" style="color: var(--muted);">No SDK operations in this window.</td></tr>
+          <tr><td colspan="5" class="px-4 py-6 text-center text-muted">No SDK operations in this window.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Most-served entities ({{ days }}d)</h2>
-  <div class="mb-6 rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">
+  <h2 class="mb-2 text-sm font-medium text-muted">Most-served entities ({{ days }}d)</h2>
+  <div class="mb-6 rounded-xl border p-4 border-line bg-surface">
     {% if most_served %}
       <div class="flex flex-wrap gap-2">
         {% for eid, n in most_served %}
-          <a href="{% url 'brainconfig:entity' eid %}" class="rounded-full border px-2.5 py-1 text-xs"
-             style="border-color: var(--line); font-family: var(--font-mono); color: var(--muted);">
-            {{ eid }} <span style="color: var(--accent, #6366f1);">×{{ n }}</span>
+          <a href="{% url 'brainconfig:entity' eid %}" class="rounded-full border px-2.5 py-1 text-xs border-line font-mono text-muted">
+            {{ eid }} <span class="text-accent" >×{{ n }}</span>
           </a>
         {% endfor %}
       </div>
     {% else %}
-      <div class="text-sm" style="color: var(--muted);">No reads in this window.</div>
+      <div class="text-sm text-muted">No reads in this window.</div>
     {% endif %}
   </div>
 
-  <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Event stream ({{ event_total }} in window, newest 200 shown)</h2>
+  <h2 class="mb-2 text-sm font-medium text-muted">Event stream ({{ event_total }} in window, newest 200 shown)</h2>
   <form method="get" class="mb-3 flex items-end gap-3">
     <label class="text-sm">
-      <span class="block text-xs" style="color: var(--muted);">Type</span>
-      <select name="type" onchange="this.form.submit()" class="mt-1 rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">
+      <span class="block text-xs text-muted">Type</span>
+      <select name="type" onchange="this.form.submit()" class="mt-1 rounded-lg border px-2 py-1.5 border-line bg-surface-2">
         <option value="">all</option>
         {% for t in event_types %}<option value="{{ t }}" {% if t == etype %}selected{% endif %}>{{ t }}</option>{% endfor %}
       </select>
     </label>
     <label class="text-sm">
-      <span class="block text-xs" style="color: var(--muted);">Window</span>
-      <select name="days" onchange="this.form.submit()" class="mt-1 rounded-lg border px-2 py-1.5" style="border-color: var(--line); background: var(--surface-2);">
+      <span class="block text-xs text-muted">Window</span>
+      <select name="days" onchange="this.form.submit()" class="mt-1 rounded-lg border px-2 py-1.5 border-line bg-surface-2">
         {% for d in day_choices %}<option value="{{ d }}" {% if d == days %}selected{% endif %}>{{ d }}d</option>{% endfor %}
       </select>
     </label>
   </form>
-  <div class="overflow-x-auto rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+  <div class="overflow-x-auto rounded-xl border border-line bg-surface">
     <table class="w-full text-sm">
       <thead>
-        <tr class="border-b text-left" style="border-color: var(--line); color: var(--muted);">
+        <tr class="border-b text-left border-line text-muted">
           <th class="px-4 py-3 font-medium">When</th>
           <th class="px-4 py-3 font-medium">Type</th>
           <th class="px-4 py-3 font-medium">Consumer</th>
@@ -109,20 +108,20 @@
       </thead>
       <tbody>
         {% for row in event_rows %}
-          <tr class="border-b align-top" style="border-color: var(--line);">
-            <td class="px-4 py-2.5 text-xs whitespace-nowrap" style="font-family: var(--font-mono); color: var(--muted);">{{ row.e.created_at|date:"m-d H:i:s" }}</td>
+          <tr class="border-b align-top border-line">
+            <td class="px-4 py-2.5 text-xs whitespace-nowrap font-mono text-muted">{{ row.e.created_at|date:"m-d H:i:s" }}</td>
             <td class="px-4 py-2.5">
               <span class="rounded-full px-2 py-0.5 text-xs"
                     style="background: {% if row.e.type == 'read' %}#e7f6f2{% elif row.e.type == 'drift' or row.e.type == 'auth_denied' or row.e.type == 'degraded' %}#fdecec{% elif row.e.type == 'feed' %}#fff4d6{% else %}#eef0ff{% endif %};">
                 {{ row.e.type }}
               </span>
             </td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ row.e.consumer|default:"—" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted);">{{ row.n_entities|default:"—" }}</td>
-            <td class="px-4 py-2.5 text-xs" style="font-family: var(--font-mono); color: var(--muted); overflow-wrap: anywhere;">{{ row.details_json }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ row.e.consumer|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ row.n_entities|default:"—" }}</td>
+            <td class="px-4 py-2.5 text-xs font-mono text-muted [overflow-wrap:anywhere]">{{ row.details_json }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="px-4 py-6 text-center" style="color: var(--muted);">No events match.</td></tr>
+          <tr><td colspan="5" class="px-4 py-6 text-center text-muted">No events match.</td></tr>
         {% endfor %}
       </tbody>
     </table>

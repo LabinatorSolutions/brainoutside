@@ -10,23 +10,30 @@
 {% endblock %}
 
 {% block content %}
-  {% if setup_build.state %}
-    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Setup build</h2>
-    <div class="mb-6 rounded-xl border px-4 py-3 text-sm"
-         style="border-color: {% if setup_build.state == 'failed' %}#ff6b6b{% else %}var(--line){% endif %}; background: var(--surface);">
-      <div class="flex items-center gap-2">
-        {% if setup_build.state == "running" %}
-          <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
-        {% endif %}
-        <span>{{ setup_build.label|default:"—" }}</span>
-        <span class="text-xs" style="color: var(--muted); font-family: var(--font-mono);">
-          {{ setup_build.state }}{% if setup_build.state == "running" %} · {{ setup_build.step }}/{{ setup_build.total }}{% endif %}
-        </span>
-      </div>
-      {% if setup_build.error %}
-        <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
-             style="background: #0d1117; color: #c9d1d9;">{{ setup_build.error }}</pre>
-      {% endif %}
+  {% if ops_jobs %}
+    <h2 class="mb-2 text-sm font-medium" style="color: var(--muted);">Setup &amp; repair jobs</h2>
+    <div class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+      {% for j in ops_jobs %}
+        <div class="border-b px-4 py-3 text-sm last:border-0" style="border-color: var(--line);">
+          <div class="flex items-center gap-2">
+            {% if j.state == "running" %}
+              <span class="inline-block h-2 w-2 animate-pulse rounded-full" style="background: var(--accent, #6366f1);"></span>
+            {% endif %}
+            <span>{{ j.label|default:j.spec.label }}</span>
+            <span class="text-xs"
+                  style="font-family: var(--font-mono); color: {% if j.state == 'failed' %}#c0392b{% else %}var(--muted){% endif %};">
+              {{ j.state }}{% if j.state == "running" and j.total %} · {{ j.step }}/{{ j.total }}{% endif %}
+            </span>
+          </div>
+          {% if j.result %}
+            <div class="mt-1 text-xs" style="color: var(--muted); font-family: var(--font-mono);">{{ j.result }}</div>
+          {% endif %}
+          {% if j.error %}
+            <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
+                 style="background: #0d1117; color: #c9d1d9;">{{ j.error }}</pre>
+          {% endif %}
+        </div>
+      {% endfor %}
     </div>
   {% endif %}
 

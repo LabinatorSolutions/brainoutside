@@ -57,17 +57,20 @@ def tasks(request):
     except Exception:
         pass
 
-    # The setup Build job is a Q2 task like any other, but django_q only
-    # materialises a Task row once it FINISHES — so while it runs, the only
-    # trace here would be queue depth. It publishes its own progress record;
-    # read that so a running build is visible where every other background
-    # job is visible.
-    from apps.brainconfig import setup_state
+    # Ops jobs (the setup build, and the repair actions) are Q2 tasks like
+    # any other, but django_q only materialises a Task row once one
+    # FINISHES — so while they run the only trace here would be queue
+    # depth. They publish their own progress records; read those, so
+    # anything a button started is visible where everything else is.
+    from apps.brainconfig import jobs as ops_jobs
 
-    setup_build = setup_state.get_progress()
+    ops_job_rows = ops_jobs.active()
 
     live = [op for op in running if not op.is_stale]
-    busy = bool(live or extracting or approving or setup_build.get("state") == "running")
+    busy = bool(
+        live or extracting or approving
+        or any(j.get("state") == "running" for j in ops_job_rows)
+    )
     return render(
         request,
         "ops/tasks.html",
@@ -78,7 +81,7 @@ def tasks(request):
             "approving": approving,
             "queue_depth": queue_depth,
             "q_tasks": q_tasks,
-            "setup_build": setup_build,
+            "ops_jobs": ops_job_rows,
             "busy": busy,
             **ops_context(request),
         },

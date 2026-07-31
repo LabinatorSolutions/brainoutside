@@ -21,18 +21,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.core.cache import cache
-
 from apps.core import runtime_setting_store as store
 
 KEY_WRITE_SKIPPED = "setup.write_skipped"
 KEY_READ_VERIFIED_URL = "setup.read_verified_url"
 
-#: Where the Build step publishes progress. The cache, not a table: this
-#: is ephemeral by nature, and a lost Redis costs a progress bar, not a
-#: setup. TTL outlives the slowest plausible clone-and-index.
-PROGRESS_CACHE_KEY = "setup:build:progress"
-PROGRESS_TTL_SECONDS = 60 * 30
+#: The Build step is one of the named ops jobs (`jobs.py`), so it shows up
+#: on the Tasks page next to every other background action instead of
+#: having its own private progress channel.
+BUILD_JOB = "setup_build"
 
 
 @dataclass(frozen=True)
@@ -212,19 +209,24 @@ def needs_first_admin() -> bool:
 
 
 def set_progress(**fields) -> None:
-    """Merge fields into the published progress record."""
-    current = cache.get(PROGRESS_CACHE_KEY) or {}
-    current.update(fields)
-    cache.set(PROGRESS_CACHE_KEY, current, PROGRESS_TTL_SECONDS)
+    from apps.brainconfig import jobs
+
+    jobs.update(BUILD_JOB, **fields)
 
 
 def get_progress() -> dict:
-    return cache.get(PROGRESS_CACHE_KEY) or {}
+    from apps.brainconfig import jobs
+
+    return jobs.get(BUILD_JOB)
 
 
 def clear_progress() -> None:
-    cache.delete(PROGRESS_CACHE_KEY)
+    from apps.brainconfig import jobs
+
+    jobs.clear(BUILD_JOB)
 
 
 def build_running() -> bool:
-    return get_progress().get("state") == "running"
+    from apps.brainconfig import jobs
+
+    return jobs.is_running(BUILD_JOB)

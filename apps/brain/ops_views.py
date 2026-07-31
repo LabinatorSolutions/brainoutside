@@ -74,10 +74,18 @@ def dashboard(request):
             "tokens_out": agg["tout"] or 0,
         }
 
+    # Setup health, top of the page. Nobody reads a docs page after the
+    # thing is already running, so the remaining setup work has to be
+    # visible state — above all "your ops UI is on the public internet".
+    from apps.brainconfig import health as health_checks
+
+    health_problems = health_checks.problems(health_checks.all_checks(request))
+
     return render(
         request,
         "ops/dashboard.html",
         {
+            "health_problems": health_problems,
             "last_sync": last_sync,
             "probe": probe,
             "entity_total": entities.count(),

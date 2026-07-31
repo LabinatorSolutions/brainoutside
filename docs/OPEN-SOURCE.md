@@ -109,6 +109,37 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Known issues to close before the beta
 
+- [ ] **RELEASE BLOCKER: the enforced CSP strips every inline style, so the
+      ops UI is largely unstyled on real deployments.**
+      `apps/core/security/headers.py` sets
+      `style-src 'self' 'nonce-<per-request>'`. A nonce authorises inline
+      `<style>` *blocks*; it does nothing for `style="…"` *attributes*,
+      which require `'unsafe-inline'` — and per CSP3, when a nonce is
+      present `'unsafe-inline'` is ignored, so the two cannot simply be
+      combined. Every ops template carries the design tokens as inline
+      style attributes (`style="background: var(--accent)"`,
+      `style="border-color: var(--line)"`), so all of them are dropped.
+      **Why nobody noticed:** `dev.py` sets `CSP_REPORT_ONLY=True`, so the
+      local stack logs ~104 violations and renders correctly, while the
+      deployed stack (`prod.py`, enforcing) renders the same page with
+      transparent buttons and no surface colours. Every visual check to
+      date, including the M3.5 ones, ran on the permissive stack.
+      *Measured 2026-07-31, same page on both stacks: "Test connection"
+      button background `rgb(99,102,241)` under dev vs `rgba(0,0,0,0)`
+      under prod; ~105 `Applying inline style violates…` console errors.*
+      Three ways out, none of them free — this needs a decision, not a
+      default:
+      1. Drop the nonce from `style-src` and use `'unsafe-inline'`. Two
+         lines. Weakens CSP against CSS injection, which is not academic
+         here: the brain browser renders note markdown, so injected
+         content reaches the page.
+      2. Move the tokens out of style attributes into real CSS classes.
+         Correct, and it is the M5 UI rewrite.
+      3. `'unsafe-hashes'` plus a hash per distinct attribute value —
+         impractical to maintain.
+      Note the fix is NOT "add unsafe-inline alongside the nonce"; that is
+      a no-op.
+
 - [ ] **Snapshot swap is not atomic.** `snapshots.build_tier` does
       `rmtree(final)` then `rename(tmp, final)`, so there is a window
       where a tier directory does not exist. Anything reading the

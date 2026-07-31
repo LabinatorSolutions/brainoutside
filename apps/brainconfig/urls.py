@@ -11,7 +11,7 @@ from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
 from apps.reader import ops_views as reader_ops
 
-from . import views
+from . import health_views, views
 
 app_name = "brainconfig"
 
@@ -35,4 +35,10 @@ urlpatterns = [
     path("chat/<int:pk>/send", reader_ops.chat_send, name="chat-send"),
     path("chat/message/<int:pk>/", reader_ops.chat_message, name="chat-message"),
     path("settings/", views.settings_page, name="settings"),
+    # Setup health + the repair actions (M5.3). Separate page rather than a
+    # Settings tab: these are *actions on the world* (re-clone, rotate a
+    # key), not values in a form.
+    path("health/", health_views.health_page, name="health"),
+    path("health/jobs.json", health_views.jobs_json, name="health-jobs"),
+    path("health/webhook-secret", health_views.reveal_webhook, name="webhook-secret"),
 ]

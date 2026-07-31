@@ -15,6 +15,32 @@
 {% endblock %}
 
 {% block content %}
+  {# --- setup health --------------------------------------------------
+       Only problems, and only above the fold. An operator who has finished
+       setting up should see nothing here; one who hasn't should not be
+       able to miss it. Details and the fix buttons live on /ops/health/.
+  #}
+  {% if health_problems %}
+    <div class="mb-6 rounded-xl border" style="border-color: var(--line); background: var(--surface);">
+      <div class="flex items-center justify-between border-b px-4 py-3" style="border-color: var(--line);">
+        <span class="text-sm font-medium">Setup &amp; health</span>
+        <a href="{% url 'brainconfig:health' %}" class="text-xs underline"
+           style="color: var(--accent, #6366f1);">Review and fix &rarr;</a>
+      </div>
+      {% for c in health_problems %}
+        <div class="flex items-start gap-2.5 border-b px-4 py-3 last:border-0" style="border-color: var(--line);">
+          <span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full"
+                style="background: {% if c.level == 'danger' %}#ff6b6b{% else %}#b7791f{% endif %};"></span>
+          <div>
+            <div class="text-sm font-medium"
+                 style="{% if c.level == 'danger' %}color: #c0392b;{% endif %}">{{ c.title }}</div>
+            <div class="mt-0.5 max-w-3xl text-xs" style="color: var(--muted);">{{ c.detail }}</div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
   {# --- tiles row ------------------------------------------------------ #}
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <div class="rounded-xl border p-4" style="border-color: var(--line); background: var(--surface);">

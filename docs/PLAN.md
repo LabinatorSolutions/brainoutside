@@ -528,10 +528,21 @@ continuously, not as a big-bang at M5).
   CLAUDE.md contract, `_TEMPLATE.md`s, both skills, one example lens,
   placeholder identity files. The app's startup contract check is the
   template validator. *Check: fresh template clone boots the app clean.*
-- **5.3** First-run wizard: create admin → connect brain repo → paste
-  Anthropic key OR subscription token (`sk-ant-oat` — the no-API-billing
-  path is a headline feature) → bootstrap. *Check: blank instance to
-  working brain without touching DEPLOY.md.*
+- **5.3** ✅ **DONE 2026-07-31.** First-run wizard: create admin → connect
+  brain repo → paste Anthropic key OR subscription token (`sk-ant-oat` —
+  the no-API-billing path is a headline feature) → bootstrap.
+  *Checked: a blank instance running `config.settings.prod` with only
+  `POSTGRES_PASSWORD` + `ALLOWED_HOSTS` set was driven through the whole
+  wizard in a real browser to 49 indexed entities and a dashboard with
+  the rings drawn — no terminal, no DEPLOY.md.* Boot secrets generate
+  once and persist (cross-container race verified with 6 simultaneous
+  containers); git credentials moved to encrypted settings with env/file
+  override; `bootstrap()` now refuses a clone whose origin isn't the
+  configured repo; `/ops/health/` reports and repairs.
+  **One release blocker found and NOT fixed here:** the enforced CSP
+  strips inline style attributes, so the ops UI is largely unstyled on a
+  real deployment — dev runs CSP report-only, which hid it. The fix is a
+  security-posture decision; options are in `docs/OPEN-SOURCE.md`.
 - **5.4** Cross-platform: bash/Makefile twin of `dev.ps1`; README with
   the rings hero GIF; INSTALL; honest SECURITY posture (§9 truths).
   *Check: setup succeeds on a clean Linux/macOS box.*

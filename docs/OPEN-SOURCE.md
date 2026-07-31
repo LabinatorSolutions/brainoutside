@@ -46,20 +46,38 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 
 ## Setup experience (5.3) — designed in SETUP-DESIGN.md
 
-- [ ] Auto-generate + PERSIST boot secrets, so required env drops to 2
+- [x] Auto-generate + PERSIST boot secrets, so required env drops to 2
       (`POSTGRES_PASSWORD` + domain). Persistence is load-bearing: a
       regenerating `FIELD_ENCRYPTION_KEY` silently destroys every stored
-      credential.
-- [ ] First-run wizard at `/setup`: admin → create brain repo (deep link
+      credential. Written once to `$BRAIN_STATE_DIR/boot-secrets.json` on
+      a new `brain-state` volume; generation is locked so web/mcp/worker
+      racing on first boot cannot diverge. `OAUTH_ISSUER` /
+      `PUBLIC_BASE_URL` now derive from `ALLOWED_HOSTS` (the template's
+      inherited boot-refusal on `OAUTH_ISSUER` guarded OAuth flows this
+      app doesn't vendor, and would have been a third required var).
+- [x] First-run wizard at `/setup`: admin → create brain repo (deep link
       to `brain-template/generate`, no token needed) → deploy key with
       copy button + Verify → write PAT → Claude key OR `sk-ant-oat` →
-      bootstrap. No `docker exec` anywhere.
-- [ ] Git credentials → encrypted settings (+ app-generated SSH keypair),
-      env/file overrides win when present.
-- [ ] Dashboard setup-health panel — the ops-UI-is-public warning is the
-      one that actually protects novices.
-- [ ] Subscription-token support is a headline feature (no API billing).
+      bootstrap. No `docker exec` anywhere. Walked end-to-end in a browser
+      on a blank prod-settings instance.
+- [x] Git credentials → encrypted settings (+ app-generated SSH keypair),
+      env/file overrides win when present. `ssh-keygen -y` independently
+      derives the same public half, so the generated key is a real one.
+- [x] Dashboard setup-health panel — the ops-UI-is-public warning is the
+      one that actually protects novices. Plus `/ops/health/` with the
+      repair actions (verify, pull, rebuild, replace the clone, rotate the
+      deploy key, generate a webhook secret).
+- [x] Subscription-token support is a headline feature (no API billing) —
+      offered as a first-class choice on the wizard's Claude step.
 - [ ] `docker compose up` happy path documented in ≤10 lines.
+- [ ] Decide the CSP inline-style question (see the release blocker
+      below) — until then a deployed install is functional but unstyled.
+- [ ] The wizard's template deep link 404s until `brain-template` is
+      published as its own repo (5.4).
+- [ ] Changing `BRAIN_REPO_URL` after setup is safe (the server refuses to
+      serve a mismatched clone, and "Replace the clone" repairs it), but
+      the wizard does not yet offer that repair inline — it only appears
+      on the health page.
 - [x] First boot with a valid clone + empty DB auto-indexes + builds
       snapshots (`brain_bootstrap`) — no "empty brain" trap on day one.
 - [x] `sync_brain --no-pull` for credential-less clones (local dev,

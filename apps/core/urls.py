@@ -23,7 +23,6 @@ import hashlib
 import json
 
 from asgiref.sync import async_to_sync
-from django.conf import settings
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.urls import URLPattern, path
 from django.views.decorators.csrf import csrf_exempt
@@ -163,9 +162,15 @@ def _make_openapi_view(version: str):
     def view(request: HttpRequest) -> HttpResponse:
         hidden = _hidden_slugs_for(request)
         if hidden not in cache_map:
+            # Inside the cache-miss branch on purpose: the title is
+            # operator-editable on /ops/settings/, but reading it per
+            # request would put a DB query back on the hot path this
+            # cache exists to keep clear. Renames land on restart.
+            from apps.brainconfig.services import app_name
+
             doc = build_openapi(
                 version=version,
-                title=getattr(settings, "APP_NAME", "API"),
+                title=app_name() or "API",
                 exclude_slugs=hidden,
             )
             body = json.dumps(doc)

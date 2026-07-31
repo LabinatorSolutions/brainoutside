@@ -132,7 +132,7 @@ is technically movable.
 | `GITHUB_WEBHOOK_SECRET` | **UI, auto-gen** | Read per request in `brain/views.py`; generate it and show it to paste into GitHub |
 | `BRAIN_COMMIT_NAME` / `_EMAIL` | **UI** | Pure display config, read per commit |
 | `FEED_PAYLOAD_MAX_KB` | **UI** | Read per request in `intake.py` |
-| `APP_NAME` | **UI** | Only a context-processor value; the default stays in env for rebranding |
+| `APP_NAME` | **UI — done** | On `/ops/settings/`; env remains the first-boot fallback. Boot-time consumers (OpenAPI title, MCP server name, `Q_CLUSTER`, Postgres `application_name`) only re-read on restart |
 | `PUBLIC_BASE_URL` | **UI** | Low value, but harmless and read at render |
 | Claude key, models, budgets, cap | **UI (already)** | Encrypted `AppSetting` today |
 

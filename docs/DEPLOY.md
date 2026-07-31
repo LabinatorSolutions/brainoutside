@@ -59,7 +59,7 @@ Setting any of them yourself still wins.
 | Var | Why |
 |---|---|
 | `ADMIN_IP_ALLOWLIST` | CIDRs allowed to reach `/ops/…`. Empty = no IP check. See §5. |
-| `APP_NAME` | Branding in the tab, landing page and login. |
+| `APP_NAME` | Branding in the tab, landing page and login. Also settable on `/ops/settings/`, which wins over this — set it here only to brand the very first boot. |
 | `BRAIN_COMMIT_NAME` / `_EMAIL` | Author on approval commits, so server writes are distinguishable from yours. |
 
 `SECURE_SSL_REDIRECT_ENABLED` defaults to on and is correct behind

@@ -39,9 +39,27 @@ class SettingSpec:
     #: handled at each call site so the policy is visible in one table.
     #: The Settings page shows which source is live either way.
     env_wins: bool = False
+    #: Reject longer values at save time; 0 means unbounded. Only set on
+    #: free-text keys that land somewhere with a layout to break — the
+    #: value column is a TextField, so nothing else stops a 5 KB paste.
+    max_len: int = 0
 
 
 REGISTRY: tuple[SettingSpec, ...] = (
+    SettingSpec(
+        "APP_NAME",
+        "App name",
+        "Branding in the browser tab, sidebar, landing page, login and "
+        "error pages. Applies on the next page load. The OpenAPI title "
+        "and the MCP server name are read once per process, so those "
+        "follow after a restart.",
+        # Boot-time value = env/.env, falling back to the built-in name.
+        # Frozen at import on purpose: that is exactly what an env var
+        # means, and it keeps the Settings page honest about the value
+        # in force when nothing is stored.
+        default=dj_settings.APP_NAME,
+        max_len=60,
+    ),
     SettingSpec(
         "ANTHROPIC_API_KEY",
         "Anthropic credential",
@@ -184,6 +202,28 @@ def set_value(key: str, value: str, *, actor=None) -> None:
 
 
 # ---- typed accessors (what SdkRunner consumes) ---------------------------
+
+
+def app_name() -> str:
+    """Branding string for templates. Never raises.
+
+    Read on every HTML render — including the 500 and maintenance pages,
+    which exist precisely when the database is the broken thing. A failed
+    query there must degrade to the boot-time value, not take the branded
+    error page down with it (`apps/core/views.py::_render_error`). Hence
+    the bare except: OperationalError when Postgres is gone,
+    ProgrammingError before the first migrate, InvalidToken swallowed
+    upstream in `AppSetting.value`.
+
+    Not cached: `django_redis` is absent from the host test venv, so a
+    cache round-trip here would fail every template test. One indexed
+    lookup on a single-digit-row table per page render is the cheaper
+    trade for a single-user server.
+    """
+    try:
+        return get("APP_NAME") or dj_settings.APP_NAME
+    except Exception:  # noqa: BLE001 - see docstring
+        return dj_settings.APP_NAME
 
 
 def anthropic_api_key() -> str:

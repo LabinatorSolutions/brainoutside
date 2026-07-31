@@ -74,10 +74,14 @@ def _user_is_staff(request: HttpRequest) -> bool:
 
 
 def _render_503(request: HttpRequest) -> HttpResponse:
+    # Local import: apps/core is the vendored framework and must not gain a
+    # module-level dependency on a brain app.
+    from apps.brainconfig import services as brainconfig_services
+
     body = render_to_string(
         "errors/maintenance.html",
         {
-            "APP_NAME": settings.APP_NAME,
+            "APP_NAME": brainconfig_services.app_name(),
             "maintenance_message": maintenance.get_message(),
         },
         request=request,

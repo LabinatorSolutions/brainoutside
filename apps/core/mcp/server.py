@@ -116,7 +116,12 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    mcp = FastMCP(getattr(settings, "APP_NAME", "MCP Server"))
+    # Read once, at subprocess boot — FastMCP fixes the name for the life
+    # of the server, so a rename on /ops/settings/ lands on the next
+    # `reload mcp` / container restart.
+    from apps.brainconfig.services import app_name
+
+    mcp = FastMCP(app_name() or "MCP Server")
     count = register_all(mcp)
     log.info("mcp subprocess: registered %d tool(s)", count)
 

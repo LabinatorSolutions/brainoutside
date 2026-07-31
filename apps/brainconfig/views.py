@@ -64,7 +64,8 @@ def settings_page(request):
 
 
 def _save(request) -> None:
-    changed = []
+    changed: list[str] = []
+    rejected: list[str] = []
     for spec in services.REGISTRY:
         clear = request.POST.get(f"clear__{spec.key}") == "on"
         raw = (request.POST.get(f"value__{spec.key}") or "").strip()
@@ -75,12 +76,19 @@ def _save(request) -> None:
             continue
         if not raw:
             continue  # blank input = keep current (write-only secrets rely on this)
+        if spec.max_len and len(raw) > spec.max_len:
+            # Reject rather than truncate: a silently shortened app name
+            # looks like the save worked.
+            rejected.append(f"{spec.key} (max {spec.max_len} characters)")
+            continue
         if raw != services.get(spec.key) or not services.is_db_set(spec.key):
             services.set_value(spec.key, raw, actor=request.user)
             changed.append(spec.key)
+    if rejected:
+        messages.error(request, f"Too long, not saved: {', '.join(rejected)}")
     if changed:
         messages.success(request, f"Saved: {', '.join(changed)}")
-    else:
+    elif not rejected:
         messages.info(request, "Nothing changed.")
 
 

@@ -6,7 +6,10 @@ from django.http import HttpRequest
 def app_meta(_request: HttpRequest) -> dict[str, object]:
     """Expose `APP_NAME` (and later DEBUG / version) to every template."""
     return {
-        "APP_NAME": settings.APP_NAME,
+        # Operator-editable on /ops/settings/, falling back to the env
+        # value. `app_name()` swallows DB errors, so a page still renders
+        # branded when the database is what's broken.
+        "APP_NAME": _app_name(),
         # used by the magic-link login template to decide which
         # social buttons to render. Empty dict → no social row at all.
         "social_providers": list(getattr(settings, "SOCIALACCOUNT_PROVIDERS", {}).keys()),
@@ -20,6 +23,14 @@ def app_meta(_request: HttpRequest) -> dict[str, object]:
         # "Dev login (skip 2FA)" button when set; always False in prod.
         "dev_login_enabled": _dev_login_enabled(),
     }
+
+
+def _app_name() -> str:
+    # Local import, like `_dev_login_enabled` below: this module is named
+    # by string in TEMPLATES, and brainconfig reaches models.
+    from apps.brainconfig.services import app_name
+
+    return app_name()
 
 
 def _dev_login_enabled() -> bool:

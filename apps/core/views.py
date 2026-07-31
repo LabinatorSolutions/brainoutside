@@ -168,12 +168,18 @@ def _render_error(
     even when the database / cache / template loader is the thing
     that's broken.
     """
+    # Local import: apps/core is the vendored framework and must not gain a
+    # module-level dependency on a brain app.
+    from apps.brainconfig import services as brainconfig_services
+
     request_id = getattr(request, "request_id", "") or ""
     try:
         body = render_to_string(
             template,
             {
-                "APP_NAME": settings.APP_NAME,
+                # Never raises — falls back to the env value if the DB is
+                # the thing that produced this 500 in the first place.
+                "APP_NAME": brainconfig_services.app_name(),
                 "request_id": request_id,
                 "STATUS_PAGE_URL": getattr(settings, "STATUS_PAGE_URL", "") or "",
                 "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "") or "",

@@ -85,9 +85,14 @@ def _resolve_placeholders(text: str) -> str:
     against an optional setting renders cleanly when it's unconfigured;
     the markdown should be authored to read OK in that case). Unknown
     tokens pass through verbatim — a stray `{{ TODO }}` stays visible."""
+    from apps.brainconfig.services import app_name
     from config.settings.env import settings
 
     mapping = {key: getattr(settings, key, "") for key in _PUBLIC_SETTING_KEYS}
+    # APP_NAME is operator-editable on /ops/settings/; the env object only
+    # knows the boot-time value, so a renamed install would keep quoting
+    # the old name at readers.
+    mapping["APP_NAME"] = app_name()
     # The ops console lives under a configurable (and, in prod, deliberately
     # unguessable) prefix, so a guide cannot hardcode `/ops/keys/`. Computed
     # rather than added to _PUBLIC_SETTING_KEYS because the useful value is a

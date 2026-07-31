@@ -1,20 +1,15 @@
 """`manage.py rotate_keys <email>` — emergency revocation utility.
 
-Revokes every active API key belonging to a single user. The typical
-trigger is a credential leak: support flags that a customer's
-`mcpsk_...` showed up in a paste site / GitHub commit / shared
-screenshot, the operator runs this command, all that user's keys go
-dead within the cache TTL (≤30s), the customer mints a fresh one
-from /dashboard/keys/.
+Revokes every active API key belonging to a single user. The trigger is
+a credential leak: an `mcpsk_...` shows up in a paste site / a commit /
+a shared screenshot and you want everything dead now, without deciding
+which key it was. Revocation is immediate — `apps.api_keys.events` busts
+the cached Principal on each revoke rather than waiting out the 60s TTL.
 
-This is intentionally a CLI tool rather than an admin-panel button
-because it's an "I know what I'm doing" operation — there's no
-confirmation modal, no two-step approval, just immediate revocation
-of every key for one user. Audit row is written so the action is
-attributable even if the operator's session is later compromised.
-
-Use the admin Users page (10.2.1.3) for the click-driven per-key
-revocation path.
+This stays a CLI tool rather than an ops-console button because it is an
+"I know what I'm doing" operation: no confirmation, no per-key choice,
+just every key for one user gone. Per-key revoke, rotate and tier
+changes are the click-driven path, at `/<ops-prefix>/consumers/`.
 """
 from __future__ import annotations
 
@@ -65,6 +60,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Revoked {revoked_count} key(s) for {user.email}. "
-                "Cache invalidation propagates within ~30s."
+                "The cached Principal for each was busted inline — the next "
+                "call with any of them fails."
             )
         )

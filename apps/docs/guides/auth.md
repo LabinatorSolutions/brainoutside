@@ -1,12 +1,19 @@
 # Authentication
 
-Every paid `/api/v1/*` call is authenticated with an **API key** sent
-in the `Authorization` header. Keys are minted in the dashboard at
-[/dashboard/keys/](/dashboard/keys/) and look like `mcpsk_<~43 url-safe
+Every `/api/v1/*` call is authenticated with an **API key** sent in the
+`Authorization` header. Keys are minted in the ops console at
+[API keys]({{ OPS_KEYS_URL }}) and look like `mcpsk_<~43 url-safe
 characters>` (256 bits of entropy).
 
-Endpoints with `credits_cost=0` accept anonymous callers — no key
-required. Every endpoint with `credits_cost>0` requires a valid key.
+**There is no anonymous tier.** This server fronts a private knowledge
+base, so every endpoint requires a valid key — including the ones that
+cost nothing to call. An unauthenticated request gets `401
+auth_required`, never a partial answer.
+
+Each key also carries a **tier** (`public`, `agents-only`, `private`)
+that caps the most sensitive note it can read, and its own rate limit.
+Both are set when you mint the key and editable afterwards; a key with
+no profile is treated as `public`.
 
 ## Sending the header
 
@@ -52,31 +59,37 @@ Keys are SHA-256 hashed at rest — we never store the plaintext. **The
 secret is shown exactly once at creation.** If you lose it, revoke the
 key and mint a new one.
 
-  - Mint a new key: dashboard → **API keys** → **+ New key**
-  - Revoke a key: dashboard → **API keys** → **Revoke** (instant; in-flight
-    calls finish, new calls return `401 invalid_credential`)
-  - See per-key usage: click any key in the list → **Recent activity**
+  - Mint a new key: ops console → **API keys** → **Mint a key**
+  - Rotate a key: **Rotate** — mints a replacement carrying the same tier
+    and rate limit, then revokes the old one in the same transaction
+  - Revoke a key: **Revoke** (instant; in-flight calls finish, new calls
+    return `401 invalid_credential`)
+  - See per-key usage: last-used timestamp, source IP and 7-day read count
+    are on the key's card
 
 ## Failure modes
 
 | Status | Code | Cause |
 |---|---|---|
-| `401` | `invalid_credential` | Bad / unknown / revoked key |
-| `401` | `auth_required` | No `Authorization` header on a paid endpoint |
-| `402` | `insufficient_credits` | Credit balance is below the per-call cost; top up on the [billing page](/dashboard/billing/) |
+| `401` | `auth_required` | No `Authorization` header — on any endpoint |
+| `401` | `invalid_credential` | Bad / unknown / revoked / expired key |
+| `422` | `input_validation_error` | `unknown entity: <id>` also means "exists, but above your key's tier" — the two are deliberately indistinguishable |
+| `429` | `rate_limit_exceeded` | Over the key's requests-per-minute limit, or too many failed auth attempts on its prefix. `Retry-After` is set |
 
 See the [error codes guide](/docs/guide/errors/) for the full response
 body shape and the complete error catalog.
 
 ## Best practices
 
-  - **One key per environment.** Use a `prod-server` key in production
-    and a `local-dev` key on your machine. If one leaks you only have
-    to revoke one, and your dashboard's _Recent activity_ tells you
-    exactly which.
-  - **Rotate periodically.** Revoke + re-mint every 90 days. The
-    process is two clicks and zero downtime if you swap before
-    revoking.
+  - **One key per client.** A separate key for Claude Desktop, for
+    claude.ai, and for each script. If one leaks you revoke exactly one,
+    and the last-used timestamp on each card tells you which is which.
+  - **Grant the lowest tier that works.** `agents-only` is the normal
+    choice for an assistant you run yourself; `private` should go only
+    to a client you fully control.
+  - **Rotate periodically.** **Rotate** carries the tier and limit onto
+    the replacement, so the only thing you have to change is the secret
+    in your client.
   - **Never put keys in client-side JS.** Keys belong on a server
     you trust. Browser-side calls leak your secret to anyone who
     opens devtools.

@@ -34,7 +34,7 @@
   {% if bundle.is_anonymous %}
     <div class="mt-3 rounded-xl border border-brand-200 bg-brand-50 p-6 text-center dark:border-brand-900 dark:bg-brand-950/40">
       <p class="text-sm text-brand-900 dark:text-brand-200">
-        Paste a consumer API key to use Try it. Keys are issued in the ops console.
+        Paste a consumer API key to use Try it. Mint one under <a class="underline" href="{% url 'brainconfig:consumers' %}">API keys</a>.
       </p>
     </div>
   {% else %}

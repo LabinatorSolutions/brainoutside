@@ -88,6 +88,13 @@ def _resolve_placeholders(text: str) -> str:
     from config.settings.env import settings
 
     mapping = {key: getattr(settings, key, "") for key in _PUBLIC_SETTING_KEYS}
+    # The ops console lives under a configurable (and, in prod, deliberately
+    # unguessable) prefix, so a guide cannot hardcode `/ops/keys/`. Computed
+    # rather than added to _PUBLIC_SETTING_KEYS because the useful value is a
+    # whole URL, not the raw setting.
+    _ops = "/" + (getattr(settings, "ADMIN_PANEL_URL_PATH", "") or "ops/").strip("/") + "/"
+    mapping["OPS_KEYS_URL"] = f"{_ops}consumers/"
+    mapping["OPS_LOGS_URL"] = f"{_ops}logs/"
 
     def repl(m: re.Match[str]) -> str:
         key = m.group(1)

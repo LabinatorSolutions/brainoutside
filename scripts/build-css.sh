@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Rebuild static/css/tw.css (the compiled Tailwind build that base.html
-# loads) from static/css/app.css.
+# loads) from assets/css/app.css.
 #
 # Uses the Tailwind v4 STANDALONE CLI — no Node, no npm, no package.json,
 # no node_modules anywhere in the repo. The binary is downloaded once into
@@ -38,5 +38,5 @@ if [ ! -x "$BIN" ]; then
   chmod +x "$BIN"
 fi
 
-"$BIN" -i static/css/app.css -o static/css/tw.css --minify "$@"
+"$BIN" -i assets/css/app.css -o static/css/tw.css --minify "$@"
 echo "built static/css/tw.css ($(wc -c < static/css/tw.css) bytes)"

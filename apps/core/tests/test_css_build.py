@@ -28,6 +28,7 @@ into a failure.
 from __future__ import annotations
 
 import os
+import re
 import platform
 import subprocess
 from pathlib import Path
@@ -35,7 +36,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[3]
-APP_CSS = REPO / "static" / "css" / "app.css"
+APP_CSS = REPO / "assets" / "css" / "app.css"
 TW_CSS = REPO / "static" / "css" / "tw.css"
 VERSION_FILE = REPO / "scripts" / "tailwind-version.txt"
 
@@ -114,7 +115,7 @@ def test_source_declares_its_scanning_roots():
         "../../templates/**/*.html",
         "../../apps/**/templates/**/*.html",
         "../../apps/**/*.py",
-        "../js/**/*.js",
+        "../../static/js/**/*.js",
     ):
         assert f'@source "{root}"' in css, f"app.css stopped scanning {root}"
 
@@ -134,6 +135,50 @@ def test_build_output_contains_utilities_from_templates():
             "committed build is stale. Run `.\\dev.ps1 css`."
         )
     assert ".max-w-4xl{" in css
+
+
+def test_no_tailwind_source_files_under_static():
+    """`static/` holds SERVED assets only — never Tailwind build input.
+
+    `collectstatic` under prod settings post-processes every CSS file it
+    collects, and WhiteNoise's manifest storage resolves each `@import`
+    to a real file on disk. `@import "tailwindcss"` is not a file, so it
+    raises MissingFileError on 'css/tailwindcss', collectstatic exits
+    non-zero, and the web container crash-loops before it ever serves a
+    request.
+
+    app.css lived in `static/css/` for exactly one commit and this is how
+    it was found: booting a blank instance on prod settings. Nothing in
+    dev catches it, because dev uses plain StaticFilesStorage and never
+    post-processes anything.
+    """
+    # Matched at the START of a line so that prose in a comment ("app.css
+    # maps these into an @theme block", which tokens.css legitimately says)
+    # is not mistaken for a directive.
+    directive = re.compile(
+        r"^\s*@(import|theme|apply|plugin|source|custom-variant)\b", re.M
+    )
+    offenders = []
+    for path in (REPO / "static").rglob("*.css"):
+        if path.name == "tw.css":
+            continue  # the compiled OUTPUT; contains none of these by design
+        text = path.read_text(encoding="utf-8")
+        hit = sorted({m.group(1) for m in directive.finditer(text)})
+        if hit:
+            offenders.append(
+                f"{path.relative_to(REPO)} -> @{', @'.join(hit)}"
+            )
+    assert not offenders, (
+        "Tailwind source directives found under static/. These files are "
+        "collected and post-processed at deploy time, and an unresolvable "
+        "@import fails collectstatic outright. Build sources belong in "
+        "assets/:\n  " + "\n  ".join(offenders)
+    )
+    # And the compiled artifact must stay resolvable.
+    assert "@import" not in TW_CSS.read_text(encoding="utf-8"), (
+        "tw.css contains an @import; collectstatic will try to resolve it "
+        "as a file path and fail the deploy."
+    )
 
 
 def test_no_javascript_tailwind_config():

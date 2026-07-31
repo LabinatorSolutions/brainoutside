@@ -1,9 +1,17 @@
 /*
  * Tailwind SOURCE — compiles to `static/css/tw.css` (what base.html
- * loads) via `.\dev.ps1 css` (or `bash scripts/build-css.sh`). Never
- * serve this file raw: browsers can't interpret @import/@apply. COMMIT
+ * loads) via `.\dev.ps1 css` (or `bash scripts/build-css.sh`). COMMIT
  * the rebuilt tw.css after edits — the Docker image has no CSS build
  * step, so self-hosters and the GHCR image need no toolchain.
+ *
+ * THIS FILE LIVES OUTSIDE `static/` ON PURPOSE. It is build input, not a
+ * served asset, and browsers cannot interpret @import/@apply anyway. It
+ * used to sit in static/css/, where `collectstatic` picked it up and
+ * WhiteNoise's manifest storage tried to resolve `@import "tailwindcss"`
+ * as a real file — MissingFileError on 'css/tailwindcss', collectstatic
+ * exits non-zero, and the web container crash-loops on first boot. That
+ * only ever happens under prod settings, which is why it survived every
+ * local check until a blank prod-settings instance was booted.
  * Self-hosted Inter + JetBrains Mono live in static/fonts/.
  *
  * Tailwind v4: configuration is CSS-first (`@theme` below). There is no
@@ -21,7 +29,7 @@
 @source "../../templates/**/*.html";
 @source "../../apps/**/templates/**/*.html";
 @source "../../apps/**/*.py";
-@source "../js/**/*.js";
+@source "../../static/js/**/*.js";
 
 /* Bundled with the standalone CLI — verified loading under v4.3.3. */
 @plugin "@tailwindcss/forms";

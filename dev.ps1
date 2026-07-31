@@ -332,7 +332,7 @@ switch ($Command.ToLowerInvariant()) {
     }
 
     'css' {
-        # Rebuild static/css/tw.css from static/css/app.css with the
+        # Rebuild static/css/tw.css from assets/css/app.css with the
         # Tailwind v4 standalone binary. No Node, no node_modules: the
         # binary is cached in .cache/ (gitignored) and the OUTPUT is
         # committed, so Docker and self-hosters never need a toolchain.
@@ -359,7 +359,7 @@ switch ($Command.ToLowerInvariant()) {
             }
         }
 
-        $inFile = Join-Path $Root 'static\css\app.css'
+        $inFile = Join-Path $Root 'assets\css\app.css'
         $outFile = Join-Path $Root 'static\css\tw.css'
         $twArgs = @('-i', $inFile, '-o', $outFile, '--minify')
         if ($Rest -contains '-Watch' -or $Rest -contains '--watch' -or $Watch) {

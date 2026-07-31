@@ -83,6 +83,36 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 - [x] `sync_brain --no-pull` for credential-less clones (local dev,
       host-owned pulls).
 
+## UI rewrite (5.6) — designed in UI-REWRITE.md, runs BEFORE 5.4
+
+Decided 2026-07-31: launch WITH the better UI. Full detail and build
+order in [UI-REWRITE.md](UI-REWRITE.md).
+
+- [ ] Restore a real Tailwind build — v4, standalone CLI binary, no Node
+      or `node_modules` in the repo, `tw.css` stays committed so
+      self-hosters need no toolchain. Today `tailwind.config.js` is
+      decorative: nothing reads it, and the artifact has been frozen
+      since 2026-07-28, so any class added since silently does nothing.
+- [ ] `tokens.css` → Tailwind `@theme`, so `bg-surface` / `border-line` /
+      `text-muted` are real utilities. The primitive→semantic split
+      already there is exactly the right shape; it was never wired up.
+- [ ] Component layer (`btn`, `card`, `table`, `badge`, `field`,
+      `stat-tile`) + a living style guide at `/ops/styleguide/`.
+- [ ] Convert all 24 templates — 455 inline `style="…"` attributes,
+      concentrated entirely in `ops/` and `setup/`; the vendored `docs/`,
+      `errors/` and `components/` pages are already clean.
+- [ ] Redesign: sidebar with an active state (`nav.py` emits none today,
+      so the nav never shows where you are), page furniture, table
+      density, responsive, and a dark-mode decision — `darkMode: "class"`
+      is configured and a theme-toggle partial exists, but `tokens.css`
+      has no dark block, so the toggle currently toggles nothing.
+- [ ] Guardrails so it cannot regress: **enforce CSP in dev** (the
+      report-only default is what hid the blocker), a test that fails on
+      `style="` in any template, and a test that rebuilds `tw.css` and
+      fails if it differs from the committed artifact.
+- [ ] Launch assets last, against the shipped UI — and still not the
+      graph explorer until the click-through bug below is fixed.
+
 ## Cross-platform + docs (5.4)
 
 - [ ] Publish `ghcr.io/<owner>/brainoutside` — multi-arch, semver, built
@@ -127,8 +157,15 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Known issues to close before the beta
 
-- [ ] **RELEASE BLOCKER: the enforced CSP strips every inline style, so the
-      ops UI is largely unstyled on real deployments.**
+- [ ] **RELEASE BLOCKER — resolution decided 2026-07-31: the UI rewrite
+      (M5.6, `docs/UI-REWRITE.md`) fixes this by removing every inline
+      style, and runs BEFORE 5.4/5.5. The interim `style-src-attr`
+      band-aid is deliberately NOT applied: nothing ships before the
+      rewrite, so loosening the CSP only to revert it weeks later is
+      strictly worse than doing neither.** Detail below.
+
+      **The enforced CSP strips every inline style, so the ops UI is
+      largely unstyled on real deployments.**
       `apps/core/security/headers.py` sets
       `style-src 'self' 'nonce-<per-request>'`. A nonce authorises inline
       `<style>` *blocks*; it does nothing for `style="…"` *attributes*,

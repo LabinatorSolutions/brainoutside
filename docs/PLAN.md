@@ -543,6 +543,23 @@ continuously, not as a big-bang at M5).
   strips inline style attributes, so the ops UI is largely unstyled on a
   real deployment — dev runs CSP report-only, which hid it. The fix is a
   security-posture decision; options are in `docs/OPEN-SOURCE.md`.
+- **5.6** **UI rewrite — runs BEFORE 5.4/5.5** (decided 2026-07-31).
+  Designed in `docs/UI-REWRITE.md`. Restore a real Tailwind build (v4,
+  standalone CLI, no Node in the repo), wire `tokens.css` into `@theme`
+  so the semantic tokens become utilities, build a component layer, then
+  redesign all ~13 ops pages and delete all 455 inline `style="…"`
+  attributes. Launching with the better UI means the launch assets and
+  docs screenshots get made once, against what ships.
+  *Check: zero inline styles in templates; `tw.css` regenerable from
+  source; every page verified in a real browser under ENFORCED CSP.*
+
+  This is also the fix for the release blocker below — the enforced CSP
+  strips inline style attributes, so the ops UI is largely unstyled on
+  any real deployment, and `dev.py`'s report-only CSP hid it from every
+  visual check this project has done. The rewrite removes the need to
+  loosen CSP at all; the interim `style-src-attr` band-aid is explicitly
+  NOT applied.
+
 - **5.4** Cross-platform: bash/Makefile twin of `dev.ps1`; README with
   the rings hero GIF; INSTALL; honest SECURITY posture (§9 truths).
   *Check: setup succeeds on a clean Linux/macOS box.*

@@ -4,6 +4,7 @@ Settings lives in this app; dashboard + brain browser views live in
 apps.brain (they are views over the Entity index) but route through here
 so the whole ops surface shares one prefix and one nav.
 """
+from django.conf import settings
 from django.urls import path
 
 from apps.brain import ops_views
@@ -11,7 +12,7 @@ from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
 from apps.reader import ops_views as reader_ops
 
-from . import health_views, views
+from . import health_views, styleguide_views, views
 
 app_name = "brainconfig"
 
@@ -42,3 +43,11 @@ urlpatterns = [
     path("health/jobs.json", health_views.jobs_json, name="health-jobs"),
     path("health/webhook-secret", health_views.reveal_webhook, name="webhook-secret"),
 ]
+
+# Living style guide for the component layer (M5.6.1). Development only:
+# it is a review aid for the design system, not product surface, so it is
+# never routed on a deployment. The view re-checks DEBUG itself.
+if settings.DEBUG:
+    urlpatterns += [
+        path("styleguide/", styleguide_views.styleguide, name="styleguide"),
+    ]

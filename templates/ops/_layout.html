@@ -12,7 +12,7 @@
 {% block title %}{% block page_title_tag %}Ops{% endblock %} · {{ APP_NAME }}{% endblock %}
 
 {% block body %}
-<div x-data="{drawerOpen: false}" class="min-h-screen" style="background: var(--surface-2); color: var(--ink);">
+<div x-data="{drawerOpen: false}" class="min-h-screen bg-surface-2 text-ink">
   {% include "partials/_sidebar.html" with nav_sections=ops_nav_sections %}
 
   <div class="lg:ps-64">
@@ -21,7 +21,7 @@
     <main id="main-content" class="px-4 py-8 sm:px-6 lg:px-8" role="main">
       <div class="mx-auto max-w-4xl">
         <header class="mb-6">
-          <h1 class="text-2xl font-semibold tracking-tight" style="font-family: var(--font-display);">
+          <h1 class="page-title">
             {% block page_title %}Ops{% endblock %}
           </h1>
           {% block page_subtitle %}{% endblock %}

@@ -1,31 +1,31 @@
 {% comment %}
-  Brain-server docs sidebar — endpoint catalog grouped by section.
-  Replaces the template's dashboard sidebar (dashboard/account links).
+  Brain-server sidebar — ops nav grouped by section.
   Included with: nav_sections — [{label, items:[{label, url, active?}]}].
   Parent layout's Alpine root owns `drawerOpen`.
+
+  `item.active` is honoured here; nav.py starts emitting it in M5.6.3.
 {% endcomment %}
-<aside class="fixed inset-y-0 start-0 z-40 w-64 overflow-y-auto border-e transition-transform duration-200 lg:translate-x-0"
-       style="background: var(--surface-2); border-color: var(--line);"
+<aside class="fixed inset-y-0 start-0 z-40 w-64 overflow-y-auto border-e border-line bg-surface-2 transition-transform duration-200 lg:translate-x-0"
        :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
        aria-label="Sidebar">
-  <div class="flex h-14 items-center border-b px-4 font-semibold" style="border-color: var(--line); font-family: var(--font-display);">
+  <div class="flex h-14 items-center border-b border-line px-4 font-display font-semibold">
     <a href="/docs/" class="flex items-center gap-2">
-      <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: var(--accent);"></span>
+      <span class="inline-block h-2.5 w-2.5 rounded-pill bg-accent"></span>
       {{ APP_NAME }}
     </a>
   </div>
   <nav class="px-2 pb-8">
     {% for section in nav_sections %}
       <div class="mt-4">
-        <div class="px-2 text-xs font-medium uppercase tracking-wide" style="color: var(--muted);">
+        <div class="px-2 text-xs font-medium uppercase tracking-wide text-muted">
           {{ section.label }}
         </div>
         <ul class="mt-1">
           {% for item in section.items %}
             <li>
               <a href="{{ item.url }}"
-                 class="block rounded-md px-2 py-1.5 text-sm"
-                 style="color: var(--ink);">{{ item.label }}</a>
+                 class="nav-item{% if item.active %} nav-item-active{% endif %}"
+                 {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
             </li>
           {% endfor %}
         </ul>

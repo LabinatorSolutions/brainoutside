@@ -3,9 +3,7 @@
   dashboard/account/i18n routes this app doesn't mount). Included by the
   docs layout with: title, nav_links, show_drawer.
 {% endcomment %}
-<header class="sticky top-0 z-30 border-b"
-        style="background: var(--surface); border-color: var(--line);"
-        role="banner">
+<header class="sticky top-0 z-30 border-b border-line bg-surface" role="banner">
   <div class="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
     {% if show_drawer %}
       <button type="button" class="lg:hidden" aria-label="Open navigation"
@@ -15,14 +13,13 @@
         </svg>
       </button>
     {% endif %}
-    <a href="/docs/" class="flex items-center gap-2 font-semibold"
-       style="font-family: var(--font-display); color: var(--ink);">
-      <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: var(--accent);"></span>
+    <a href="/docs/" class="flex items-center gap-2 font-display font-semibold text-ink">
+      <span class="inline-block h-2.5 w-2.5 rounded-pill bg-accent"></span>
       {{ title|default:APP_NAME }}
     </a>
     <nav class="ms-auto flex items-center gap-4 text-sm">
       {% for link in nav_links %}
-        <a href="{{ link.url }}" style="color: var(--muted);">{{ link.label }}</a>
+        <a href="{{ link.url }}" class="text-muted hover:text-ink">{{ link.label }}</a>
       {% endfor %}
     </nav>
   </div>

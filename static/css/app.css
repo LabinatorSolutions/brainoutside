@@ -48,40 +48,6 @@
   --color-brand-900: #312e81;
   --color-brand-950: #1e1b4b;
 
-  /* ---- The semantic layer from tokens.css, as real utilities ----
-   * Each maps to a var() rather than a literal, so `bg-surface`,
-   * `border-line`, `text-muted`, `bg-accent` resolve THROUGH tokens.css
-   * at runtime. Two consequences worth stating:
-   *   1. Re-theming stays a one-file edit of tokens.css with no rebuild,
-   *      which is the point — self-hosters have no toolchain.
-   *   2. Dark mode needs no `dark:` variants on components. tokens.css's
-   *      `.dark` block re-points the same variables and every utility
-   *      follows automatically.
-   * Components must style against THESE, never a palette primitive and
-   * never a literal hex: a hardcoded colour is invisible in light-mode
-   * review and wrong in dark. */
-  --color-surface:   var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-ink:       var(--ink);
-  --color-muted:     var(--muted);
-  --color-line:      var(--line);
-  --color-accent:          var(--accent);
-  --color-accent-strong:   var(--accent-strong);
-  --color-accent-contrast: var(--accent-contrast);
-  --color-accent-2:  var(--accent-2);
-  --color-accent-3:  var(--accent-3);
-  --color-signal:    var(--signal);
-  --color-warn:      var(--warn);
-  --color-danger:    var(--danger);
-
-  /* Terminal scale — fixed in both themes (a log pane is dark by design). */
-  --color-term-900: var(--c-ink-900);
-  --color-term-800: var(--c-ink-800);
-  --color-term-700: var(--c-ink-700);
-  --color-term-600: var(--c-ink-600);
-  --color-term-400: var(--c-ink-400);
-  --color-term-300: var(--c-ink-300);
-
   /* Geometry -> rounded-card / rounded-control / rounded-pill,
    * shadow-card / shadow-soft. Literals, and defined HERE rather than in
    * tokens.css: a theme key cannot be `var()` of its own name (that is a
@@ -109,6 +75,59 @@
   --text-6xl: 3.75rem;
   --text-6xl--line-height: 1.05;
   --text-6xl--letter-spacing: -0.025em;
+}
+
+/* ---- The semantic layer from tokens.css, as real utilities ----
+ *
+ * `@theme inline` is load-bearing, not a style choice. A plain `@theme`
+ * would emit `:root { --color-surface: var(--surface) }` and have
+ * `.bg-surface` reference `var(--color-surface)`. Custom properties
+ * resolve their var() where they are DECLARED, so `--color-surface`
+ * would substitute the light value at :root and every descendant would
+ * inherit that already-resolved colour. Putting `.dark` on <html> hides
+ * this (the declaration and the override land on the same element), but
+ * `.dark` on any subtree — which is exactly how /ops/styleguide/ shows
+ * both themes at once — would leave every utility stuck on light while
+ * hand-written CSS using `var(--surface)` went dark. Half-dark cards
+ * with invisible text; found on the style guide, which is what it is for.
+ *
+ * `inline` substitutes the value into the utility instead, so
+ * `.bg-surface` is literally `background-color: var(--surface)` and
+ * re-resolves wherever it is used. Consequences worth stating:
+ *   1. Re-theming stays a one-file edit of tokens.css with no rebuild —
+ *      the point, since self-hosters have no toolchain.
+ *   2. Dark mode needs no `dark:` variants on components at all.
+ *   3. `--color-surface` and friends are NOT emitted to :root. Nothing
+ *      should reference them directly; hand-written CSS uses the short
+ *      names (`var(--surface)`), which tokens.css does emit.
+ *
+ * Components style against THESE, never a palette primitive and never a
+ * literal hex: a hardcoded colour is invisible in light-mode review and
+ * wrong in dark. */
+@theme inline {
+  --color-surface:   var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink:       var(--ink);
+  --color-muted:     var(--muted);
+  --color-line:      var(--line);
+  --color-accent:          var(--accent);
+  --color-accent-strong:   var(--accent-strong);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-2:  var(--accent-2);
+  --color-accent-3:  var(--accent-3);
+  --color-signal:    var(--signal);
+  --color-warn:      var(--warn);
+  --color-danger:    var(--danger);
+
+  /* Terminal scale — fixed in both themes (a log pane is dark by design),
+   * so these deliberately point at primitives the .dark block never
+   * re-points. */
+  --color-term-900: var(--c-ink-900);
+  --color-term-800: var(--c-ink-800);
+  --color-term-700: var(--c-ink-700);
+  --color-term-600: var(--c-ink-600);
+  --color-term-400: var(--c-ink-400);
+  --color-term-300: var(--c-ink-300);
 }
 
 /* ----- Web fonts (self-hosted, no CDN) ----- */
@@ -268,22 +287,282 @@
 
 /* ----- Reusable component primitives ----- */
 @layer components {
-  /* v4 `@apply` only takes utilities, not other component classes, so the
-   * shared base is a grouped selector instead of `@apply btn` inside each
-   * variant. Same single-class specificity as before, so templates using
-   * `btn-primary` alone still pick up the base — as they did under v3,
-   * where @apply inlined it. */
+  /* ============================================================
+   * THE COMPONENT VOCABULARY (M5.6.1)
+   *
+   * The pages this replaces repeated the same eleven-class button string
+   * a dozen times, drifting a little each time: 13 copies of the primary
+   * button, 8 of the ghost, 15+ of the text input. "Professional" here
+   * mostly means CONSISTENT, and copy-paste does not survive contact
+   * with thirteen pages. So: raw utilities for layout, these for the
+   * repeated furniture.
+   *
+   * HARD RULE: components style against SEMANTIC tokens only —
+   * bg-surface, border-line, text-muted, bg-accent. Never a palette
+   * primitive, never a literal hex. A hardcoded colour is invisible in
+   * light-mode review and simply wrong in dark. The terminal panes at
+   * the bottom are the one deliberate exception; they are dark in both
+   * themes by design.
+   *
+   * v4 note: `@apply` takes utilities only, not other component classes,
+   * so shared bases are grouped selectors rather than `@apply btn`.
+   * ============================================================ */
+
+  /* ----- Buttons ----- */
   .btn,
   .btn-primary,
-  .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    @apply inline-flex select-none items-center justify-center gap-2
+           rounded-control px-4 py-2 text-sm font-medium
+           transition-colors disabled:cursor-not-allowed disabled:opacity-55;
   }
   .btn-primary {
-    @apply bg-brand-500 hover:bg-brand-400 text-zinc-950;
+    background: var(--accent);
+    color: var(--accent-contrast);
   }
-  .btn-secondary {
-    @apply border border-zinc-300 hover:border-zinc-400 text-zinc-900
-           dark:border-zinc-700 dark:hover:border-zinc-500 dark:text-zinc-100;
+  .btn-primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+  /* `btn-secondary` is the outlined button. Kept as an alias of
+   * `btn-ghost` because the vendored docs/errors pages already use that
+   * name in 14 places; new code should reach for btn-ghost. */
+  .btn-secondary,
+  .btn-ghost {
+    border: 1px solid var(--line);
+    color: var(--ink);
+    background: transparent;
+  }
+  .btn-secondary:hover:not(:disabled),
+  .btn-ghost:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--ink) 28%, transparent);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+  .btn-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 82%, black);
+  }
+  /* Destructive, but secondary in the visual hierarchy — an outlined
+   * button that only turns red on intent. */
+  .btn-danger-ghost {
+    @apply inline-flex select-none items-center justify-center gap-2
+           rounded-control px-4 py-2 text-sm font-medium transition-colors
+           disabled:cursor-not-allowed disabled:opacity-55;
+    border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+    color: var(--danger);
+    background: transparent;
+  }
+  .btn-danger-ghost:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+  }
+  .btn-sm { @apply gap-1.5 px-3 py-1.5 text-xs; }
+  .btn-block { @apply w-full; }
+
+  /* ----- Cards ----- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+  }
+  .card-header {
+    @apply flex items-center justify-between gap-3 px-4 py-3;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-title {
+    @apply text-sm font-semibold;
+    font-family: var(--font-display);
+  }
+  .card-body { @apply p-4; }
+  .card-footer {
+    @apply flex flex-wrap items-center gap-2 px-4 py-3;
+    border-top: 1px solid var(--line);
+  }
+  /* A card row in a stacked list: last one carries no divider. */
+  .card-row {
+    @apply px-4 py-3;
+    border-bottom: 1px solid var(--line);
+  }
+  .card-row:last-child { border-bottom: 0; }
+
+  /* ----- Tables -----
+   * Wrap in `.table-wrap` so a wide table scrolls itself instead of
+   * pushing the page sideways. */
+  .table-wrap { @apply w-full overflow-x-auto; }
+  .table { @apply w-full text-sm; border-collapse: collapse; }
+  .table th {
+    @apply px-3 py-2 text-start text-xs font-medium uppercase tracking-wide;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .table td {
+    @apply px-3 py-2 align-top;
+    border-bottom: 1px solid var(--line);
+  }
+  .table tbody tr:last-child td { border-bottom: 0; }
+  .table-hover tbody tr:hover td {
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+  }
+  .table-fixed-head thead th {
+    @apply sticky top-0 z-10;
+    background: var(--surface);
+  }
+
+  /* ----- Badges ----- */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-pill px-2 py-0.5
+           text-xs font-medium;
+    border: 1px solid transparent;
+  }
+  .badge-ok {
+    background: color-mix(in srgb, var(--signal) 16%, transparent);
+    border-color: color-mix(in srgb, var(--signal) 40%, transparent);
+    color: color-mix(in srgb, var(--signal) 72%, var(--ink));
+  }
+  .badge-warn {
+    background: color-mix(in srgb, var(--warn) 22%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+    color: color-mix(in srgb, var(--warn) 62%, var(--ink));
+  }
+  .badge-danger {
+    background: color-mix(in srgb, var(--danger) 14%, transparent);
+    border-color: color-mix(in srgb, var(--danger) 42%, transparent);
+    color: color-mix(in srgb, var(--danger) 70%, var(--ink));
+  }
+  .badge-info {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+    color: color-mix(in srgb, var(--accent) 72%, var(--ink));
+  }
+  .badge-muted {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    border-color: var(--line);
+    color: var(--muted);
+  }
+
+  /* ----- Status dots ----- */
+  .dot { @apply inline-block h-2 w-2 shrink-0 rounded-pill; }
+  .dot-ok     { background: var(--signal); }
+  .dot-warn   { background: var(--warn); }
+  .dot-danger { background: var(--danger); }
+  .dot-info   { background: var(--accent); }
+  .dot-muted  { background: var(--muted); }
+  .dot-live   { @apply animate-pulse; background: var(--accent); }
+
+  /* ----- Form fields ----- */
+  .field { @apply block; }
+  .field-label {
+    @apply mb-1 block text-sm font-medium;
+    color: var(--ink);
+  }
+  .field-input,
+  .field-textarea,
+  .field-select {
+    @apply block w-full rounded-control px-3 py-2 text-sm;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+  .field-input:focus,
+  .field-textarea:focus,
+  .field-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .field-input::placeholder,
+  .field-textarea::placeholder { color: var(--muted); }
+  .field-mono { font-family: var(--font-mono); }
+  .field-hint { @apply mt-1 text-xs; color: var(--muted); }
+  .field-error { @apply mt-1 text-xs; color: var(--danger); }
+
+  /* ----- Stat tiles ----- */
+  .stat-tile {
+    @apply flex flex-col gap-1 p-4;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+  }
+  .stat-value {
+    @apply text-2xl font-semibold leading-none;
+    font-family: var(--font-display);
+  }
+  .stat-label {
+    @apply text-xs uppercase tracking-wide;
+    color: var(--muted);
+  }
+
+  /* ----- Notices (inline callouts) ----- */
+  .notice {
+    @apply rounded-control px-4 py-3 text-sm;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .notice-ok {
+    border-color: color-mix(in srgb, var(--signal) 45%, transparent);
+    background: color-mix(in srgb, var(--signal) 10%, transparent);
+  }
+  .notice-warn {
+    border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+    background: color-mix(in srgb, var(--warn) 14%, transparent);
+  }
+  .notice-danger {
+    border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+    background: color-mix(in srgb, var(--danger) 9%, transparent);
+  }
+
+  /* ----- Definition grid (the "what this server knows" pattern) ----- */
+  .meta-grid { @apply grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2; }
+  .meta-label { @apply text-xs; color: var(--muted); }
+  .meta-value { font-family: var(--font-mono); word-break: break-word; }
+
+  /* ----- Page furniture ----- */
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight;
+    font-family: var(--font-display);
+  }
+  .page-subtitle { @apply mt-1 text-sm; color: var(--muted); }
+  .section-title {
+    @apply mb-2 mt-8 text-sm font-medium;
+    color: var(--muted);
+  }
+  .link-accent {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .link-accent:hover { color: var(--accent-strong); }
+
+  /* ----- Sidebar nav items -----
+   * `nav-item-active` is styled here and emitted by the template from
+   * `item.active`; nav.py starts setting that flag in M5.6.3, which is
+   * when the sidebar finally shows where you are. */
+  .nav-item {
+    @apply block rounded-control px-2 py-1.5 text-sm;
+    color: var(--ink);
+  }
+  .nav-item:hover {
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+  }
+  .nav-item-active {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ----- Empty state ----- */
+  .empty-state {
+    @apply flex flex-col items-center justify-center gap-2 px-6 py-12 text-center;
+    color: var(--muted);
+    border: 1px dashed var(--line);
+    border-radius: var(--radius-card);
+  }
+  .empty-state-title {
+    @apply text-sm font-medium;
+    color: var(--ink);
   }
   .container-app {
     @apply mx-auto max-w-6xl px-6;

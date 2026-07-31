@@ -5,23 +5,19 @@ register also surfaces as a callable tool inside Claude (Desktop, Code,
 or any MCP-aware client). One endpoint definition → one REST route + one
 MCP tool, no duplicate code.
 
-## Claude.ai (web) — recommended
+## First, mint a key
 
-For the smoothest setup, use Claude.ai's custom-connector flow — it
-handles OAuth (Dynamic Client Registration + PKCE) for you, no JSON
-editing required.
+Every client below authenticates the same way: a bearer key from
+[API keys]({{ OPS_KEYS_URL }}) → **Mint a key**. Give it the
+`agents-only` tier unless you specifically want the client to reach
+`private` notes. The secret is shown once.
 
-1. **Settings → Connectors → Add custom server**.
-2. Paste `{{ PUBLIC_BASE_URL }}/mcp/` as the server URL. Submit.
-3. Sign in via magic-link, approve the consent screen, and your
-   tools appear in the conversation.
-
-If you'd rather skip the OAuth handshake (e.g. for a trusted personal
-account), mint a **URL token** at
-[/dashboard/url-tokens/](/dashboard/url-tokens/) → **+ New URL token**.
-Copy the full `https://.../mcp/k/mcpurl_.../` URL it prints once and
-paste that into the same Claude.ai connector field. No bearer header
-needed — the token is part of the path.
+> **This build authenticates with bearer keys only.** OAuth /
+> Dynamic Client Registration and the `/mcp/k/<token>/` URL-token
+> surface are not enabled here, so Claude.ai's *custom connector*
+> flow — which expects a server that runs the OAuth handshake — will
+> not complete. Use a client that can send an `Authorization` header:
+> Claude Desktop, Claude Code, or Cursor, all below.
 
 ## Claude Desktop
 
@@ -91,30 +87,28 @@ Restart Cursor; tools appear under your configured server name.
 
 ## Authentication
 
-Use the same `Authorization: Bearer mcpsk_<key>` token used for REST.
-Each tool invocation counts against your credit quota — see the
-[billing page](/dashboard/billing/) for your current balance.
+Use the same `Authorization: Bearer mcpsk_<key>` token used for REST —
+see the [auth guide](/docs/guide/auth/). There is no anonymous access on
+either surface.
 
-If your client supports **OAuth-based MCP authentication** (instead of
-a static bearer), point it at:
-
-```
-{{ PUBLIC_BASE_URL }}/oauth/authorize/
-```
-
-The Authorization Server metadata is published at
-`/.well-known/oauth-authorization-server` and we support Dynamic
-Client Registration (DCR) per RFC 7591 so most clients self-register
-without operator action.
+The key's **tier** applies to MCP exactly as it does to REST: a tool call
+from an `agents-only` key cannot read a `private` note, and gets the same
+"unknown entity" answer a non-existent id would. Tier and rate limit are
+editable per key on the [API keys]({{ OPS_KEYS_URL }}) page and take
+effect on the next call.
 
 ## Troubleshooting
 
   - **No tools show up**: open Claude Desktop devtools (Help →
     Developer Tools), check the MCP server log for connection errors.
-    Most common cause: wrong `token`.
-  - **Tools show but return errors**: check the request log on
-    [/dashboard/usage/](/dashboard/usage/) for the failing call —
-    status codes match the [error codes guide](/docs/guide/errors/).
+    Most common cause: a wrong or revoked key. Confirm the key is still
+    active on the [API keys]({{ OPS_KEYS_URL }}) page — its *last used*
+    timestamp tells you whether the call ever arrived.
+  - **Tools show but return errors**: check the event stream on
+    [Logs]({{ OPS_LOGS_URL }}) for the failing call — status codes match
+    the [error codes guide](/docs/guide/errors/).
+  - **A note you know exists comes back "unknown entity"**: the key's
+    tier is below that note's visibility. Raise the tier on its card.
   - **Tool name ends with `__v2` / `__v3`**: the endpoint ships multiple
     versions and the suffix marks the non-default one. The unsuffixed
     name is the stable v1; pick the suffixed version only if you

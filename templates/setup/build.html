@@ -1,0 +1,111 @@
+{% extends "setup/_layout.html" %}
+
+{% block step_title %}Build your brain{% endblock %}
+{% block step_blurb %}
+  Clone the repository, read every note's frontmatter into the index, and
+  materialise one snapshot per visibility tier.
+{% endblock %}
+
+{% block step_body %}
+<div x-data="build()" x-init="start()">
+
+  <template x-if="p.state === 'running'">
+    <div>
+      <div class="flex items-center justify-between text-sm">
+        <span x-text="p.label || 'Working…'">Working…</span>
+        <span style="color: var(--muted); font-family: var(--font-mono);"
+              x-text="(p.step || 0) + '/' + (p.total || 3)"></span>
+      </div>
+      <div class="mt-2 h-2 w-full overflow-hidden rounded-full" style="background: var(--surface-2);">
+        <div class="h-full transition-all" style="background: var(--accent, #6366f1);"
+             :style="'width:' + Math.round(((p.step || 0) / (p.total || 3)) * 100) + '%'"></div>
+      </div>
+      <p class="mt-3 text-xs" style="color: var(--muted);">
+        Running on the worker — this page is only watching. Safe to close;
+        it will still be running when you come back.
+      </p>
+    </div>
+  </template>
+
+  <template x-if="p.state === 'done'">
+    <div>
+      <div class="rounded-lg border px-4 py-3 text-sm" style="border-color: #4db8a8;">
+        <div class="font-semibold" style="color: #2c8577;">Your brain is online.</div>
+        <div class="mt-1" style="color: var(--muted); font-family: var(--font-mono);">
+          <span x-text="p.entities"></span> entities · HEAD <span x-text="p.head"></span>
+        </div>
+      </div>
+      <form method="post" action="{% url 'setup:finish' %}" class="mt-5">
+        {% csrf_token %}
+        <button type="submit"
+                class="home-cta inline-flex items-center justify-center px-8 py-3 text-sm font-semibold">
+          Go to the dashboard &rarr;
+        </button>
+      </form>
+    </div>
+  </template>
+
+  <template x-if="p.state === 'failed'">
+    <div>
+      <div class="rounded-lg border px-4 py-3 text-sm" style="border-color: #ff6b6b;">
+        <div class="font-semibold" style="color: #c0392b;" x-text="p.label || 'Build failed'"></div>
+        <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
+             style="background: #0d1117; color: #c9d1d9;" x-text="p.error"></pre>
+      </div>
+      <div class="mt-4 flex gap-2">
+        {# See the note on the start form below: no optimistic x-if swap here. #}
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="home-cta inline-flex px-6 py-3 text-sm font-semibold">
+            Try again
+          </button>
+        </form>
+        <a href="{% url 'setup:step' slug='read' %}"
+           class="rounded-lg border px-4 py-2 text-sm" style="border-color: var(--line);">
+          Back to the deploy key
+        </a>
+      </div>
+    </div>
+  </template>
+
+  {% comment %}
+    No optimistic "now running" state change on submit. Setting `p` here
+    would flip the surrounding `x-if` and REMOVE this form from the DOM
+    during its own submit event — and a detached form does not submit, so
+    the click would silently do nothing. The POST redirects back here and
+    the server has already written the running state, so the optimistic
+    update bought nothing anyway.
+  {% endcomment %}
+  <template x-if="!p.state">
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit"
+              class="home-cta inline-flex items-center justify-center px-8 py-3 text-sm font-semibold">
+        Build my brain
+      </button>
+      <p class="mt-2 text-xs" style="color: var(--muted);">
+        Usually a few seconds. It also shows up under Tasks in the ops UI.
+      </p>
+    </form>
+  </template>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+  function build() {
+    return {
+      p: {{ progress_json|safe }},
+      start() {
+        // Poll rather than stream: a wizard tab that someone leaves open
+        // shouldn't hold a connection, and a missed tick costs nothing.
+        setInterval(async () => {
+          if (this.p.state === 'done') return;
+          try {
+            const r = await fetch('{% url "setup:progress" %}');
+            if (r.ok) this.p = await r.json();
+          } catch (e) { /* transient — the next tick retries */ }
+        }, 1500);
+      },
+    };
+  }
+</script>
+{% endblock %}

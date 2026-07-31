@@ -1,0 +1,112 @@
+{% extends "setup/_layout.html" %}
+
+{% block step_title %}Let the server read your brain{% endblock %}
+{% block step_blurb %}
+  This server generated a key pair and kept the private half encrypted.
+  Give GitHub the public half — read-only — and it can clone and pull.
+{% endblock %}
+
+{% block step_body %}
+  <dl class="mb-5 text-sm">
+    <dt style="color: var(--muted);">Repository</dt>
+    <dd style="font-family: var(--font-mono);">{{ repo_url }}</dd>
+  </dl>
+
+  {% if key_source == "file" %}
+    <div class="rounded-lg border px-4 py-3 text-sm" style="border-color: var(--line);">
+      A deploy key file is mounted into this deployment
+      (<code>BRAIN_GIT_SSH_KEY_PATH</code>), so there is nothing to install
+      here. Press Verify to confirm it works.
+    </div>
+  {% else %}
+    <div x-data="{copied: false}">
+      <label class="block text-sm font-medium">Public key</label>
+      <textarea readonly rows="3" x-ref="key"
+                class="mt-1 block w-full rounded-lg border px-3 py-2 text-xs"
+                style="border-color: var(--line); background: var(--surface-2); font-family: var(--font-mono);"
+                >{{ public_key }}</textarea>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <button type="button"
+                class="rounded-lg px-4 py-2 text-sm font-medium text-white"
+                style="background: var(--accent, #6366f1);"
+                @click="navigator.clipboard.writeText($refs.key.value).then(() => { copied = true; setTimeout(() => copied = false, 2000) })">
+          <span x-text="copied ? 'Copied' : 'Copy key'">Copy key</span>
+        </button>
+        {% if add_key_url %}
+          <a href="{{ add_key_url }}" target="_blank" rel="noopener"
+             class="rounded-lg border px-4 py-2 text-sm font-medium"
+             style="border-color: var(--line);">
+            Open GitHub &rarr; Add deploy key
+          </a>
+        {% endif %}
+      </div>
+      <p class="mt-2 text-xs" style="color: var(--muted);">
+        Leave "Allow write access" <strong>unchecked</strong>. Writing is a
+        separate credential in the next step, on purpose: a stolen read key
+        leaks your brain, a stolen write key rewrites it.
+      </p>
+    </div>
+  {% endif %}
+
+  {% if result %}
+    <div class="mt-5 rounded-lg border px-4 py-3 text-sm"
+         style="border-color: {% if result.ok %}#4db8a8{% else %}#ff6b6b{% endif %};">
+      <div class="font-semibold" style="color: {% if result.ok %}#2c8577{% else %}#c0392b{% endif %};">
+        {{ result.message }}
+      </div>
+      {% if result.head %}
+        <div class="mt-1" style="color: var(--muted); font-family: var(--font-mono);">
+          HEAD {{ result.head }}
+        </div>
+      {% endif %}
+      {% if result.missing %}
+        <ul class="mt-2 list-disc ps-5" style="font-family: var(--font-mono);">
+          {% for m in result.missing %}<li>{{ m }}</li>{% endfor %}
+        </ul>
+        <p class="mt-2" style="color: var(--muted);">
+          Start from the brain-template repository — those files are the
+          operating contract this server reads.
+        </p>
+      {% endif %}
+      {% if result.git_error %}
+        <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
+             style="background: #0d1117; color: #c9d1d9;">{{ result.git_error }}</pre>
+        <p class="mt-2" style="color: var(--muted);">
+          That is git's own message, unedited. "Permission denied
+          (publickey)" almost always means the key above hasn't been added
+          to <em>this</em> repository yet.
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% comment %}
+    The disable is DEFERRED by a tick on purpose. A form's data set is
+    built after the submit event fires, and disabled controls are excluded
+    from it — so disabling the submitter synchronously drops its
+    name/value, and the view sees no `action` at all. Costs nothing, and
+    the button still greys out for the life of the request.
+  {% endcomment %}
+  <form method="post" class="mt-5 flex flex-wrap items-center gap-2"
+        x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+    {% csrf_token %}
+    <button type="submit" name="action" value="verify"
+            :disabled="busy"
+            class="home-cta inline-flex items-center justify-center px-6 py-3 text-sm font-semibold"
+            :style="busy ? 'opacity:.6; pointer-events:none' : ''">
+      <span x-text="busy ? 'Checking…' : (({{ verified|yesno:'true,false' }}) ? 'Verify again' : 'I\'ve added it → Verify')">Verify</span>
+    </button>
+    {% if key_source != "file" %}
+      <button type="submit" name="action" value="regenerate" :disabled="busy"
+              class="rounded-lg border px-4 py-2 text-sm"
+              style="border-color: var(--line); color: var(--muted);">
+        Generate a new key
+      </button>
+    {% endif %}
+    {% if verified %}
+      <a href="{% url 'setup:step' slug='write' %}"
+         class="rounded-lg px-6 py-2.5 text-sm font-medium text-white"
+         style="background: var(--ink);">Continue</a>
+    {% endif %}
+  </form>
+{% endblock %}

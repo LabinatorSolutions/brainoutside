@@ -70,6 +70,10 @@ urlpatterns: list = [
         name="login",
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    # First-run wizard. Top level, not under the ops prefix: it has to be
+    # reachable before an operator account or a brain exists. Inside the
+    # IP-allowlist perimeter in prod (IP_ALLOWLIST_EXTRA_PREFIXES).
+    path("setup/", include("apps.brainconfig.setup_urls", namespace="setup")),
     path("healthz", healthz, name="healthz"),
     path("readyz", readyz, name="readyz"),
     path(".well-known/security.txt", security_txt, name="security-txt"),

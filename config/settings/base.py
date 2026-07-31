@@ -67,6 +67,9 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Sends an unowned or unfinished install to /setup/. After auth, since
+    # it needs request.user to know whether the operator is the one asking.
+    "apps.brainconfig.middleware.SetupRequiredMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -167,8 +170,10 @@ ADMIN_IP_ALLOWLIST = list(_env.ADMIN_IP_ALLOWLIST)
 # Non-admin prefixes pulled inside the same IP-allowlist perimeter.
 # Docs are staff-only and must 404 (not redirect) for outsiders; the
 # login page is a door that shouldn't exist for the open internet at
-# all (nothing-public decision).
-IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/", "login/", "logout/"]
+# all (nothing-public decision). `setup/` is the most sensitive of the
+# three before an account exists — it is where the first operator
+# account gets created — so it belongs inside the perimeter too.
+IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/", "login/", "logout/", "setup/"]
 
 DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
 DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL

@@ -97,6 +97,59 @@ persisted to the data volume:
 > A `FIELD_ENCRYPTION_KEY` that regenerates per boot silently destroys
 > every stored credential. Generate → persist → verify on next boot.
 
+### Where each setting lives, and why
+
+Two stores already exist and should be reused rather than reinvented:
+
+- `apps/core/runtime_settings.py` — plain values in Postgres, Redis
+  read-through cache, **env fallback when no override is set**. Already
+  used by `ADMIN_IP_ALLOWLIST`.
+- `apps/brainconfig` `AppSetting` — Fernet-encrypted. Already used by
+  `ANTHROPIC_API_KEY`, model choices, budgets, the daily cap.
+
+Three tests decide where a setting belongs. **(1)** Needed before the DB
+is reachable? Must be env. **(2)** Read at import time? Moving it means a
+restart, so it is not really a UI setting. **(3)** Would a wrong value
+lock the operator out of the UI that sets it? Keep it in env even if it
+is technically movable.
+
+| Setting | Verdict | Why |
+|---|---|---|
+| `DATABASE_URL`, `POSTGRES_PASSWORD` | **env** | Needed to reach the DB |
+| `REDIS_URL` | **env** | Needed at boot by cache + queue |
+| `DJANGO_SETTINGS_MODULE`, `DEBUG` | **env** | Process bootstrap |
+| `SECRET_KEY` | **auto-gen + persist** | Signs sessions — needed before any login exists |
+| `FIELD_ENCRYPTION_KEY` | **auto-gen + persist** | Decrypts the settings table itself; storing it there is circular |
+| `MCP_LOOPBACK_SECRET` | **auto-gen + persist** | Shared between web and mcp at startup |
+| `DJANGO_ADMIN_URL_PATH` | **auto-gen (env)** | Baked into `config/urls.py` at import — a change needs a restart |
+| `ADMIN_PANEL_URL_PATH` | **env** | Same: URL routing, resolved at import |
+| `ALLOWED_HOSTS` | **env** | Lockout footgun: a wrong value 400s every request, including the page that would fix it |
+| `BRAIN_REPO_DIR`, `BRAIN_VIEWS_DIR` | **env** | Container paths tied to volume mounts; compose owns them |
+| `ADMIN_IP_ALLOWLIST` | **UI (already works)** | Flows through `runtime_settings` today — just needs exposing on the Settings page, with a guard that the editor's own IP stays allowed |
+| `BRAIN_REPO_URL` | **UI (wizard)** | Changing it must also clear the clone — see the origin-check gap below |
+| SSH deploy key | **UI, encrypted** | App generates it; user pastes the public half into GitHub |
+| Write PAT | **UI, encrypted** | Env/file override retained (see the tradeoff above) |
+| `GITHUB_WEBHOOK_SECRET` | **UI, auto-gen** | Read per request in `brain/views.py`; generate it and show it to paste into GitHub |
+| `BRAIN_COMMIT_NAME` / `_EMAIL` | **UI** | Pure display config, read per commit |
+| `FEED_PAYLOAD_MAX_KB` | **UI** | Read per request in `intake.py` |
+| `APP_NAME` | **UI** | Only a context-processor value; the default stays in env for rebranding |
+| `PUBLIC_BASE_URL` | **UI** | Low value, but harmless and read at render |
+| Claude key, models, budgets, cap | **UI (already)** | Encrypted `AppSetting` today |
+
+**Result: the only env a human writes is `POSTGRES_PASSWORD` and the
+domain.** Everything else is generated, defaulted, or set in the browser.
+
+Two things this exposes that must be handled with it:
+
+- **Changing `BRAIN_REPO_URL` in the UI does nothing today.**
+  `gitrepo.bootstrap()` reuses *any* valid clone at the repo dir and
+  never checks that its origin matches the configured URL, so a repo
+  switch would silently keep serving the old brain. Before this becomes a
+  UI field: compare origin on boot, and fail loudly (or offer a "replace
+  the clone" action) when they differ.
+- **Anything UI-settable that needs a restart must say so** in the UI, not
+  fail silently or pretend it took effect.
+
 ### Step 1 — First visit is the wizard, not a login box
 
 Zero users in the DB → every route redirects to `/setup`. No

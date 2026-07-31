@@ -88,30 +88,45 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 Decided 2026-07-31: launch WITH the better UI. Full detail and build
 order in [UI-REWRITE.md](UI-REWRITE.md).
 
-- [ ] Restore a real Tailwind build — v4, standalone CLI binary, no Node
-      or `node_modules` in the repo, `tw.css` stays committed so
-      self-hosters need no toolchain. Today `tailwind.config.js` is
-      decorative: nothing reads it, and the artifact has been frozen
-      since 2026-07-28, so any class added since silently does nothing.
-- [ ] `tokens.css` → Tailwind `@theme`, so `bg-surface` / `border-line` /
-      `text-muted` are real utilities. The primitive→semantic split
-      already there is exactly the right shape; it was never wired up.
-- [ ] Component layer (`btn`, `card`, `table`, `badge`, `field`,
-      `stat-tile`) + a living style guide at `/ops/styleguide/`.
-- [ ] Convert all 24 templates — 455 inline `style="…"` attributes,
-      concentrated entirely in `ops/` and `setup/`; the vendored `docs/`,
-      `errors/` and `components/` pages are already clean.
-- [ ] Redesign: sidebar with an active state (`nav.py` emits none today,
-      so the nav never shows where you are), page furniture, table
-      density, responsive, and a dark-mode decision — `darkMode: "class"`
-      is configured and a theme-toggle partial exists, but `tokens.css`
-      has no dark block, so the toggle currently toggles nothing.
-- [ ] Guardrails so it cannot regress: **enforce CSP in dev** (the
-      report-only default is what hid the blocker), a test that fails on
-      `style="` in any template, and a test that rebuilds `tw.css` and
-      fails if it differs from the committed artifact.
+- [x] Restore a real Tailwind build — v4.3.3, standalone CLI binary, no
+      Node or `node_modules`, `tw.css` stays committed so self-hosters
+      need no toolchain. `.\dev.ps1 css [-Watch]` + the POSIX twin, both
+      reading one pinned version. `tailwind.config.js` deleted (v4 is
+      CSS-first). `@tailwindcss/forms` + `typography` both load in the
+      standalone binary — the one unknown, checked first.
+- [x] `tokens.css` → Tailwind `@theme`, so `bg-surface` / `border-line` /
+      `text-muted` are real utilities. Uses **`@theme inline`**, which is
+      load-bearing: a plain `@theme` resolves the var() at `:root`, so a
+      `.dark` subtree inherits the already-resolved light colour.
+- [x] Component layer (btn family, card, table, badge, dot, field,
+      stat-tile, notice, meta-grid, empty-state, diff lines) + a living
+      style guide at `/ops/styleguide/` (staff-only AND DEBUG-only). It
+      found the `@theme inline` bug on its first render.
+- [x] Convert all templates — **455 → 0** inline `style="…"` attributes.
+- [x] **Dark mode ships.** `tokens.css` has a `.dark` block; the toggle
+      that used to toggle nothing now works. Status colours needed a
+      second token each (`--signal-ink` / `--warn-ink` / `--danger-ink`):
+      the fills fail contrast as text (#4db8a8 is ~2.1:1 on paper).
+- [x] Sidebar active state — `nav.py` emits it now, longest-match so the
+      root-mounted dashboard doesn't light up on every page.
+- [ ] Rest of the redesign: page furniture, table density, responsive
+      (5.6.3.2–.4). No horizontal overflow at 390/820/1440 today, but
+      nothing has been designed FOR those widths yet.
+- [x] Guardrails: **CSP enforced in dev**; tests that fail on an inline
+      style attribute, on a nonce-less inline `<script>`, on a multi-line
+      `{#…#}` comment, on duplicate `class` attributes, and on `tw.css`
+      differing from a fresh build. 39 tests pass.
 - [ ] Launch assets last, against the shipped UI — and still not the
       graph explorer until the click-through bug below is fixed.
+
+**Found by enforcing CSP in dev, all previously invisible:** three inline
+`<script>` blocks had no nonce and were refused outright — the whole chat
+send/stream implementation (the Send button did nothing on every
+deployment) and the auto-refresh on tasks + feed detail. Alpine's *string*
+`:style` binding is also dropped (it calls `setAttribute`), which killed
+the wizard's busy-state affordance; the *object* form goes through the
+CSSOM and is fine. A multi-line `{#…#}` comment was printing four lines of
+engineering commentary above the fold on the dashboard.
 
 ## Cross-platform + docs (5.4)
 
@@ -157,12 +172,15 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Known issues to close before the beta
 
-- [ ] **RELEASE BLOCKER — resolution decided 2026-07-31: the UI rewrite
-      (M5.6, `docs/UI-REWRITE.md`) fixes this by removing every inline
-      style, and runs BEFORE 5.4/5.5. The interim `style-src-attr`
-      band-aid is deliberately NOT applied: nothing ships before the
-      rewrite, so loosening the CSP only to revert it weeks later is
-      strictly worse than doing neither.** Detail below.
+- [x] **RELEASE BLOCKER — CLOSED 2026-07-31 by M5.6.2.** Every inline
+      style attribute is gone (455 → 0 across 45 templates) and a test
+      keeps them gone, so the CSP never needed loosening: the
+      `style-src-attr` band-aid was never applied and is no longer
+      needed. The policy that ships is the strict one, and it is now
+      strict about things that actually work. Historical detail below,
+      kept because the *reason* it hid for so long is the lesson:
+      `dev.py` defaulted to report-only, so every visual check this
+      project ever did ran on a permissive stack. Dev now enforces.
 
       **The enforced CSP strips every inline style, so the ops UI is
       largely unstyled on real deployments.**

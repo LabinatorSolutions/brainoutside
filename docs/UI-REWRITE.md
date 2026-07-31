@@ -1,5 +1,44 @@
 # UI rewrite (M5.6) — design
 
+> **Status 2026-07-31.** 5.6.0 (foundation), 5.6.1 (component layer +
+> style guide) and 5.6.2 (conversion) are DONE and committed. 455 → 0
+> inline styles; the release blocker is closed by removal. 5.6.3.1 (nav
+> active state) done. Remaining: 5.6.3.2–.4 (page furniture, table
+> density, responsive) and 5.6.4 (launch assets).
+>
+> **What enforcing CSP in dev turned up, none of it visible before.**
+> §6's first guardrail was the highest-value change in this document by
+> some distance — it did not merely reveal the inline styles, it revealed
+> three *dead features*:
+> - Three inline `<script>` blocks had no nonce, so the policy refused
+>   them: the entire chat send/stream implementation (the Send button was
+>   inert on every deployment) plus the auto-refresh on tasks and feed
+>   detail, which only render while work is in flight.
+> - Alpine's **string** `:style` binding compiles to `setAttribute`, so it
+>   is dropped too; the wizard's busy-state affordance never worked. The
+>   **object** form writes through the CSSOM and is fine.
+> - A multi-line `{#…#}` comment — Django's hash comment is single-line
+>   only — was printing four lines of engineering commentary above the
+>   fold on the dashboard.
+>
+> Two design corrections worth carrying forward:
+> - **`@theme inline` is mandatory**, not stylistic. A plain `@theme`
+>   emits `:root { --color-surface: var(--surface) }`, and a custom
+>   property resolves its `var()` where it is DECLARED — so a `.dark`
+>   subtree inherits the already-resolved *light* value. Toggling `.dark`
+>   on `<html>` hides this completely, which is why the 5.6.0.2 check
+>   passed 16/16 and the style guide caught it minutes later.
+> - **Status colours need two tokens each.** `--signal` / `--warn` /
+>   `--danger` are tuned as fills; as text on the paper surface they are
+>   ~2.1:1 and ~2.8:1, well under 4.5:1. `--signal-ink` / `--warn-ink` /
+>   `--danger-ink` are the readable variants, and the relationship
+>   inverts in dark mode (lighter than the fill, not darker).
+>
+> Guardrails landed: CSP enforced in dev, plus tests that fail on an
+> inline style attribute, a nonce-less inline `<script>`, a multi-line
+> `{#…#}`, duplicate `class` attributes on one tag, and `tw.css` drifting
+> from a fresh build. 39 tests pass.
+
 The ops UI is the product. Everything a person will see, screenshot, or
 judge BrainOutside by is one of ~13 pages behind the login. This is the
 plan to make them good, and to make the styling *correct* — which it

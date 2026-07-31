@@ -162,11 +162,22 @@ Rebuildable from your repo: entities, sync runs, snapshots. **Not**
 rebuildable: feeds, events, SDK ledger, chat history — and
 `boot-secrets.json`, which is why the state volume is in the list.
 
-## 7. Webhook (optional)
+## 7. Webhook (not optional in practice)
 
 Repo → Webhooks → `https://your-domain/webhooks/github`, content type
-JSON, secret = `GITHUB_WEBHOOK_SECRET`, push events only. Without it the
-periodic pull still picks changes up, just more slowly.
+JSON, secret = `GITHUB_WEBHOOK_SECRET`, push events only.
+
+This used to say the periodic pull would pick changes up anyway, just
+more slowly. **There is no periodic pull.** The only three things that
+sync the clone are this webhook, the "Pull from GitHub" button on
+`/ops/health/`, and `manage.py sync_brain`. Without the webhook the
+server keeps serving the brain as of the last manual pull, indefinitely,
+and nothing warns you that it is behind.
+
+(`config/scheduled.py`, which `manage.py sync_scheduled` imports to
+register Q2 cron rows, is absent from the repo — so no scheduled task of
+any kind is registered on a deploy, including the idempotency-key purge.
+Tracked separately; it is not something this page can work around.)
 
 ## 8. Post-deploy checks
 

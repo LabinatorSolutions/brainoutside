@@ -213,6 +213,21 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       Note the fix is NOT "add unsafe-inline alongside the nonce"; that is
       a no-op.
 
+- [ ] **The display font is not self-hosted, so only this machine sees
+      it.** `--font-display` is `'Space Grotesk', system-ui, sans-serif`,
+      but `static/fonts/` contains only Inter (4 weights) and JetBrains
+      Mono (2), and the build emits `@font-face` for exactly those.
+      Measured in Chromium against the prod instance:
+      `document.fonts.check('16px "Space Grotesk"')` returns true here
+      **because the font is installed on this laptop**, while
+      `document.fonts` lists no Space Grotesk face. Every heading in the
+      app therefore renders Space Grotesk for Hasan and `system-ui` for
+      every self-hoster — and every screenshot taken so far shows the
+      former. Fix before M5.6.4 launch assets: vendor the woff2 (SIL OFL
+      1.1) next to the others and add the `@font-face`, or drop it from
+      the stack. Not a deploy blocker; purely cosmetic, but it makes the
+      marketing shots dishonest.
+
 - [ ] **Snapshot swap is not atomic.** `snapshots.build_tier` does
       `rmtree(final)` then `rename(tmp, final)`, so there is a window
       where a tier directory does not exist. Anything reading the

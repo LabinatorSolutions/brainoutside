@@ -26,7 +26,10 @@ param(
     [switch]$NoCache,
 
     # down: also remove named volumes (pgdata - the local database).
-    [switch]$Volumes
+    [switch]$Volumes,
+
+    # css: rebuild on every template/app.css save instead of once.
+    [switch]$Watch
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,13 +52,18 @@ dev.ps1 - the brain stack (web + mcp + worker + postgres + redis) on Docker
   .\dev.ps1 shell [svc]       bash inside a container (default: web)
   .\dev.ps1 manage <args>     run manage.py in the web container
   .\dev.ps1 superuser         create a Django superuser
+  .\dev.ps1 css [-Watch]      rebuild static/css/tw.css from app.css
   .\dev.ps1 help              this text
 
 Code edits are live: web reloads itself, `reload` covers mcp + worker.
+TEMPLATE edits also need `reload web`. Adding a Tailwind class to a
+template needs `css` too - tw.css is a committed build artifact, not
+something the container generates.
 
   .\dev.ps1 reload worker
   .\dev.ps1 manage rebuild_index
   .\dev.ps1 logs web mcp
+  .\dev.ps1 css -Watch
 '@
 
 # ---------------------------------------------------------------- helpers ---
@@ -321,6 +329,54 @@ switch ($Command.ToLowerInvariant()) {
 
     'superuser' {
         Invoke-Compose @('exec', 'web', 'python', 'manage.py', 'createsuperuser') -AllowFailure
+    }
+
+    'css' {
+        # Rebuild static/css/tw.css from static/css/app.css with the
+        # Tailwind v4 standalone binary. No Node, no node_modules: the
+        # binary is cached in .cache/ (gitignored) and the OUTPUT is
+        # committed, so Docker and self-hosters never need a toolchain.
+        $twVersion = (Get-Content (Join-Path $Root 'scripts\tailwind-version.txt') -Raw).Trim()
+        $asset = if ([Environment]::Is64BitOperatingSystem -and
+                     [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') {
+            'tailwindcss-windows-arm64.exe'
+        } else {
+            'tailwindcss-windows-x64.exe'
+        }
+        $cacheDir = Join-Path $Root '.cache'
+        $bin = Join-Path $cacheDir "tailwindcss-$twVersion-$asset"
+
+        if (-not (Test-Path $bin)) {
+            New-Item -ItemType Directory -Force -Path $cacheDir | Out-Null
+            Write-Step "downloading tailwindcss $twVersion ($asset)"
+            $url = "https://github.com/tailwindlabs/tailwindcss/releases/download/$twVersion/$asset"
+            $prev = $ProgressPreference
+            $ProgressPreference = 'SilentlyContinue'   # the progress bar makes this ~10x slower
+            try {
+                Invoke-WebRequest -Uri $url -OutFile $bin -UseBasicParsing
+            } finally {
+                $ProgressPreference = $prev
+            }
+        }
+
+        $inFile = Join-Path $Root 'static\css\app.css'
+        $outFile = Join-Path $Root 'static\css\tw.css'
+        $twArgs = @('-i', $inFile, '-o', $outFile, '--minify')
+        if ($Rest -contains '-Watch' -or $Rest -contains '--watch' -or $Watch) {
+            Write-Step "watching templates -> static/css/tw.css (Ctrl+C to stop)"
+            $twArgs += '--watch'
+        } else {
+            Write-Step "building static/css/tw.css"
+        }
+
+        & $bin @twArgs
+        if ($LASTEXITCODE -ne 0) { Write-Fail "tailwind build failed"; exit $LASTEXITCODE }
+
+        if (-not ($twArgs -contains '--watch')) {
+            $size = (Get-Item $outFile).Length
+            Write-Host "    static/css/tw.css - $size bytes" -ForegroundColor Green
+            Write-Warn "commit tw.css: the image ships the artifact, it is not built at deploy time."
+        }
     }
 
     'help' { Write-Host $Usage }

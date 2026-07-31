@@ -1,14 +1,63 @@
 /*
  * Tailwind SOURCE — compiles to `static/css/tw.css` (what base.html
- * loads) via `bash scripts/build-css.sh`. Never serve this file raw:
- * browsers can't interpret @tailwind/@apply. Commit the rebuilt tw.css
- * after edits — the Docker image has no CSS build step.
+ * loads) via `.\dev.ps1 css` (or `bash scripts/build-css.sh`). Never
+ * serve this file raw: browsers can't interpret @import/@apply. COMMIT
+ * the rebuilt tw.css after edits — the Docker image has no CSS build
+ * step, so self-hosters and the GHCR image need no toolchain.
  * Self-hosted Inter + JetBrains Mono live in static/fonts/.
+ *
+ * Tailwind v4: configuration is CSS-first (`@theme` below). There is no
+ * JS config — `tailwind.config.js` was deleted with this port; nothing
+ * had read it since the build stopped running.
  */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* `source(none)` turns OFF v4's automatic content detection and makes the
+ * `@source` list below the whole truth. Without it v4 scans up from the
+ * project root, which here means `data/brain-repo` (the entire brain, a
+ * few thousand markdown files) and `.venv/` — slow, and it would mine
+ * class-like strings out of prose and Python packages. */
+@import "tailwindcss" source(none);
+
+@source "../../templates/**/*.html";
+@source "../../apps/**/templates/**/*.html";
+@source "../../apps/**/*.py";
+@source "../js/**/*.js";
+
+/* Bundled with the standalone CLI — verified loading under v4.3.3. */
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
+
+/* v4's default `dark:` variant follows prefers-color-scheme; this app
+ * toggles a `.dark` class on <html> (see partials/_theme_toggle.html),
+ * which is what `darkMode: "class"` used to declare. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* `brand` aliases the indigo scale so brand-500 = #6366f1 (--c-indigo)
+   * and brand-600 = #4f46e5 (--c-indigo-strong), matching the semantic
+   * accent in tokens.css. */
+  --color-brand-50:  #eef2ff;
+  --color-brand-100: #e0e7ff;
+  --color-brand-200: #c7d2fe;
+  --color-brand-300: #a5b4fc;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+  --color-brand-700: #4338ca;
+  --color-brand-800: #3730a3;
+  --color-brand-900: #312e81;
+  --color-brand-950: #1e1b4b;
+
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1.1;
+  --text-5xl--letter-spacing: -0.02em;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1.05;
+  --text-6xl--letter-spacing: -0.025em;
+}
 
 /* ----- Web fonts (self-hosted, no CDN) ----- */
 @layer base {
@@ -69,6 +118,17 @@
     display: none !important;
   }
 
+  /* v3→v4 compat: v4's preflight defaults border-color to `currentColor`,
+   * where v3 defaulted it to gray-200. 127 bare `border` utilities across
+   * the templates relied on the v3 default, and flipping them to ink at
+   * port time would be a silent visual change in a step that is meant to
+   * have none. This is the upgrade guide's documented shim and it is
+   * TRANSITIONAL — M5.6.2 converts those borders to the semantic
+   * `border-line` token, and this block goes with the last one. */
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+
   :root {
     color-scheme: light dark;
   }
@@ -98,7 +158,11 @@
    * so the ring reads as a true gap between the focused element and
    * its background rather than a second visual outline. */
   *:focus-visible {
-    @apply outline-none ring-2 ring-brand-400 ring-offset-2 ring-offset-zinc-50;
+    /* v4 renamed v3's `outline-none` (transparent 2px outline, kept for
+     * forced-colors mode) to `outline-hidden`; v4's `outline-none` now
+     * really means `outline-style: none`, which would drop the
+     * high-contrast fallback. */
+    @apply outline-hidden ring-2 ring-brand-400 ring-offset-2 ring-offset-zinc-50;
   }
   html.dark *:focus-visible {
     @apply ring-offset-zinc-950;
@@ -130,14 +194,21 @@
 
 /* ----- Reusable component primitives ----- */
 @layer components {
-  .btn {
+  /* v4 `@apply` only takes utilities, not other component classes, so the
+   * shared base is a grouped selector instead of `@apply btn` inside each
+   * variant. Same single-class specificity as before, so templates using
+   * `btn-primary` alone still pick up the base — as they did under v3,
+   * where @apply inlined it. */
+  .btn,
+  .btn-primary,
+  .btn-secondary {
     @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors;
   }
   .btn-primary {
-    @apply btn bg-brand-500 hover:bg-brand-400 text-zinc-950;
+    @apply bg-brand-500 hover:bg-brand-400 text-zinc-950;
   }
   .btn-secondary {
-    @apply btn border border-zinc-300 hover:border-zinc-400 text-zinc-900
+    @apply border border-zinc-300 hover:border-zinc-400 text-zinc-900
            dark:border-zinc-700 dark:hover:border-zinc-500 dark:text-zinc-100;
   }
   .container-app {

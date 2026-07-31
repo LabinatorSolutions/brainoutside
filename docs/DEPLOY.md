@@ -107,12 +107,46 @@ but put a network boundary in front of it too:
 
 - **Tailscale** on the VPS + `ADMIN_IP_ALLOWLIST` set to the tailnet
   range (the middleware 404s everyone else), or
-- a **Cloudflare Access** rule covering `/docs/*`, `/ops/*` and the
-  generated admin slug.
+- a **Cloudflare Access** rule covering `/docs/*`, `/ops/*`, `/setup/*`,
+  `/login/*` and the generated admin slug.
 
 Public internet should reach only `/`, `/api/`, `/mcp`,
-`/webhooks/github` and `/healthz|/readyz`. The dashboard warns when the
-ops UI is unrestricted and reachable from a non-local address.
+`/webhooks/github` and `/healthz|/readyz`. Putting Access in front of
+those breaks your MCP consumers and silently kills the webhook. The
+dashboard warns when the ops UI is unrestricted and reachable from a
+non-local address.
+
+### If you are behind a CDN or reverse proxy, do this first
+
+Coolify fronts the app with Traefik, and most deploys add Cloudflare on
+top. In that shape `REMOTE_ADDR` is the proxy, not the caller — so every
+per-IP control lumps the whole internet into one bucket. That is not
+cosmetic: the admin-login lockout is per-IP, so an attacker's failed
+attempts trip the sentinel on the shared address and **lock you out of
+your own admin** while they continue from another edge node.
+
+Set both:
+
+```
+TRUSTED_PROXY_IP_HEADER=CF-Connecting-IP
+TRUSTED_PROXY_IPS=10.0.0.0/8
+```
+
+`TRUSTED_PROXY_IPS` is the address the proxy connects **from**, matched
+against `REMOTE_ADDR` — the hop adjacent to this app. Behind Coolify that
+is the Traefik container on the Docker network (a private address), *not*
+Cloudflare's published ranges. Don't guess it: open `/ops/health/` and
+the exposure panel prints the address it actually observes, plus which
+of the three states you are in.
+
+The header is trusted only on requests whose peer is in that list, so a
+caller reaching the origin directly cannot forge it. Setting one without
+the other refuses to boot in prod, because a half-configuration looks
+identical to a working one while every per-IP control stays inert.
+
+**`ADMIN_IP_ALLOWLIST` compares against the resolved address**, so
+configure this section before setting it — otherwise you are allowlisting
+against your proxy's address and the first request 404s you out.
 
 ## 6. Backups
 

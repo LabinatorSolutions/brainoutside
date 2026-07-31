@@ -10,6 +10,7 @@ from django.urls import path
 from apps.brain import ops_views
 from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
+from apps.mind import ops_views as mind_ops
 from apps.reader import ops_views as reader_ops
 
 from . import health_views, styleguide_views, views
@@ -35,6 +36,10 @@ urlpatterns = [
     path("chat/<int:pk>/", reader_ops.chat_session, name="chat-session"),
     path("chat/<int:pk>/send", reader_ops.chat_send, name="chat-send"),
     path("chat/message/<int:pk>/", reader_ops.chat_message, name="chat-message"),
+    # API keys + their tier/rate-limit profiles. Lives in apps.mind because
+    # that app owns Consumer; routed here so the ops surface keeps one
+    # prefix and one nav.
+    path("consumers/", mind_ops.consumers_page, name="consumers"),
     path("settings/", views.settings_page, name="settings"),
     # Setup health + the repair actions (M5.3). Separate page rather than a
     # Settings tab: these are *actions on the world* (re-clone, rotate a

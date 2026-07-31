@@ -36,6 +36,7 @@ def _active_labels(path: str) -> list[str]:
         ("/ops/chat/", "Chat"),
         ("/ops/tasks/", "Tasks"),
         ("/ops/logs/", "Logs"),
+        ("/ops/consumers/", "API keys"),
         ("/ops/settings/", "Settings"),
         ("/ops/health/", "Setup & health"),
         # Detail pages have no nav entry and must highlight their parent —

@@ -77,8 +77,13 @@ def test_committed_css_matches_a_fresh_build(tmp_path):
     )
     assert proc.returncode == 0, f"tailwind build failed:\n{proc.stderr}"
 
-    built = fresh.read_bytes()
-    committed = TW_CSS.read_bytes()
+    # Compare EOL-normalized. `.gitattributes` pins tw.css to LF so this
+    # should be a no-op, but a contributor with a different core.autocrlf
+    # (or a zip download) would otherwise see a 1-byte CRLF diff reported
+    # as "your build output is stale", which is both wrong and a
+    # thoroughly confusing first-run experience.
+    built = fresh.read_bytes().replace(b"\r\n", b"\n")
+    committed = TW_CSS.read_bytes().replace(b"\r\n", b"\n")
     if built != committed:
         pytest.fail(
             "static/css/tw.css is out of date with static/css/app.css and the "

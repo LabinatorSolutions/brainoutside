@@ -4,13 +4,12 @@
 {% block page_title %}{{ e.title|default:e.entity_id }}{% endblock %}
 {% block page_subtitle %}
   <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-    <span class="rounded-full px-2 py-0.5" style="background: var(--surface); border: 1px solid var(--line); font-family: var(--font-mono);">{{ e.entity_id }}</span>
-    <span class="rounded-full px-2 py-0.5" style="background: #eef0ff;">{{ e.kind }}</span>
-    <span class="rounded-full px-2 py-0.5"
-          style="background: {% if e.visibility == 'public' %}#e7f6f2{% elif e.visibility == 'private' %}#fdecec{% else %}#eef0ff{% endif %};">
+    <span class="rounded-pill border border-line bg-surface px-2 py-0.5 font-mono">{{ e.entity_id }}</span>
+    <span class="badge badge-info">{{ e.kind }}</span>
+    <span class="badge {% if e.visibility == 'public' %}badge-ok{% elif e.visibility == 'private' %}badge-danger{% else %}badge-info{% endif %}">
       {{ e.visibility }}
     </span>
-    <span class="rounded-full px-2 py-0.5" style="background: var(--surface); border: 1px solid var(--line);">{{ e.status }}</span>
+    <span class="rounded-pill border border-line bg-surface px-2 py-0.5">{{ e.status }}</span>
     {% for t in e.topics %}<span class="rounded-full px-2 py-0.5 bg-surface-2">#{{ t }}</span>{% endfor %}
     {% for p in e.projects %}<span class="rounded-full px-2 py-0.5 bg-surface-2">@{{ p }}</span>{% endfor %}
     {% if e.date %}<span class="text-muted font-mono" >{{ e.date }}</span>{% endif %}
@@ -22,7 +21,7 @@
   <div class="mb-4 text-sm"><a class="text-muted" href="{% url 'brainconfig:browser' %}">← back to browser</a></div>
 
   {% if stale %}
-    <div class="mb-4 rounded-xl border p-3 text-sm" style="border-color: #e2c465; background: #fff8e6;">
+    <div class="notice notice-warn mb-4 p-3">
       <strong>Stale:</strong> last-verified is older than {{ stale_after }} days
       ({{ e.last_verified|default:"never" }}) — readers must not cite its numbers/status as current
       (reader rule 3).
@@ -30,7 +29,7 @@
   {% endif %}
 
   {% if e.status == "superseded" %}
-    <div class="mb-4 rounded-xl border p-3 text-sm" style="border-color: #e2c465; background: #fff8e6;">
+    <div class="notice notice-warn mb-4 p-3">
       <strong>Superseded</strong>
       {% if superseded_by %} by <a class="text-accent" href="{% url 'brainconfig:entity' superseded_by.entity_id %}">{{ superseded_by.entity_id }}</a>
       {% elif e.superseded_by %} by {{ e.superseded_by }} (not in index){% endif %}
@@ -46,7 +45,7 @@
   {% endif %}
 
   {% if read_error %}
-    <div class="rounded-xl border p-4 text-sm" style="border-color: #ff6b6b; background: var(--surface);">
+    <div class="notice notice-danger p-4">
       {{ read_error }} — the index row exists but the clone file is unreadable (drift?).
     </div>
   {% else %}
@@ -57,7 +56,7 @@
     {% if frontmatter %}
       <details class="mt-4 rounded-xl border p-4 text-sm border-line bg-surface">
         <summary class="text-muted cursor-pointer" >Raw frontmatter</summary>
-        <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs" style="background: #0d1117; color: #c9d1d9;">{{ frontmatter }}</pre>
+        <pre class="pane-terminal mt-2 overflow-x-auto p-3 text-xs">{{ frontmatter }}</pre>
       </details>
     {% endif %}
   {% endif %}

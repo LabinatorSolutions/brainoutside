@@ -33,11 +33,9 @@
       </div>
       {% for c in health_problems %}
         <div class="flex items-start gap-2.5 border-b px-4 py-3 last:border-0 border-line">
-          <span class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full"
-                style="background: {% if c.level == 'danger' %}#ff6b6b{% else %}#b7791f{% endif %};"></span>
+          <span class="dot mt-1.5 {% if c.level == 'danger' %}dot-danger{% else %}dot-warn{% endif %}"></span>
           <div>
-            <div class="text-sm font-medium"
-                 style="{% if c.level == 'danger' %}color: #c0392b;{% endif %}">{{ c.title }}</div>
+            <div class="text-sm font-medium {% if c.level == 'danger' %}text-danger-ink{% endif %}">{{ c.title }}</div>
             <div class="mt-0.5 max-w-3xl text-xs text-muted">{{ c.detail }}</div>
           </div>
         </div>
@@ -50,15 +48,15 @@
     <div class="rounded-xl border p-4 border-line bg-surface">
       <div class="text-xs uppercase tracking-wide text-muted">Sync</div>
       {% if probe.valid and probe.contract_ok %}
-        <div class="mt-1 text-lg font-semibold" style="color: #2c8577;">healthy</div>
+        <div class="mt-1 text-lg font-semibold text-signal-ink">healthy</div>
       {% else %}
-        <div class="mt-1 text-lg font-semibold" style="color: #c0392b;">degraded</div>
+        <div class="mt-1 text-lg font-semibold text-danger-ink">degraded</div>
       {% endif %}
       <div class="mt-1 text-xs text-muted font-mono">
         {% if last_sync %}
           {{ last_sync.trigger }} · {{ last_sync.commit_sha|slice:":8" }} ·
           {{ last_sync.started_at|timesince }} ago
-          {% if last_sync.drift_detected %}<span style="color:#c0392b;">· drift</span>{% endif %}
+          {% if last_sync.drift_detected %}<span class="text-danger-ink">· drift</span>{% endif %}
         {% else %}never synced{% endif %}
       </div>
     </div>
@@ -167,9 +165,9 @@
             <li>
               <span class="text-muted" >{{ op.created_at|date:"m-d H:i" }}</span>
               {{ op.kind }} ·
-              {% if op.ok is None %}<span style="color:#b58900;">running</span>
-              {% elif op.ok %}<span style="color:#2c8577;">ok</span>
-              {% else %}<span style="color:#c0392b;">{{ op.error_class|default:"error" }}</span>{% endif %}
+              {% if op.ok is None %}<span class="text-warn-ink">running</span>
+              {% elif op.ok %}<span class="text-signal-ink">ok</span>
+              {% else %}<span class="text-danger-ink">{{ op.error_class|default:"error" }}</span>{% endif %}
               {% if op.cost_usd %}· ${{ op.cost_usd|floatformat:4 }}{% endif %}
             </li>
           {% endfor %}

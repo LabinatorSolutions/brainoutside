@@ -16,7 +16,7 @@
   <form method="post" class="max-w-sm">
     {% csrf_token %}
     {% if form.errors %}
-      <div class="notice notice-danger mb-4 text-danger">
+      <div class="notice notice-danger mb-4 text-danger-ink">
         {% for field, errors in form.errors.items %}
           {% for e in errors %}<div>{{ e }}</div>{% endfor %}
         {% endfor %}

@@ -17,10 +17,12 @@
               x-text="(p.step || 0) + '/' + (p.total || 3)"></span>
       </div>
       <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
-        {# A genuinely dynamic width, so it cannot become a class. Alpine's
-           OBJECT :style syntax writes through element.style.setProperty(),
-           which CSP allows; the string syntax would setAttribute('style', …)
-           and be dropped. #}
+        {% comment %}
+          A genuinely dynamic width, so it cannot become a class. Alpine's
+          OBJECT binding syntax writes through element.style.setProperty(),
+          which CSP allows; the string form would call setAttribute and be
+          dropped.
+        {% endcomment %}
         <div class="h-full transition-all bg-accent"
              :style="{ width: Math.round(((p.step || 0) / (p.total || 3)) * 100) + '%' }"></div>
       </div>
@@ -34,7 +36,7 @@
   <template x-if="p.state === 'done'">
     <div>
       <div class="notice notice-ok">
-        <div class="font-semibold text-signal">Your brain is online.</div>
+        <div class="font-semibold text-signal-ink">Your brain is online.</div>
         <div class="mt-1 text-muted font-mono">
           <span x-text="p.entities"></span> entities · HEAD <span x-text="p.head"></span>
         </div>
@@ -52,7 +54,7 @@
   <template x-if="p.state === 'failed'">
     <div>
       <div class="notice notice-danger">
-        <div class="font-semibold text-danger" x-text="p.label || 'Build failed'"></div>
+        <div class="font-semibold text-danger-ink" x-text="p.label || 'Build failed'"></div>
         <pre class="pane-terminal mt-2 overflow-x-auto p-3 text-xs" x-text="p.error"></pre>
       </div>
       <div class="mt-4 flex gap-2">

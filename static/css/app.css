@@ -118,6 +118,12 @@
   --color-signal:    var(--signal);
   --color-warn:      var(--warn);
   --color-danger:    var(--danger);
+  /* Status colours as TEXT — see the note in tokens.css. Use
+   * text-signal-ink / text-warn-ink / text-danger-ink for words, and
+   * bg-signal / bg-warn / bg-danger for fills. */
+  --color-signal-ink: var(--signal-ink);
+  --color-warn-ink:   var(--warn-ink);
+  --color-danger-ink: var(--danger-ink);
 
   /* Terminal scale — fixed in both themes (a log pane is dark by design),
    * so these deliberately point at primitives the .dark block never
@@ -417,20 +423,22 @@
            text-xs font-medium;
     border: 1px solid transparent;
   }
+  /* Tinted fill + the readable text variant. Deliberately NOT
+   * `color: var(--signal)` — the fill colours fail contrast as text. */
   .badge-ok {
     background: color-mix(in srgb, var(--signal) 16%, transparent);
     border-color: color-mix(in srgb, var(--signal) 40%, transparent);
-    color: color-mix(in srgb, var(--signal) 72%, var(--ink));
+    color: var(--signal-ink);
   }
   .badge-warn {
     background: color-mix(in srgb, var(--warn) 22%, transparent);
     border-color: color-mix(in srgb, var(--warn) 55%, transparent);
-    color: color-mix(in srgb, var(--warn) 62%, var(--ink));
+    color: var(--warn-ink);
   }
   .badge-danger {
     background: color-mix(in srgb, var(--danger) 14%, transparent);
     border-color: color-mix(in srgb, var(--danger) 42%, transparent);
-    color: color-mix(in srgb, var(--danger) 70%, var(--ink));
+    color: var(--danger-ink);
   }
   .badge-info {
     background: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -535,6 +543,16 @@
     text-decoration: underline;
   }
   .link-accent:hover { color: var(--accent-strong); }
+
+  /* ----- Unified-diff lines (feed proposals) -----
+   * These live inside a `pane-terminal`, so like it they are fixed across
+   * both themes and reference the terminal scale rather than the semantic
+   * one. Tints follow the familiar green-add / red-remove convention at
+   * low alpha so the code stays readable on the dark pane. */
+  .diff-line { @apply px-4; }
+  .diff-add  { background: rgba(46, 160, 67, 0.2); }
+  .diff-del  { background: rgba(248, 81, 73, 0.2); }
+  .diff-hunk { color: var(--c-ink-400); }
 
   /* ----- Sidebar nav items -----
    * `nav-item-active` is styled here and emitted by the template from

@@ -10,10 +10,9 @@
 
 {% block content %}
   {% if test_result %}
-    <div class="mb-6 rounded-xl border p-4"
-         style="border-color: {% if test_result.ok %}var(--success, #4db8a8){% else %}#ff6b6b{% endif %}; background: var(--surface);">
+    <div class="notice mb-6 p-4 {% if test_result.ok %}notice-ok{% else %}notice-danger{% endif %}">
       {% if test_result.ok %}
-        <div class="font-semibold" style="color: #2c8577;">Connection OK</div>
+        <div class="font-semibold text-signal-ink">Connection OK</div>
         <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4 font-mono">
           <div><dt class="text-muted" >model</dt><dd>{{ test_result.model }}</dd></div>
           <div><dt class="text-muted" >latency</dt><dd>{{ test_result.duration_ms }} ms</dd></div>
@@ -22,7 +21,7 @@
         </dl>
         <div class="mt-2 text-sm text-muted">reply: “{{ test_result.text }}” · op #{{ test_result.operation_id }}</div>
       {% else %}
-        <div class="font-semibold" style="color: #c0392b;">Connection failed</div>
+        <div class="font-semibold text-danger-ink">Connection failed</div>
         <div class="mt-1 text-sm font-mono">{{ test_result.error }}</div>
         {% if test_result.operation_id %}
           <div class="mt-1 text-sm text-muted">logged as op #{{ test_result.operation_id }}</div>
@@ -73,7 +72,7 @@
                 {% endif %}
               </div>
               {% if row.shadowed %}
-                <div class="mt-1 text-xs" style="color: #b7791f;">
+                <div class="mt-1 text-xs text-warn-ink">
                   A value is stored here but the environment overrides it.
                   Remove it from your env/compose to use the stored one.
                 </div>

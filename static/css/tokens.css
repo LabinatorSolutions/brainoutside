@@ -71,6 +71,16 @@
   --signal:     var(--c-teal);
   --warn:       var(--c-yellow);
   --danger:     var(--c-red);
+
+  /* Readable-as-TEXT variants of the status colours. The fills above are
+     tuned to sit behind something — as text on --surface they are far too
+     light: #4db8a8 on #fffef7 is about 2.1:1 and #ff6b6b about 2.8:1, both
+     under the 4.5:1 that body text needs. So status TEXT uses these and
+     status FILLS use the ones above. Getting this wrong is easy and
+     invisible until someone tries to read it. */
+  --signal-ink: #2c8577;
+  --warn-ink:   #8a6d1a;
+  --danger-ink: #c0392b;
 }
 
 /* ============================================================
@@ -101,6 +111,12 @@
   --signal:     #5fd0be;
   --warn:       #f7e08f;
   --danger:     #ff8787;
+
+  /* On a dark surface the relationship inverts: the readable text colour
+     is LIGHTER than the fill, not darker. */
+  --signal-ink: #6fdcc9;
+  --warn-ink:   #f5d987;
+  --danger-ink: #ff9b9b;
 
   --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
   --shadow-soft: 0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3);

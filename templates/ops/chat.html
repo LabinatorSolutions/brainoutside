@@ -39,7 +39,7 @@
                 {{ s.title|default:"(empty session)"|truncatechars:80 }}
               </a>
             </td>
-            <td class="px-4 py-2.5"><span class="rounded-full px-2 py-0.5 text-xs" style="background: {% if s.tier == 'public' %}#e7f6f2{% elif s.tier == 'agents-only' %}#fff4d6{% else %}#fdecec{% endif %};">{{ s.tier }}</span></td>
+            <td class="px-4 py-2.5"><span class="badge {% if s.tier == 'public' %}badge-ok{% elif s.tier == 'agents-only' %}badge-warn{% else %}badge-danger{% endif %}">{{ s.tier }}</span></td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ s.total_input_tokens }} / {{ s.total_output_tokens }}</td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ s.updated_at|date:"Y-m-d H:i" }}</td>
           </tr>

@@ -20,8 +20,7 @@
               <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
             {% endif %}
             <span>{{ j.label|default:j.spec.label }}</span>
-            <span class="text-xs"
-                  style="font-family: var(--font-mono); color: {% if j.state == 'failed' %}#c0392b{% else %}var(--muted){% endif %};">
+            <span class="text-xs font-mono {% if j.state == 'failed' %}text-danger-ink{% else %}text-muted{% endif %}">
               {{ j.state }}{% if j.state == "running" and j.total %} · {{ j.step }}/{{ j.total }}{% endif %}
             </span>
           </div>
@@ -29,8 +28,7 @@
             <div class="mt-1 text-xs text-muted font-mono">{{ j.result }}</div>
           {% endif %}
           {% if j.error %}
-            <pre class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
-                 style="background: #0d1117; color: #c9d1d9;">{{ j.error }}</pre>
+            <pre class="pane-terminal mt-2 overflow-x-auto p-3 text-xs">{{ j.error }}</pre>
           {% endif %}
         </div>
       {% endfor %}
@@ -87,7 +85,7 @@
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.created_at|timesince }} ago</td>
             <td class="px-4 py-2.5">
               {% if op.is_stale %}
-                <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;" title="Older than the worker timeout — the run was killed before it could finalize.">stale (likely killed)</span>
+                <span class="badge badge-danger" title="Older than the worker timeout — the run was killed before it could finalize.">stale (likely killed)</span>
               {% else %}
                 <span class="inline-block h-2 w-2 animate-pulse rounded-full bg-accent"></span>
                 <span class="text-xs">running</span>
@@ -121,9 +119,9 @@
             <td class="px-4 py-2.5 font-mono">{{ op.kind }}</td>
             <td class="px-4 py-2.5">
               {% if op.ok %}
-                <span class="rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">ok</span>
+                <span class="badge badge-ok">ok</span>
               {% else %}
-                <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;" title="{{ op.error_class }}">{{ op.error_class|default:"error" }}</span>
+                <span class="badge badge-danger" title="{{ op.error_class }}">{{ op.error_class|default:"error" }}</span>
               {% endif %}
             </td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ op.model|default:"—" }}</td>
@@ -156,9 +154,9 @@
             <td class="px-4 py-2.5 text-xs font-mono">{{ t.func }}</td>
             <td class="px-4 py-2.5">
               {% if t.success %}
-                <span class="rounded-full px-2 py-0.5 text-xs" style="background: #e7f6f2;">ok</span>
+                <span class="badge badge-ok">ok</span>
               {% else %}
-                <span class="rounded-full px-2 py-0.5 text-xs" style="background: #fdecec; color: #a33;">failed</span>
+                <span class="badge badge-danger">failed</span>
               {% endif %}
             </td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ t.started|date:"Y-m-d H:i:s" }}</td>

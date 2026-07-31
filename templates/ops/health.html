@@ -23,8 +23,8 @@
             <span class="text-xs text-muted font-mono" x-text="j.state"></span>
           </div>
           <div x-show="j.result" class="mt-1 text-xs text-muted font-mono" x-text="j.result"></div>
-          <pre x-show="j.error" class="mt-2 overflow-x-auto rounded-lg p-3 text-xs"
-               style="background: #0d1117; color: #c9d1d9;" x-text="j.error"></pre>
+          <pre x-show="j.error" class="pane-terminal mt-2 overflow-x-auto p-3 text-xs"
+               x-text="j.error"></pre>
         </div>
       </template>
     </div>
@@ -32,14 +32,11 @@
 
   {# ---- checks ---- #}
   {% for c in checks %}
-    <div class="mb-3 rounded-xl border p-4"
-         style="background: var(--surface);
-                border-color: {% if c.level == 'danger' %}#ff6b6b{% elif c.level == 'warn' %}#b7791f{% else %}var(--line){% endif %};">
+    <div class="card mb-3 p-4 {% if c.level == 'danger' %}notice-danger{% elif c.level == 'warn' %}notice-warn{% endif %}">
       <div class="flex items-start justify-between gap-4">
         <div>
           <div class="flex items-center gap-2">
-            <span class="inline-block h-2 w-2 rounded-full"
-                  style="background: {% if c.level == 'danger' %}#ff6b6b{% elif c.level == 'warn' %}#b7791f{% elif c.level == 'ok' %}#4db8a8{% else %}var(--muted){% endif %};"></span>
+            <span class="dot {% if c.level == 'danger' %}dot-danger{% elif c.level == 'warn' %}dot-warn{% elif c.level == 'ok' %}dot-ok{% else %}dot-muted{% endif %}"></span>
             <span class="font-medium">{{ c.title }}</span>
           </div>
           <p class="mt-1 max-w-2xl text-sm text-muted">{{ c.detail }}</p>
@@ -52,8 +49,7 @@
               <span x-ref="dangerText" class="hidden">{{ runnable.replace_clone.danger }}</span>
               <button type="submit" name="action" value="replace_clone"
                       :disabled="busy('replace_clone')"
-                      class="rounded-lg px-4 py-2 text-sm font-medium text-white"
-                      style="background: #c0392b;">Replace the clone</button>
+                      class="btn-danger">Replace the clone</button>
             </form>
           {% elif c.action == "generate_webhook_secret" %}
             <form method="post" @submit="defer()">

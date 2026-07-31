@@ -14,8 +14,15 @@
         ${{ today_cost|floatformat:4 }}{% if cap %} / ${{ cap|floatformat:2 }}{% endif %}
       </div>
       {% if cap %}
-        <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-surface-2">
-          <div class="h-2 rounded-full" style="width: {{ cap_pct }}%; background: {% if cap_pct >= 100 %}var(--danger, #ff6b6b){% elif cap_pct >= 75 %}#e0b000{% else %}var(--success, #4db8a8){% endif %};"></div>
+        {% comment %}
+          The COLOUR is a class, but the width is a server-rendered
+          percentage and no utility can express an arbitrary runtime value.
+          A nonce'd style BLOCK is the CSP-legal way to say it: the policy
+          authorises blocks by nonce and only refuses style ATTRIBUTES.
+        {% endcomment %}
+        <style nonce="{{ csp_nonce }}">#cap-bar { width: {{ cap_pct }}%; }</style>
+        <div class="mt-2 h-2 w-full overflow-hidden rounded-pill bg-surface-2">
+          <div id="cap-bar" class="h-2 rounded-pill {% if cap_pct >= 100 %}bg-danger{% elif cap_pct >= 75 %}bg-warn{% else %}bg-signal{% endif %}"></div>
         </div>
         <div class="mt-1 text-xs text-muted">
           {% if cap_pct >= 100 %}BREAKER TRIPPED — SDK runs refused until tomorrow or a higher cap{% else %}{{ cap_pct }}% of the daily circuit breaker{% endif %}
@@ -53,7 +60,7 @@
           <tr class="border-b border-line">
             <td class="px-4 py-2.5 font-mono">{{ k.kind }}</td>
             <td class="px-4 py-2.5 font-mono">{{ k.runs }}</td>
-            <td class="px-4 py-2.5" style="font-family: var(--font-mono); {% if k.errors %}color: #a33;{% endif %}">{{ k.errors }}</td>
+            <td class="px-4 py-2.5 font-mono{% if k.errors %} text-danger-ink{% endif %}">{{ k.errors }}</td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">{{ k.tin|default:0 }} / {{ k.tout|default:0 }}</td>
             <td class="px-4 py-2.5 text-xs font-mono text-muted">${{ k.cost|default:0|floatformat:4 }}</td>
           </tr>
@@ -111,8 +118,7 @@
           <tr class="border-b align-top border-line">
             <td class="px-4 py-2.5 text-xs whitespace-nowrap font-mono text-muted">{{ row.e.created_at|date:"m-d H:i:s" }}</td>
             <td class="px-4 py-2.5">
-              <span class="rounded-full px-2 py-0.5 text-xs"
-                    style="background: {% if row.e.type == 'read' %}#e7f6f2{% elif row.e.type == 'drift' or row.e.type == 'auth_denied' or row.e.type == 'degraded' %}#fdecec{% elif row.e.type == 'feed' %}#fff4d6{% else %}#eef0ff{% endif %};">
+              <span class="badge {% if row.e.type == 'read' %}badge-ok{% elif row.e.type == 'drift' or row.e.type == 'auth_denied' or row.e.type == 'degraded' %}badge-danger{% elif row.e.type == 'feed' %}badge-warn{% else %}badge-info{% endif %}">
                 {{ row.e.type }}
               </span>
             </td>

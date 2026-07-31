@@ -28,13 +28,13 @@
   {% if result %}
     <div class="notice mb-5 {% if result.ok %}notice-ok{% else %}notice-danger{% endif %}">
       {% if result.ok %}
-        <div class="font-semibold text-signal">Connection OK</div>
+        <div class="font-semibold text-signal-ink">Connection OK</div>
         <div class="mt-1 text-muted font-mono">
           {{ result.model }} · {{ result.duration_ms }} ms ·
           {{ result.input_tokens }}/{{ result.output_tokens }} tokens
         </div>
       {% else %}
-        <div class="font-semibold text-danger">Connection failed</div>
+        <div class="font-semibold text-danger-ink">Connection failed</div>
         <div class="mt-1 font-mono">{{ result.error }}</div>
       {% endif %}
     </div>

@@ -25,7 +25,7 @@
       {% for s in steps %}
         <li class="flex items-center gap-1.5 rounded-pill border border-line px-3 py-1
                    {% if s.slug == current %}bg-ink text-surface
-                   {% elif s.done %}text-signal
+                   {% elif s.done %}text-signal-ink
                    {% else %}text-muted{% endif %}">
           <span class="font-mono">{{ forloop.counter }}</span>
           <span>{{ s.title }}</span>

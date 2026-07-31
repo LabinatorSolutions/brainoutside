@@ -47,7 +47,7 @@
 
   {% if result %}
     <div class="notice mt-5 {% if result.ok %}notice-ok{% else %}notice-danger{% endif %}">
-      <div class="font-semibold {% if result.ok %}text-signal{% else %}text-danger{% endif %}">
+      <div class="font-semibold {% if result.ok %}text-signal-ink{% else %}text-danger-ink{% endif %}">
         {{ result.message }}
       </div>
       {% if result.head %}

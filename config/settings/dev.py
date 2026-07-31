@@ -2,7 +2,6 @@
 from config.logging import build_logging
 
 from .base import *  # noqa: F401,F403
-from .env import settings as _env
 
 DEBUG = True
 
@@ -20,4 +19,10 @@ ALLOWED_HOSTS = list({*ALLOWED_HOSTS, "localhost", "127.0.0.1", "0.0.0.0"})  # n
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-CSP_REPORT_ONLY = True if _env.CSP_REPORT_ONLY is None else _env.CSP_REPORT_ONLY
+# CSP is ENFORCED in dev, deliberately — dev used to default this to
+# report-only, which is exactly what hid a release blocker for the whole
+# project: `style-src 'self' 'nonce-…'` drops every `style="…"` attribute,
+# so prod rendered unstyled while every local visual check looked fine.
+# Dev must fail the same way prod does. base.py already defaults to
+# enforcing and still honours `CSP_REPORT_ONLY=true` in .env for anyone
+# who needs to inventory violations without the page falling apart.

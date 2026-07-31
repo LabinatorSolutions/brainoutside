@@ -22,6 +22,8 @@ import logging
 from django.conf import settings
 
 from apps.core import runtime_setting_store as store
+from apps.core.security.client_ip import client_ip as _resolve_client_ip
+from apps.core.security.client_ip import peer_ip, trusted_proxy_header
 
 log = logging.getLogger(__name__)
 
@@ -33,8 +35,16 @@ def _check(id, level, title, detail, **extra) -> dict:
 
 
 def _client_ip(request) -> str:
-    forwarded = (request.META.get("HTTP_X_FORWARDED_FOR") or "").split(",")[0].strip()
-    return forwarded or request.META.get("REMOTE_ADDR", "")
+    """The resolved caller address, as every per-IP control now sees it.
+
+    This used to read `X-Forwarded-For` directly, which any caller can
+    set — so a request claiming `X-Forwarded-For: 127.0.0.1` could talk
+    the exposure check into reporting "local install" and hide the
+    warning it exists to raise. It now goes through the same trusted-proxy
+    resolution as the lockout and the allowlist, so what this page prints
+    is what those controls actually enforce on.
+    """
+    return _resolve_client_ip(request) or ""
 
 
 def _looks_local(value: str) -> bool:
@@ -68,6 +78,41 @@ def _is_local_request(request) -> bool:
 # ---- individual checks ---------------------------------------------------
 
 
+def _address_detail(request) -> str:
+    """Explain which address the per-IP controls see, and why.
+
+    An operator behind a proxy cannot configure `TRUSTED_PROXY_IPS`
+    without knowing the peer address their proxy connects from, and that
+    value is only observable from a real request — so this prints it.
+    The "configured but not trusted" case is called out explicitly
+    because it looks identical to working from the outside while every
+    per-IP control silently still buckets on the proxy.
+    """
+    resolved = _client_ip(request) or "unknown"
+    peer = peer_ip(request) or "unknown"
+    header = trusted_proxy_header()
+
+    if not header:
+        return (
+            f"Requests reach this app from {peer}. No trusted proxy header is "
+            "configured, so that is the address every per-IP control uses. If "
+            "you are behind a CDN or reverse proxy, that is the PROXY, not the "
+            "caller — set TRUSTED_PROXY_IP_HEADER (e.g. CF-Connecting-IP) and "
+            f"TRUSTED_PROXY_IPS (containing {peer}) so they see real callers."
+        )
+    if resolved == peer:
+        return (
+            f"{header} is configured, but requests are arriving from {peer}, "
+            "which is not listed in TRUSTED_PROXY_IPS — so the header is being "
+            f"ignored and per-IP controls are bucketing every caller as {peer}. "
+            f"Add {peer} to TRUSTED_PROXY_IPS."
+        )
+    return (
+        f"Your address is {resolved}, read from the {header} header sent by the "
+        f"trusted proxy at {peer}."
+    )
+
+
 def check_exposure(request) -> dict:
     """The one that actually protects novices (SETUP-DESIGN.md Step 2)."""
     from apps.core.runtime_settings import get_admin_ip_allowlist
@@ -76,7 +121,8 @@ def check_exposure(request) -> dict:
     if allowlist:
         return _check(
             "exposure", "ok", "Ops UI is IP-restricted",
-            f"Only {', '.join(allowlist)} can reach the ops pages.",
+            f"Only {', '.join(allowlist)} can reach the ops pages. "
+            + _address_detail(request),
         )
     if _is_local_request(request):
         return _check(
@@ -89,8 +135,8 @@ def check_exposure(request) -> dict:
         "This page approves feeds and can read every private note, and "
         "nothing in this application is restricting who reaches it. Put it "
         "behind Tailscale or Cloudflare Access, or set ADMIN_IP_ALLOWLIST. "
-        f"Your current address is {_client_ip(request) or 'unknown'}. "
-        "If you already have a network boundary in front of this server, "
+        + _address_detail(request)
+        + " If you already have a network boundary in front of this server, "
         "this check cannot see it — it only knows about the app's own "
         "allowlist.",
         fix_hint="ADMIN_IP_ALLOWLIST",

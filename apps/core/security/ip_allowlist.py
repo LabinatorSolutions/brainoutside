@@ -1,5 +1,12 @@
 """IP allowlist enforcement for admin URL prefixes.
 
+Source addresses come from `apps.core.security.client_ip`, so behind a
+configured reverse proxy this compares the real caller rather than the
+proxy. With no proxy configured it is `REMOTE_ADDR` — which means that
+behind an UNCONFIGURED proxy the allowlist would compare every caller
+against the proxy's own address and lock the operator out. Configure
+`TRUSTED_PROXY_IP_HEADER`/`TRUSTED_PROXY_IPS` before setting this.
+
 `ADMIN_IP_ALLOWLIST` is a list of CIDRs (e.g. `["10.0.0.0/24",
 "203.0.113.5/32"]`). When non-empty, only those source IPs may reach
 `<ADMIN_PANEL_URL_PATH>` or `<DJANGO_ADMIN_URL_PATH>` paths; everyone
@@ -30,6 +37,8 @@ from typing import Awaitable, Callable
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse, HttpResponseNotFound
+
+from apps.core.security.client_ip import client_ip
 
 log = logging.getLogger(__name__)
 
@@ -104,10 +113,6 @@ def _is_admin_request(path: str) -> bool:
     return any(path.startswith(p) for p in _admin_path_prefixes())
 
 
-def _client_ip(request: HttpRequest) -> str | None:
-    return request.META.get("REMOTE_ADDR") or None
-
-
 class AdminIPAllowlistMiddleware:
     """Async-only. Refuses admin-prefix requests from non-allowlisted IPs.
 
@@ -137,7 +142,7 @@ class AdminIPAllowlistMiddleware:
     async def __call__(self, request: HttpRequest) -> HttpResponse:
         path = request.path or ""
         if _is_admin_request(path):
-            ip = _client_ip(request)
+            ip = client_ip(request)
             # is_ip_allowed reads the DB (runtime override) — must hop to a
             # thread or the ORM raises SynchronousOnlyOperation under ASGI
             # and the override silently never loads.

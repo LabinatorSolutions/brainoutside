@@ -31,6 +31,7 @@ from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_asy
 from django.http import HttpRequest, HttpResponse, HttpResponseNotFound
 
 from apps.core import audit_hook
+from apps.core.security.client_ip import client_ip
 from apps.core.security.lockout import is_locked, record_failure
 
 log = logging.getLogger(__name__)
@@ -88,9 +89,6 @@ def _is_honeypot_path(path: str) -> bool:
     return False
 
 
-def _client_ip(request: HttpRequest) -> str | None:
-    return request.META.get("REMOTE_ADDR") or None
-
 
 def _record_hit(request: HttpRequest, path: str) -> None:
     """Write the audit row + bump the per-IP honeypot counter.
@@ -99,7 +97,7 @@ def _record_hit(request: HttpRequest, path: str) -> None:
     `sync_to_async` to avoid blocking the event loop on a slow audit
     write. The recorder itself is best-effort.
     """
-    ip = _client_ip(request)
+    ip = client_ip(request)
     user_agent = request.headers.get("User-Agent", "")
     request_id = getattr(request, "request_id", "") or ""
 
@@ -157,7 +155,7 @@ class HoneypotMiddleware:
             log.warning(
                 "honeypot hit: path=%s ip=%s ua=%s",
                 path,
-                _client_ip(request),
+                client_ip(request),
                 request.headers.get("User-Agent", "")[:120],
             )
             try:

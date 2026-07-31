@@ -33,6 +33,7 @@ from django.dispatch import receiver
 from django.http import HttpRequest, HttpResponse, JsonResponse
 
 from apps.core.security.alerts import notify_staff
+from apps.core.security.client_ip import client_ip
 from apps.core.security.lockout import is_locked, record_failure
 
 log = logging.getLogger(__name__)
@@ -60,10 +61,6 @@ def _admin_login_paths() -> list[str]:
         prefix = "/" + raw.strip("/") + "/"
         paths.append(prefix + "login/")
     return paths
-
-
-def _client_ip(request: HttpRequest) -> str | None:
-    return request.META.get("REMOTE_ADDR") or None
 
 
 def _is_admin_login_request(request: HttpRequest) -> bool:
@@ -96,7 +93,7 @@ class AdminLoginThrottleMiddleware:
 
     async def __call__(self, request: HttpRequest) -> HttpResponse:
         if request.method == "POST" and _is_admin_login_request(request):
-            ip = _client_ip(request)
+            ip = client_ip(request)
             if ip:
                 gate = is_locked("admin-login", ip)
                 if not gate.allowed:
@@ -142,7 +139,7 @@ def record_admin_login_failure(
         return
     if not _is_admin_login_request(request):
         return
-    ip = _client_ip(request)
+    ip = client_ip(request)
     if not ip:
         return
     result = record_failure(

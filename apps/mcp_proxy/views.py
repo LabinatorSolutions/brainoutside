@@ -84,6 +84,7 @@ from apps.core.charging import charge as charge_credits
 from apps.core.charging import make_idempotency_key
 from apps.core.events import EndpointCalled, fire
 from apps.core.registry import registry
+from apps.core.security.client_ip import client_ip
 from apps.core.security.lockout import is_token_locked, is_url_token_locked
 from apps.core.throttling import check as throttle_check
 
@@ -344,9 +345,6 @@ def _not_found_tool_error_response(
     return resp
 
 
-def _client_ip(request: HttpRequest) -> str | None:
-    return request.META.get("REMOTE_ADDR") or None
-
 
 def _bearer_token_from_request(request: HttpRequest) -> str | None:
     raw = request.headers.get("Authorization") or ""
@@ -521,7 +519,7 @@ async def mcp_proxy_view(
     log_slug = _slug_from_jsonrpc(body)
     is_tools_list = _is_tools_list(body)
     user_agent = request.headers.get("User-Agent", "")
-    ip = _client_ip(request)
+    ip = client_ip(request)
     start = time.perf_counter()
 
     # `/mcp/k/<token>/` URL-path auth branch. The route

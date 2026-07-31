@@ -182,6 +182,13 @@ ADMIN_IP_ALLOWLIST = list(_env.ADMIN_IP_ALLOWLIST)
 # account gets created — so it belongs inside the perimeter too.
 IP_ALLOWLIST_EXTRA_PREFIXES = ["docs/", "login/", "logout/", "setup/"]
 
+# ----- Real client IP behind a reverse proxy -----------------------------------
+# Read by `apps.core.security.client_ip`, which every per-IP control now
+# resolves through. Empty = trust nothing, use REMOTE_ADDR (the default,
+# and correct for a direct-to-origin deploy).
+TRUSTED_PROXY_IP_HEADER = _env.TRUSTED_PROXY_IP_HEADER.strip()
+TRUSTED_PROXY_IPS = list(_env.TRUSTED_PROXY_IPS)
+
 DEV_LOGIN_ENABLED = _env.DEV_LOGIN_ENABLED
 DEV_LOGIN_EMAIL = _env.DEV_LOGIN_EMAIL
 

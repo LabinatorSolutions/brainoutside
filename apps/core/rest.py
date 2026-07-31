@@ -42,6 +42,7 @@ from apps.core.charging import charge as charge_credits
 from apps.core.charging import make_idempotency_key
 from apps.core.ctx import build_ctx
 from apps.core.registry import EndpointSpec
+from apps.core.security.client_ip import client_ip
 from apps.core.security.lockout import is_token_locked
 from apps.core.throttling import check as throttle_check
 
@@ -189,7 +190,7 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         throttle = await sync_to_async(throttle_check, thread_sensitive=True)(
             user=principal_user,
             endpoint_slug=spec.slug,
-            ip=_client_ip(request),
+            ip=client_ip(request),
             credential=principal.credential if principal else None,
         )
         if not throttle.allowed:
@@ -492,7 +493,7 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                     request_method=request.method or "",
                     status_code=500,
                     user_id=(principal.user.pk if principal is not None else None),
-                    ip=_client_ip(request),
+                    ip=client_ip(request),
                     user_agent=request.headers.get("User-Agent", ""),
                     handled=False,
                 )
@@ -628,13 +629,6 @@ async def _finalize_idem(record: Any, response: HttpResponse) -> HttpResponse:
         )
     return response
 
-
-def _client_ip(request: HttpRequest) -> str | None:
-    """Best-effort client IP for rate-limit bucket scoping. Phase 9.7
-    will harden this against spoofed `X-Forwarded-For` once the
-    reverse-proxy contract is locked; for now we use REMOTE_ADDR which
-    Django sets to the actual TCP peer."""
-    return request.META.get("REMOTE_ADDR") or None
 
 
 def _bearer_token(request: HttpRequest) -> str | None:

@@ -100,6 +100,20 @@ class Settings(BaseSettings):
     DJANGO_ADMIN_URL_PATH: str = "_django-admin-CHANGE-ME/"
     ADMIN_IP_ALLOWLIST: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
+    # ----- Reverse proxy / real client IP -----
+    # Behind a proxy, REMOTE_ADDR is the proxy. Every per-IP control
+    # (admin-login lockout, honeypot counter, ADMIN_IP_ALLOWLIST) then
+    # buckets the whole internet together — see
+    # `apps.core.security.client_ip` for why that inverts the lockout.
+    # Name the header your proxy sets ("CF-Connecting-IP" for Cloudflare,
+    # "X-Forwarded-For" for a plain reverse proxy) AND the addresses that
+    # proxy connects FROM. The header is honoured only on requests whose
+    # TCP peer is in TRUSTED_PROXY_IPS, so it can't be spoofed by a
+    # direct-to-origin caller. Both or neither: `assert_prod_safe()`
+    # refuses boot on half a configuration.
+    TRUSTED_PROXY_IP_HEADER: str = ""
+    TRUSTED_PROXY_IPS: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
     # ----- Dev-only direct-login shortcut (NEVER enable in prod) -----
     # When True AND DEBUG is True, exposes GET /auth/dev-login/ which logs you
     # straight in as a staff superuser AND pre-clears the staff-2FA gate for
@@ -361,6 +375,7 @@ class Settings(BaseSettings):
         "ALLOWED_HOSTS",
         "ADMIN_IP_ALLOWLIST",
         "CORS_ALLOWED_ORIGINS",
+        "TRUSTED_PROXY_IPS",
         mode="before",
     )
     @classmethod
@@ -476,6 +491,27 @@ class Settings(BaseSettings):
                 "exposes a passwordless staff-login bypass at /auth/dev-login/ "
                 "and is a local-dev convenience only. Remove it from your prod "
                 "environment before deploying."
+            )
+        # Half a proxy configuration is worse than none: the operator
+        # believes per-IP controls see real callers while the header is
+        # silently ignored (or, with the peers set but no header named,
+        # nothing is read at all). Fail at boot rather than let the
+        # admin-login lockout stay quietly inverted.
+        header, peers = self.TRUSTED_PROXY_IP_HEADER.strip(), self.TRUSTED_PROXY_IPS
+        if bool(header) != bool(peers):
+            missing, present = (
+                ("TRUSTED_PROXY_IPS", "TRUSTED_PROXY_IP_HEADER")
+                if header
+                else ("TRUSTED_PROXY_IP_HEADER", "TRUSTED_PROXY_IPS")
+            )
+            raise ImproperlyConfigured(
+                f"{present} is set but {missing} is not. Both are required: the "
+                "header names where the caller's address is carried, and the "
+                "peer list says which proxies may be believed. Without the "
+                "peer list the header would be spoofable by anyone reaching "
+                "the origin directly, so it is ignored — leaving every per-IP "
+                "control (admin-login lockout, honeypot, ADMIN_IP_ALLOWLIST) "
+                "bucketing all callers as the proxy."
             )
         # OAUTH_ISSUER is the base for every URL in the OAuth discovery
         # documents. In the TEMPLATE this was a boot-refusal: a localhost

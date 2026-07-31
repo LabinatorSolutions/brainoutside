@@ -100,9 +100,9 @@
   max-width: 300px;
   padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   background: var(--surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
   font-size: 12px;
   line-height: 1.45;
   pointer-events: none;

@@ -1,9 +1,34 @@
 /* ============================================================
    THEME TOKENS — the default "paper" theme: warm paper/cream
    surfaces, ink text, indigo accent, dark terminal scale for logs.
-   Swap the primitives below to re-theme the whole app; pages style
-   against the SEMANTIC layer (--surface, --ink, --accent...) and
-   never against raw primitives, so a palette swap is one edit here.
+
+   THIS FILE IS THE RE-THEMING SURFACE. It is a plain stylesheet loaded
+   before the Tailwind build, NOT part of it, so changing a colour here
+   re-themes the whole app with no toolchain and no rebuild — which
+   matters for self-hosters who have neither.
+
+   It works because static/css/app.css maps every token below into an
+   `@theme` block, so `bg-surface`, `border-line`, `text-muted` and
+   friends are real Tailwind utilities whose values are `var(--surface)`
+   etc. Swap a variable here and every utility that references it
+   follows, including the `.dark` block at the bottom — which is the
+   whole mechanism behind the theme toggle.
+
+   RULES:
+   - Pages style against the SEMANTIC layer (--surface, --ink, --accent),
+     never against a raw primitive and never against a literal hex. A
+     hardcoded colour is invisible in light-mode review and wrong in dark.
+   - Variables only in this file. Actual CSS rules live in app.css, where
+     they land inside Tailwind's cascade layers and so can still be
+     overridden by a utility class. (An unlayered rule beats every
+     layered one regardless of source order — that is a CSS cascade rule,
+     not a Tailwind quirk, and it silently defeats utilities.)
+   - COLOUR only. Geometry (radii, shadows) and font stacks live in
+     app.css's `@theme`, because a theme key cannot be `var()` of its own
+     name, and because colour is the thing people actually re-theme.
+     `--radius-sm` used to live here at 10px, which would have silently
+     redefined Tailwind's built-in `rounded-sm` (0.25rem) the moment
+     anyone used it — the kind of bug that costs an afternoon.
    ============================================================ */
 
 :root {
@@ -20,7 +45,9 @@
   --c-coral:   #e8a07a;
   --c-red:     #ff6b6b;
 
-  /* Terminal dark surfaces (log/code panes) */
+  /* Terminal dark surfaces (log/code panes). Deliberately FIXED across
+     both themes: a terminal pane is dark in light mode by design, so
+     these are not re-pointed in the `.dark` block below. */
   --c-ink-900: #0d1117;
   --c-ink-800: #161b22;
   --c-ink-700: #21262d;
@@ -38,82 +65,43 @@
 
   --accent:        var(--c-indigo);
   --accent-strong: var(--c-indigo-strong);
+  --accent-contrast: #ffffff;   /* text that sits ON --accent */
   --accent-2:   var(--c-violet);
   --accent-3:   var(--c-coral);
   --signal:     var(--c-teal);
   --warn:       var(--c-yellow);
   --danger:     var(--c-red);
-
-  --radius:      14px;
-  --radius-sm:   10px;
-  --radius-pill: 999px;
-  --shadow:    0 1px 2px rgba(26,26,46,.06), 0 8px 24px rgba(26,26,46,.08);
-  --shadow-sm: 0 1px 2px rgba(26,26,46,.06), 0 2px 8px rgba(26,26,46,.06);
-
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body:    'Inter', system-ui, sans-serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
 }
 
-body.brain-ui {
-  background: var(--surface);
-  color: var(--ink);
-  font-family: var(--font-body);
-}
-body.brain-ui h1, body.brain-ui h2, body.brain-ui h3 {
-  font-family: var(--font-display);
-}
-body.brain-ui code, body.brain-ui pre, body.brain-ui .mono {
-  font-family: var(--font-mono);
-}
+/* ============================================================
+   DARK THEME — a variable swap, nothing more.
 
-/* Landing page (templates/home.html) */
-.brain-ui .home-title {
-  font-family: var(--font-display);
-  color: var(--ink);
-}
-.brain-ui .home-sub { color: var(--muted); }
-.brain-ui .home-cta {
-  background: var(--accent);
-  color: #fff;
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
-  transition: background 0.15s ease;
-}
-.brain-ui .home-cta:hover { background: var(--accent-strong); }
-.brain-ui .home-hero-img { filter: drop-shadow(0 12px 32px rgba(99, 102, 241, 0.25)); }
+   Every semantic token is re-pointed; no component needs a `dark:`
+   variant to follow, because the utilities resolve through these
+   variables. partials/_theme_toggle.html puts `.dark` on <html>.
 
-/* Login card (templates/login.html) */
-.brain-ui .login-card {
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
-.brain-ui .login-input {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink);
-  font-family: var(--font-body);
-}
-.brain-ui .login-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
-}
-.brain-ui .login-error {
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.4);
-  border-radius: var(--radius-sm);
-  color: #b91c1c;
-}
+   The dark surfaces stay in the ink-blue family (#14141f, not #000) so
+   the theme still reads as the same product. The accent lightens to
+   indigo-400: #6366f1 on a near-black surface is too dim to carry
+   emphasis, and text on top of it fails contrast.
+   ============================================================ */
+.dark {
+  --surface:    #14141f;
+  --surface-2:  #1c1c2b;
+  --surface-ink: #e8e8f0;
+  --ink:        #e8e8f0;
+  --muted:      #9a9ab0;
+  --line:       rgba(232, 232, 240, 0.14);
 
-/* Dark terminal pane — logs, code, raw output */
-.brain-ui .pane-terminal {
-  background: var(--c-ink-900);
-  color: var(--c-ink-300);
-  border: 1px solid var(--c-ink-700);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+  --accent:        #818cf8;
+  --accent-strong: #a5b4fc;
+  --accent-contrast: #14141f;   /* dark text on the lighter accent */
+  --accent-2:   #b49ada;
+  --accent-3:   #f0b492;
+  --signal:     #5fd0be;
+  --warn:       #f7e08f;
+  --danger:     #ff8787;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+  --shadow-soft: 0 1px 2px rgba(0,0,0,.35), 0 2px 8px rgba(0,0,0,.3);
 }

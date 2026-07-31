@@ -48,8 +48,60 @@
   --color-brand-900: #312e81;
   --color-brand-950: #1e1b4b;
 
+  /* ---- The semantic layer from tokens.css, as real utilities ----
+   * Each maps to a var() rather than a literal, so `bg-surface`,
+   * `border-line`, `text-muted`, `bg-accent` resolve THROUGH tokens.css
+   * at runtime. Two consequences worth stating:
+   *   1. Re-theming stays a one-file edit of tokens.css with no rebuild,
+   *      which is the point — self-hosters have no toolchain.
+   *   2. Dark mode needs no `dark:` variants on components. tokens.css's
+   *      `.dark` block re-points the same variables and every utility
+   *      follows automatically.
+   * Components must style against THESE, never a palette primitive and
+   * never a literal hex: a hardcoded colour is invisible in light-mode
+   * review and wrong in dark. */
+  --color-surface:   var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink:       var(--ink);
+  --color-muted:     var(--muted);
+  --color-line:      var(--line);
+  --color-accent:          var(--accent);
+  --color-accent-strong:   var(--accent-strong);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-2:  var(--accent-2);
+  --color-accent-3:  var(--accent-3);
+  --color-signal:    var(--signal);
+  --color-warn:      var(--warn);
+  --color-danger:    var(--danger);
+
+  /* Terminal scale — fixed in both themes (a log pane is dark by design). */
+  --color-term-900: var(--c-ink-900);
+  --color-term-800: var(--c-ink-800);
+  --color-term-700: var(--c-ink-700);
+  --color-term-600: var(--c-ink-600);
+  --color-term-400: var(--c-ink-400);
+  --color-term-300: var(--c-ink-300);
+
+  /* Geometry -> rounded-card / rounded-control / rounded-pill,
+   * shadow-card / shadow-soft. Literals, and defined HERE rather than in
+   * tokens.css: a theme key cannot be `var()` of its own name (that is a
+   * self-reference, and it only appears to work because the unlayered
+   * copy in tokens.css outranks it — far too subtle to rely on).
+   * Geometry is also not the re-theming surface; colour is. Names stay
+   * clear of Tailwind's built-in --radius-{sm,md,lg} scale so those keep
+   * meaning what they say. */
+  --radius-card:    14px;
+  --radius-control: 10px;
+  --radius-pill:    999px;
+  --shadow-card: 0 1px 2px rgba(26,26,46,.06), 0 8px 24px rgba(26,26,46,.08);
+  --shadow-soft: 0 1px 2px rgba(26,26,46,.06), 0 2px 8px rgba(26,26,46,.06);
+
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  /* Headings. Lives here rather than tokens.css so `font-display` is a
+   * utility; tokens.css is colour/geometry only. */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: var(--font-sans);
 
   --text-5xl: 3rem;
   --text-5xl--line-height: 1.1;
@@ -172,6 +224,28 @@
     @apply bg-brand-500/30;
   }
 
+  /* ----- App shell type + surface -----
+   * Moved here from tokens.css in M5.6.0.2. These are RULES, and living
+   * in an unlayered stylesheet meant they beat every Tailwind utility
+   * regardless of source order — so `font-mono` on an <h2> silently lost
+   * to the heading rule below. Inside @layer base they behave: a utility
+   * on the element wins, which is what everyone expects. */
+  body.brain-ui {
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+  body.brain-ui h1,
+  body.brain-ui h2,
+  body.brain-ui h3 {
+    font-family: var(--font-display);
+  }
+  body.brain-ui code,
+  body.brain-ui pre,
+  body.brain-ui .mono {
+    font-family: var(--font-mono);
+  }
+
   /* Reduced-motion respect (Phase 10.5.6). Nukes animations +
    * transitions and disables smooth-scroll behavior so a keyboard
    * user with vestibular-disorder accommodations isn't pulled along
@@ -213,6 +287,62 @@
   }
   .container-app {
     @apply mx-auto max-w-6xl px-6;
+  }
+
+  /* ----- Landing page (templates/home.html) ----- */
+  .brain-ui .home-title {
+    font-family: var(--font-display);
+    color: var(--ink);
+  }
+  .brain-ui .home-sub { color: var(--muted); }
+  .brain-ui .home-cta {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-soft);
+    transition: background 0.15s ease;
+  }
+  .brain-ui .home-cta:hover { background: var(--accent-strong); }
+  .brain-ui .home-hero-img {
+    filter: drop-shadow(0 12px 32px color-mix(in srgb, var(--accent) 25%, transparent));
+  }
+
+  /* ----- Login card (templates/login.html) ----- */
+  .brain-ui .login-card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+  .brain-ui .login-input {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+  .brain-ui .login-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .brain-ui .login-error {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+    border-radius: var(--radius-control);
+    color: color-mix(in srgb, var(--danger) 70%, black);
+  }
+
+  /* ----- Dark terminal pane — logs, code, raw output -----
+   * The deliberate exception to "style against semantic tokens": a
+   * terminal pane is dark in BOTH themes, so it points at the fixed
+   * terminal scale rather than at --surface. */
+  .brain-ui .pane-terminal {
+    background: var(--c-ink-900);
+    color: var(--c-ink-300);
+    border: 1px solid var(--c-ink-700);
+    border-radius: var(--radius-control);
+    font-family: var(--font-mono);
   }
 
   /* Code-block container — wraps Pygments-highlighted fenced blocks

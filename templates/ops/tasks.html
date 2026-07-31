@@ -170,6 +170,11 @@
   </div>
 
   {% if busy %}
-    <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
+    {% comment %}
+      The nonce is REQUIRED: the enforced CSP refuses any inline script
+      without one, and this block only renders while work is in flight —
+      i.e. exactly when the auto-refresh is the point.
+    {% endcomment %}
+    <script nonce="{{ csp_nonce }}">setTimeout(function () { window.location.reload(); }, 5000);</script>
   {% endif %}
 {% endblock %}

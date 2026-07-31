@@ -132,7 +132,7 @@
             </label>
           {% endfor %}
           <div>
-            <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Save + re-validate</button>
+            <button type="submit" class="btn-primary">Save + re-validate</button>
           </div>
         </form>
       </details>
@@ -142,7 +142,7 @@
           {% csrf_token %}
           <input type="hidden" name="action" value="approve" />
           <button type="submit" {% if not can_approve %}disabled title="Validation must pass first"{% endif %}
-                  class="rounded-lg px-4 py-2 text-sm font-medium text-white {% if not can_approve %}opacity-40{% endif %} bg-signal">
+                  class="btn-signal {% if not can_approve %}opacity-40{% endif %}">
             Approve{% if feed.proposal_edited %} (edited){% endif %}
           </button>
         </form>
@@ -151,7 +151,7 @@
           <input type="hidden" name="action" value="reject" />
           <input type="text" name="reason" required placeholder="Reject reason (required)"
                  class="grow rounded-lg border px-2 py-1.5 text-sm border-line bg-surface-2" />
-          <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-danger">Reject</button>
+          <button type="submit" class="btn-danger">Reject</button>
         </form>
       </div>
     {% endif %}
@@ -175,7 +175,7 @@
           <a class="text-accent" href="{% url 'brainconfig:tasks' %}">Tasks</a>.
         </span>
       {% else %}
-        <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">
+        <button type="submit" class="btn-primary">
           {% if feed.error %}Retry extraction{% else %}Run extraction{% endif %}
         </button>
         <span class="text-sm text-muted">Queues the feeder agent on the worker; this page shows the proposal when it lands.</span>
@@ -184,6 +184,7 @@
   {% endif %}
 
   {% if feed.extraction_in_flight or feed.status == "approving" %}
-    <script>setTimeout(function () { window.location.reload(); }, 5000);</script>
+    {# Nonce REQUIRED — see the note in ops/tasks.html. #}
+    <script nonce="{{ csp_nonce }}">setTimeout(function () { window.location.reload(); }, 5000);</script>
   {% endif %}
 {% endblock %}

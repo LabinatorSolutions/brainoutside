@@ -55,7 +55,7 @@
             <form method="post" @submit="defer()">
               {% csrf_token %}
               <button type="submit" name="action" value="generate_webhook_secret"
-                      class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Generate a secret</button>
+                      class="btn-primary">Generate a secret</button>
             </form>
           {% elif c.action == "ack_backup" %}
             <form method="post" @submit="defer()">
@@ -126,7 +126,7 @@
     <form method="post" class="mt-5 flex flex-wrap gap-2" @submit="defer($event.submitter?.value)">
       {% csrf_token %}
       <button type="submit" name="action" value="verify_read" :disabled="busy('verify_read')"
-              class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Verify read access</button>
+              class="btn-primary">Verify read access</button>
       <button type="submit" name="action" value="pull_now" :disabled="busy('pull_now')"
               class="rounded-lg border px-4 py-2 text-sm border-line">Pull now</button>
       <button type="submit" name="action" value="rebuild_index" :disabled="busy('rebuild_index')"

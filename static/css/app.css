@@ -364,7 +364,35 @@
   .btn-danger-ghost:hover:not(:disabled) {
     background: color-mix(in srgb, var(--danger) 10%, transparent);
   }
+  /* Solid ink button — the "commit / continue" action where the accent is
+   * already spoken for. text-surface, NOT text-white: --ink inverts to
+   * near-white in dark mode, so a literal white here is invisible exactly
+   * where nobody looks. (It was: measured 1.22:1 on the wizard's Continue
+   * and Settings' Save changes.) */
+  .btn-ink {
+    background: var(--ink);
+    color: var(--surface);
+  }
+  .btn-ink:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--ink) 85%, var(--surface));
+  }
+  /* Affirmative/destructive-adjacent action: approve a feed. */
+  .btn-signal {
+    background: var(--signal);
+    color: var(--surface);
+  }
+  .btn-signal:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--signal) 85%, black);
+  }
+  .btn-ink,
+  .btn-signal {
+    @apply inline-flex select-none items-center justify-center gap-2
+           rounded-control px-4 py-2 text-sm font-medium transition-colors
+           disabled:cursor-not-allowed disabled:opacity-55;
+  }
+
   .btn-sm { @apply gap-1.5 px-3 py-1.5 text-xs; }
+  .btn-lg { @apply px-6 py-2.5; }
   .btn-block { @apply w-full; }
 
   /* ----- Cards ----- */

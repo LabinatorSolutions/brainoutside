@@ -43,11 +43,17 @@
     {% csrf_token %}
     <textarea id="message" rows="3" placeholder="Ask the mind… (Ctrl/Cmd+Enter to send)"
               class="grow rounded-xl border px-3 py-2 text-sm border-line bg-surface-2"></textarea>
-    <button id="send-btn" type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">Send</button>
+    <button id="send-btn" type="submit" class="btn-primary">Send</button>
   </form>
   <p class="mt-2 text-xs text-muted">Each turn runs the reader agent (5–30 s). Sources under each answer are the files the agent actually opened.</p>
 
-  <script>
+  {% comment %}
+    Nonce REQUIRED. Without it the enforced CSP refuses this whole block,
+    which is every bit of the chat: the submit handler, the SSE reader and
+    the streaming render. The page looked fine and the Send button did
+    nothing at all.
+  {% endcomment %}
+  <script nonce="{{ csp_nonce }}">
     (function () {
       const thread = document.getElementById("thread");
       const form = document.getElementById("send-form");
@@ -57,13 +63,15 @@
       const sendUrl = "{% url 'brainconfig:chat-send' session.pk %}";
       const entityUrlTpl = "{% url 'brainconfig:entity' 'EID' %}";
 
+      // Same classes the server-rendered bubbles use, so a streamed message
+      // and a reloaded one are indistinguishable and both follow the theme.
+      // (These were hand-set style properties duplicating the template.)
       function bubble(role) {
         const d = document.createElement("div");
-        d.className = "rounded-xl border p-4 text-sm " + (role === "user" ? "ml-12" : "mr-12");
-        d.style.borderColor = "var(--line)";
-        d.style.background = role === "user" ? "var(--surface-2)" : "var(--surface)";
-        d.style.whiteSpace = "pre-wrap";
-        d.style.overflowWrap = "anywhere";
+        d.className =
+          "rounded-card border border-line p-4 text-sm whitespace-pre-wrap " +
+          "[overflow-wrap:anywhere] " +
+          (role === "user" ? "ml-12 bg-surface-2" : "mr-12 bg-surface");
         thread.appendChild(d);
         d.scrollIntoView({ block: "end" });
         return d;
@@ -76,10 +84,8 @@
         list.forEach(function (s) {
           const a = document.createElement("a");
           a.href = entityUrlTpl.replace("EID", encodeURIComponent(s.entity_id));
-          a.className = "rounded-full border px-2 py-0.5 text-xs";
-          a.style.borderColor = "var(--line)";
-          a.style.fontFamily = "var(--font-mono)";
-          a.style.color = "var(--muted)";
+          a.className =
+            "rounded-pill border border-line px-2 py-0.5 text-xs font-mono text-muted";
           a.title = "visibility: " + s.visibility + (s.stale ? " · STALE >45d" : "");
           a.textContent = s.entity_id + (s.stale ? " ⚠" : "");
           wrap.appendChild(a);
@@ -89,8 +95,9 @@
 
       function note(el, text, isError) {
         const d = document.createElement("div");
-        d.className = "mt-2 text-xs";
-        d.style.color = isError ? "#a33" : "var(--muted)";
+        // text-danger-ink, not a literal #a33: the readable red differs
+        // between themes, and a hardcoded one is wrong in dark.
+        d.className = "mt-2 text-xs " + (isError ? "text-danger-ink" : "text-muted");
         d.textContent = text;
         el.appendChild(d);
       }
@@ -98,7 +105,6 @@
       async function send(text) {
         btn.disabled = true;
         btn.textContent = "Streaming…";
-        btn.style.opacity = "0.4";
         input.disabled = true;
 
         bubble("user").textContent = text;
@@ -149,7 +155,6 @@
         } finally {
           btn.disabled = false;
           btn.textContent = "Send";
-          btn.style.opacity = "";
           input.disabled = false;
           input.focus();
         }

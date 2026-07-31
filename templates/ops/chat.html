@@ -17,7 +17,7 @@
         {% for t in tiers %}<option value="{{ t }}" {% if t == "agents-only" %}selected{% endif %}>{{ t }}</option>{% endfor %}
       </select>
     </label>
-    <button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white bg-accent">New session</button>
+    <button type="submit" class="btn-primary">New session</button>
     <span class="text-xs text-muted">The tier is fixed per session — that's the point of the test bench.</span>
   </form>
 

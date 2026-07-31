@@ -80,6 +80,40 @@ def test_no_multiline_hash_comments():
     )
 
 
+def test_inline_scripts_carry_a_nonce():
+    """Every executable inline `<script>` needs `nonce="{{ csp_nonce }}"`.
+
+    The enforced CSP is `script-src 'self' 'nonce-…' 'unsafe-eval'`, so an
+    inline script without one is refused outright — and the page still
+    renders perfectly, it just does nothing. Three of these were shipping:
+    the entire chat send/stream implementation (4.6 KB: submit handler, SSE
+    reader, streaming render — the Send button was inert), and the
+    auto-refresh on tasks and feed detail, which only render while work is
+    in flight, i.e. exactly when they are the point.
+
+    Scripts with a `src` are covered by `'self'` and need no nonce.
+    Non-executable data blocks (`type="application/json"`) are not scripts
+    as far as CSP is concerned.
+    """
+    script_open = re.compile(r"<script(?![^>]*\bsrc=)([^>]*)>", re.I)
+    offenders = []
+    for path in _templates():
+        src = path.read_text(encoding="utf-8")
+        for match in script_open.finditer(src):
+            attrs = match.group(1)
+            if "nonce" in attrs:
+                continue
+            if re.search(r"""type\s*=\s*["'](?!text/javascript|module)""", attrs):
+                continue  # data block, never executed
+            line = src[: match.start()].count("\n") + 1
+            offenders.append(f"{path.relative_to(REPO)}:{line}")
+    assert not offenders, (
+        "Inline <script> without a nonce — the enforced CSP refuses these "
+        'and the feature silently does nothing. Add nonce="{{ csp_nonce }}":'
+        "\n  " + "\n  ".join(offenders)
+    )
+
+
 def test_no_inline_style_attributes():
     """The enforced CSP (`style-src 'self' 'nonce-…'`) drops every inline
     style attribute, and a nonce cannot authorise them — per CSP3 a nonce

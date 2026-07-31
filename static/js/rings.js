@@ -46,8 +46,13 @@
     return node;
   }
 
-  function color(kind) {
-    return VIZ.color(kind);
+  /* Colour rides on a CSS class (rings.css maps .rings-kind-* onto the
+     --viz-* tokens), NOT on fill attributes: the theme toggle then
+     recolours an already-drawn SVG for free, and the palette stays a
+     one-file edit in tokens.css. Unknown kinds get no class and fall
+     back to the catalog slot via the CSS var() default. */
+  function kindClass(kind) {
+    return VIZ.KIND_ORDER.indexOf(kind) === -1 ? "" : " rings-kind-" + kind;
   }
 
   function dotRadius(reads) {
@@ -147,16 +152,15 @@
 
       place(members, ring).forEach(function (spot) {
         var node = spot.node;
-        var fill = color(node.kind);
         var dot = svg("circle", {
-          "class": "rings-dot",
+          // Superseded notes stay in the brain but are history, never a
+          // current position (CLAUDE.md §6.6) — drawn hollow.
+          "class": "rings-dot" + kindClass(node.kind) +
+                   (node.current ? "" : " rings-dot-hollow"),
+          "data-kind": node.kind,
           cx: spot.x.toFixed(2),
           cy: spot.y.toFixed(2),
           r: dotRadius(node.reads).toFixed(2),
-          // Superseded notes stay in the brain but are history, never a
-          // current position (CLAUDE.md §6.6) — drawn hollow.
-          fill: node.current ? fill : "none",
-          stroke: fill,
           "stroke-width": node.current ? 0 : 1.4,
           opacity: node.current ? 0.9 : 0.75
         });
@@ -221,11 +225,10 @@
 
   function ping(figure, dot) {
     var halo = svg("circle", {
-      "class": "rings-ping",
+      "class": "rings-ping" + kindClass(dot.getAttribute("data-kind")),
       cx: dot.getAttribute("cx"),
       cy: dot.getAttribute("cy"),
-      r: dot.getAttribute("r"),
-      stroke: dot.getAttribute("stroke")
+      r: dot.getAttribute("r")
     });
     figure.appendChild(halo);
     setTimeout(function () {
@@ -282,7 +285,7 @@
     });
 
     var wrap = document.createElement("div");
-    wrap.className = "mt-3 space-y-2";
+    wrap.className = "rings-side";
 
     var row = document.createElement("div");
     row.className = "rings-legend";
@@ -294,10 +297,12 @@
         var item = document.createElement("span");
         item.className = "rings-legend-item";
         var swatch = document.createElement("span");
-        swatch.className = "rings-swatch";
-        swatch.style.background = color(kind);
+        swatch.className = "rings-swatch" + kindClass(kind);
         item.appendChild(swatch);
-        item.appendChild(document.createTextNode(kind + " "));
+        var label = document.createElement("span");
+        label.className = "rings-legend-label";
+        label.textContent = kind;
+        item.appendChild(label);
         var n = document.createElement("span");
         n.className = "rings-legend-n";
         n.textContent = counts[kind];

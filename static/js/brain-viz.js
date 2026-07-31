@@ -11,15 +11,23 @@
 (function (global) {
   "use strict";
 
+  // The LIGHT-theme categorical set, kept in lockstep with the
+  // --viz-* tokens in tokens.css (which also carry a dark-theme set).
+  // The rings colour via CSS classes and follow the theme live; these
+  // hexes are for consumers that paint colours from JS (explorer,
+  // timeline) — they get the dark set when their own polish pass moves
+  // them onto the tokens. The old map failed the categorical colour
+  // gates: identity was the ink primitive (1.02:1 on the dark surface,
+  // i.e. invisible) and take/story were indistinguishable at a glance.
   var KIND_COLOR = {
-    identity: "#1a1a2e",
-    project: "#e8a07a",
+    identity: "#a63263",
+    project: "#c9673a",
     take: "#6366f1",
-    story: "#9b7cc4",
-    lesson: "#4db8a8",
-    fact: "#3f8fbf",
-    lens: "#d99b00",
-    catalog: "#8a8a99"
+    story: "#8a2bad",
+    lesson: "#1f9e7e",
+    fact: "#3878cc",
+    lens: "#a87f0e",
+    catalog: "#6d7fd0"
   };
 
   // Display order: what the brain is (identity, projects) before what it
@@ -27,7 +35,8 @@
   // each tier reads as arcs of kind instead of confetti.
   var KIND_ORDER = ["identity", "project", "take", "story", "lesson", "fact", "lens", "catalog"];
 
-  var FALLBACK_COLOR = "#8a8a99";
+  // Same slot the CSS var() fallback uses for unknown kinds.
+  var FALLBACK_COLOR = "#6d7fd0";
   var DOT_MIN = 3.6;
   var DOT_MAX = 11;
 

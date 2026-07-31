@@ -81,6 +81,28 @@ def dashboard(request):
 
     health_problems = health_checks.problems(health_checks.all_checks(request))
 
+    # A settings page saved six times is one fact, not six rows — collapse
+    # consecutive same-type/same-consumer events into one entry carrying
+    # the newest timestamp and a count. Fetch deep so a chatty burst
+    # can't push everything else off the card.
+    recent_events = []
+    for ev in Event.objects.select_related("consumer")[:40]:
+        key = (ev.type, ev.consumer_id)
+        if recent_events and recent_events[-1]["key"] == key:
+            recent_events[-1]["count"] += 1
+            continue
+        recent_events.append(
+            {
+                "key": key,
+                "label": ev.type.replace("_", " "),
+                "consumer": ev.consumer if ev.consumer_id else None,
+                "at": ev.created_at,
+                "count": 1,
+            }
+        )
+        if len(recent_events) >= 10:
+            break
+
     return render(
         request,
         "ops/dashboard.html",
@@ -102,7 +124,7 @@ def dashboard(request):
             "spend_day": spend(day_ago),
             "spend_week": spend(week_ago),
             "pending_feeds": Feed.objects.filter(status="pending").count(),
-            "recent_events": Event.objects.select_related("consumer")[:10],
+            "recent_events": recent_events,
             "recent_ops": SdkOperation.objects.all()[:5],
             **ops_context(request),
         },

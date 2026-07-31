@@ -13,7 +13,8 @@
         </svg>
       </button>
     {% endif %}
-    <a href="/docs/" class="flex items-center gap-2 font-display font-semibold text-ink">
+    {# lg:hidden — once the sidebar shows, it already carries the brand. #}
+    <a href="/docs/" class="flex items-center gap-2 font-display font-semibold text-ink lg:hidden">
       <span class="inline-block h-2.5 w-2.5 rounded-pill bg-accent"></span>
       {{ title|default:APP_NAME }}
     </a>

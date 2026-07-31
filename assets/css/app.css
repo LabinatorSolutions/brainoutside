@@ -607,6 +607,15 @@
     font-weight: 500;
   }
 
+  /* ----- Kind-coloured micro-bar (entity mix and ranked lists) -----
+   * Reads the --kind-color custom property the .rings-kind-* classes
+   * set (rings.css), so a bar and the dot it summarises can never
+   * disagree. Falls back to the accent for rows with no kind class. */
+  .viz-bar {
+    fill: var(--kind-color, var(--accent));
+    opacity: 0.75;
+  }
+
   /* ----- Empty state ----- */
   .empty-state {
     @apply flex flex-col items-center justify-center gap-2 px-6 py-12 text-center;

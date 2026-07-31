@@ -19,7 +19,8 @@
     {% include "partials/_topbar.html" with title=APP_NAME nav_links=ops_top_links show_drawer=True %}
 
     <main id="main-content" class="px-4 py-8 sm:px-6 lg:px-8" role="main">
-      <div class="mx-auto max-w-4xl">
+      {# Pages override content_width when max-w-4xl is too tight. #}
+      <div class="mx-auto {% block content_width %}max-w-4xl{% endblock %}">
         <header class="mb-6">
           <h1 class="page-title">
             {% block page_title %}Ops{% endblock %}

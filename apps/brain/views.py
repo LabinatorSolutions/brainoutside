@@ -33,8 +33,26 @@ _DELIVERY_CACHE_PREFIX = "gh-delivery:"
 _DELIVERY_TTL = 60 * 60 * 24
 
 
+def _webhook_secret() -> str:
+    """Effective HMAC secret: env/compose wins, else the stored setting.
+
+    Read per request, not at import. It used to come from
+    `settings.GITHUB_WEBHOOK_SECRET`, which is resolved once at startup —
+    so the webhook-secret field on the Settings page wrote a value that
+    nothing ever read, and the wizard could not generate one without a
+    restart.
+    """
+    try:
+        from apps.brainconfig import services as cfg
+
+        return cfg.get("GITHUB_WEBHOOK_SECRET").strip()
+    except Exception:  # pragma: no cover - DB down
+        log.warning("brain: webhook secret lookup failed", exc_info=True)
+        return settings.GITHUB_WEBHOOK_SECRET
+
+
 def _signature_ok(request: HttpRequest) -> bool:
-    secret = settings.GITHUB_WEBHOOK_SECRET
+    secret = _webhook_secret()
     if not secret:
         return False  # unset secret = webhook disabled, never open
     header = request.headers.get("X-Hub-Signature-256", "")

@@ -34,6 +34,7 @@ def settings_page(request):
     for spec in services.REGISTRY:
         row = db_rows.get(spec.key)
         db_set = bool(row is not None and row.value.strip())
+        source = services.source_of(spec.key)
         rows.append(
             {
                 "spec": spec,
@@ -42,6 +43,11 @@ def settings_page(request):
                 # (the effective value may come from env — shown separately).
                 "db_value": "" if spec.secret else (row.value if row else ""),
                 "effective": "••••••••" if spec.secret and services.get(spec.key) else services.get(spec.key),
+                "source": source,
+                # An `env_wins` key with a stored value that env is beating:
+                # the row exists but is inert, and saying so is the whole
+                # point of showing provenance at all.
+                "shadowed": db_set and source == "env",
                 "updated_at": row.updated_at if row else None,
             }
         )

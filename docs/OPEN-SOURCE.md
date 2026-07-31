@@ -109,6 +109,18 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Known issues to close before the beta
 
+- [ ] **Snapshot swap is not atomic.** `snapshots.build_tier` does
+      `rmtree(final)` then `rename(tmp, final)`, so there is a window
+      where a tier directory does not exist. Anything reading the
+      snapshot in that instant — the dumb endpoint layer, a running
+      reader agent — sees a missing path rather than the old or the new
+      build. Observed once on Windows as a `PermissionError` on the
+      rename right after a container restart (bind-mount flake, not
+      reproducible); the underlying window is real on Linux too, just
+      narrow. Fix is a rename-out/rename-in swap, or building into
+      `public.<sha>/` and flipping a symlink. Low frequency, but it is a
+      correctness bug rather than a cosmetic one.
+
 - [ ] **Graph explorer: click-through breaks after using the lens picker.**
       Clicking a node opens its note reliably on a fresh page load (6/6),
       but once a lens has been applied the click lands on the canvas

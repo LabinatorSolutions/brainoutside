@@ -31,6 +31,14 @@ class SettingSpec:
     help: str
     default: str = ""
     secret: bool = False  # write-only in the UI; only "set/unset" is shown
+    #: Flip the usual precedence for this key: env beats the stored value
+    #: instead of losing to it. For anything an operator may pin in
+    #: compose/Coolify — the repo URL, the webhook secret, git credentials
+    #: — infrastructure-as-code has to win, or a UI edit would silently
+    #: diverge from the declared deployment. Declared here rather than
+    #: handled at each call site so the policy is visible in one table.
+    #: The Settings page shows which source is live either way.
+    env_wins: bool = False
 
 
 REGISTRY: tuple[SettingSpec, ...] = (
@@ -98,13 +106,28 @@ REGISTRY: tuple[SettingSpec, ...] = (
     SettingSpec(
         "BRAIN_REPO_URL",
         "Brain repo URL",
-        "Git remote of the mind. Env/compose value wins when set.",
+        "Git remote of the mind. Env/compose value wins when set. Changing "
+        "this does NOT move the clone on disk — the server refuses to boot "
+        "on a mismatch until the clone is replaced.",
+        env_wins=True,
     ),
     SettingSpec(
         "GITHUB_WEBHOOK_SECRET",
         "GitHub webhook secret",
-        "HMAC secret for POST /webhooks/github. Empty = webhook disabled.",
+        "HMAC secret for POST /webhooks/github. Empty = webhook disabled "
+        "(pushes are still picked up by the periodic pull, just slower).",
         secret=True,
+        env_wins=True,
+    ),
+    SettingSpec(
+        "BRAIN_GIT_WRITE_PAT",
+        "Git write credential",
+        "Fine-grained GitHub PAT with Contents: read+write on the brain "
+        "repo only — what approvals push with. A mounted file "
+        "(BRAIN_GIT_WRITE_PAT_PATH) or env var wins over this, and keeps "
+        "the credential out of the database; see docs/SECURITY.md.",
+        secret=True,
+        env_wins=True,
     ),
 )
 
@@ -112,15 +135,35 @@ _SPECS = {s.key: s for s in REGISTRY}
 
 
 def get(key: str) -> str:
-    """Effective value: DB → env → registry default. "" reads as unset."""
+    """Effective value. "" reads as unset at every layer.
+
+    Normally DB → env → default, so a value set in the browser sticks.
+    For `env_wins` keys the first two swap: env → DB → default.
+    """
     spec = _SPECS.get(key)
+    env_val = (os.environ.get(key) or "").strip()
+    if spec is not None and spec.env_wins and env_val:
+        return env_val
     row = AppSetting.objects.filter(key=key).first()
     if row is not None and row.value.strip():
         return row.value.strip()
-    env_val = (os.environ.get(key) or "").strip()
     if env_val:
         return env_val
     return spec.default if spec else ""
+
+
+def source_of(key: str) -> str:
+    """Where `get(key)` is currently reading from: env | db | default | unset."""
+    spec = _SPECS.get(key)
+    env_val = (os.environ.get(key) or "").strip()
+    db_set = is_db_set(key)
+    if spec is not None and spec.env_wins and env_val:
+        return "env"
+    if db_set:
+        return "db"
+    if env_val:
+        return "env"
+    return "default" if (spec and spec.default) else "unset"
 
 
 def is_db_set(key: str) -> bool:

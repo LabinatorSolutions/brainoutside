@@ -49,13 +49,16 @@ class ApplyFailure(RuntimeError):
 
 
 def _write_pat() -> str:
-    pat = dj_settings.BRAIN_GIT_WRITE_PAT.get_secret_value().strip()
-    if pat:
-        return pat
-    path = dj_settings.BRAIN_GIT_WRITE_PAT_PATH
-    if path and Path(path).is_file():
-        return Path(path).read_text(encoding="utf-8").strip()
-    return ""
+    """The push credential: env → mounted file → encrypted setting.
+
+    Kept as a thin wrapper rather than calling `gitcreds` at each use
+    site, so this module stays the ONLY place in the codebase that reads
+    the write credential (grill C13's container boundary is gone once the
+    PAT can live in the DB — this code-level one replaces it).
+    """
+    from apps.brain.services import gitcreds
+
+    return gitcreds.write_pat()
 
 
 def _tokenized_origin_url(pat: str) -> str:

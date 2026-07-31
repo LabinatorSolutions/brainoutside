@@ -62,6 +62,26 @@ def repo_dir() -> Path:
     return Path(settings.BRAIN_REPO_DIR)
 
 
+def configured_url() -> str:
+    """The brain remote this server is supposed to serve.
+
+    Env/compose wins (it is read through pydantic, so a `.env` file counts
+    as env too); otherwise the value the setup wizard stored. Nothing here
+    moves an existing clone — `origin_probe()` is what notices that they
+    have drifted apart.
+    """
+    env_value = (settings.BRAIN_REPO_URL or "").strip()
+    if env_value:
+        return env_value
+    try:
+        from apps.brainconfig import services as cfg
+
+        return cfg.get("BRAIN_REPO_URL").strip()
+    except Exception:  # pragma: no cover - DB down / apps not ready
+        log.warning("brain: could not read BRAIN_REPO_URL from settings", exc_info=True)
+        return ""
+
+
 def _lock_path() -> Path:
     # Sibling of the clone so it lives on the same shared volume but is
     # never part of the git working tree.
@@ -85,8 +105,14 @@ def repo_lock(timeout: float = LOCK_TIMEOUT_SECONDS) -> Iterator[None]:
 
 
 def _git_env() -> dict[str, str] | None:
-    """Extra env for git subprocesses; wires the deploy key when configured."""
-    key_path = settings.BRAIN_GIT_SSH_KEY_PATH
+    """Extra env for git subprocesses; wires the deploy key when configured.
+
+    The key may be an operator-mounted file or one the app generated and
+    holds encrypted — `gitcreds.ssh_key_path()` owns that precedence.
+    """
+    from apps.brain.services import gitcreds
+
+    key_path = gitcreds.ssh_key_path()
     if not key_path:
         return None
     import os
@@ -219,7 +245,7 @@ def origin_probe() -> dict[str, object]:
     (no configured URL, or no clone yet) — this answers "is the clone
     WRONG", so "no opinion" is not a failure.
     """
-    configured = (settings.BRAIN_REPO_URL or "").strip()
+    configured = configured_url()
     if not configured or not is_valid_repo():
         return {"ok": True, "configured": _redact(configured), "actual": ""}
     actual = origin_url()
@@ -272,7 +298,7 @@ def verify_contract() -> None:
 
 def bootstrap() -> dict[str, str]:
     """Idempotent: clone when absent/invalid, reuse when valid. Verified either way."""
-    url = settings.BRAIN_REPO_URL
+    url = configured_url()
     d = repo_dir()
     with repo_lock():
         if is_valid_repo():
@@ -362,7 +388,7 @@ def replace_clone(*, force: bool = False) -> dict[str, str]:
     That check is the whole reason this isn't just `rm -rf`: an approval
     that committed but failed to push lives only here.
     """
-    url = (settings.BRAIN_REPO_URL or "").strip()
+    url = configured_url()
     if not url:
         raise BrainRepoError(
             "BRAIN_REPO_URL is not set — there is nothing to re-clone from."

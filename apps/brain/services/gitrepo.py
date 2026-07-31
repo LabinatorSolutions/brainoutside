@@ -6,7 +6,14 @@ Design contract (PLAN.md §4):
   the shared volume, so the single-writer guarantee holds across
   containers, not just threads.
 - Bootstrap is idempotent: an empty/invalid directory becomes a fresh
-  clone; a valid clone is reused untouched (Coolify volume-rename safety).
+  clone; a valid clone is reused untouched (Coolify volume-rename safety)
+  — but ONLY when its `origin` is the configured repo. Reuse used to be
+  unconditional, which meant changing `BRAIN_REPO_URL` silently kept
+  serving the previous brain: no error, no warning, just the wrong mind.
+  That was survivable while the URL lived in env (you set it once, at
+  deploy time); it is not survivable now that the setup wizard makes it
+  a field someone can edit. Mismatch fails loudly and `replace_clone()`
+  is the repair.
 - After any clone/pull, `verify_contract()` fails LOUDLY if the operating
   contract (CLAUDE.md, skills, lenses) is missing from the clone — a
   server without the contract must not serve.
@@ -18,6 +25,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
@@ -145,6 +153,107 @@ def is_valid_repo() -> bool:
         return False
 
 
+# ---- origin identity ----------------------------------------------------
+#
+# `git@github.com:me/brain.git`, `https://github.com/me/brain` and
+# `ssh://git@github.com/me/brain.git` are the SAME repository. The setup
+# wizard makes this a live concern rather than a theoretical one: it hands
+# out an SSH deploy key, so a brain first cloned over HTTPS legitimately
+# switches to an SSH remote. Comparing raw strings would call that a repo
+# swap and refuse to boot.
+#
+# So comparison happens on a canonical `host/owner/name`. A false match
+# across two genuinely different repos would need someone to own the same
+# path on the same host; a false MISmatch would take a working server down
+# on a cosmetic URL difference. The former is the safer error.
+
+_SCP_LIKE_RE = re.compile(r"^(?P<user>[^@/]+@)?(?P<host>[^:/]+):(?P<path>.+)$")
+
+
+def normalize_remote(url: str) -> str:
+    """Reduce a git remote URL to `host/path`, lowercased, sans credentials.
+
+    Returns "" for an empty input. Non-URL inputs (local paths, used by
+    tests and by anyone mounting a clone directly) come back POSIX-slashed
+    and otherwise untouched, so two spellings of one path still match.
+    """
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+
+    from urllib.parse import urlsplit
+
+    host = ""
+    path = raw
+    if "://" in raw:
+        parts = urlsplit(raw)
+        host = (parts.hostname or "").lower()
+        path = parts.path
+    else:
+        m = _SCP_LIKE_RE.match(raw)
+        # A bare Windows path ("D:/repos/x") also matches the scp-like
+        # shape; a single-letter "host" is the giveaway that it isn't one.
+        if m and len(m.group("host")) > 1:
+            host = m.group("host").lower()
+            path = m.group("path")
+
+    path = path.replace("\\", "/").strip("/")
+    if path.lower().endswith(".git"):
+        path = path[: -len(".git")]
+    # GitHub/GitLab treat owner and repo names case-insensitively.
+    return f"{host}/{path}".lower() if host else path.lower()
+
+
+def origin_url() -> str:
+    """The clone's `origin`, with any embedded credential scrubbed."""
+    try:
+        return _redact(_git("remote", "get-url", "origin", cwd=repo_dir()))
+    except BrainRepoError:
+        return ""
+
+
+def origin_probe() -> dict[str, object]:
+    """Does the clone on disk point at the repo we are configured to serve?
+
+    `ok` is True when they match AND when there is nothing to compare
+    (no configured URL, or no clone yet) — this answers "is the clone
+    WRONG", so "no opinion" is not a failure.
+    """
+    configured = (settings.BRAIN_REPO_URL or "").strip()
+    if not configured or not is_valid_repo():
+        return {"ok": True, "configured": _redact(configured), "actual": ""}
+    actual = origin_url()
+    if not actual:
+        # A clone with no `origin` (someone `git init`'d the volume) can't
+        # be pulled or pushed, so it is a mismatch, not an unknown.
+        return {
+            "ok": False,
+            "configured": _redact(configured),
+            "actual": "",
+            "reason": "the clone has no `origin` remote",
+        }
+    return {
+        "ok": normalize_remote(actual) == normalize_remote(configured),
+        "configured": _redact(configured),
+        "actual": actual,
+    }
+
+
+def _assert_origin_matches() -> None:
+    probe = origin_probe()
+    if probe["ok"]:
+        return
+    raise BrainRepoError(
+        f"The clone at {repo_dir()} is not the configured brain. "
+        f"BRAIN_REPO_URL is {probe['configured']!r} but the clone's origin "
+        f"is {probe['actual'] or 'missing'!r}. Refusing to serve — the "
+        "alternative is silently answering every question from the wrong "
+        "mind. Either point the configuration back at the original repo, "
+        "or use the 'Replace the clone' repair action to re-clone from the "
+        "new URL (which discards the local copy)."
+    )
+
+
 def head_sha() -> str:
     return _git("rev-parse", "HEAD", cwd=repo_dir())
 
@@ -167,6 +276,7 @@ def bootstrap() -> dict[str, str]:
     d = repo_dir()
     with repo_lock():
         if is_valid_repo():
+            _assert_origin_matches()
             action = "reused"
         else:
             if not url:
@@ -213,6 +323,73 @@ def status_probe() -> dict[str, object]:
             info["contract_ok"] = not missing
             if missing:
                 info["contract_missing"] = missing
+            origin = origin_probe()
+            info["origin_ok"] = origin["ok"]
+            if not origin["ok"]:
+                info["origin"] = origin
         return info
     except BrainRepoError as exc:  # pragma: no cover - defensive
         return {"valid": False, "error": str(exc)}
+
+
+def local_only_commits() -> int:
+    """Commits on HEAD that the tracked upstream branch doesn't have.
+
+    Non-zero means the brain on disk is ahead of GitHub — approvals
+    committed but never pushed. Returns 0 when there is no upstream to
+    compare against (a detached or untracked branch can't be "ahead").
+    """
+    try:
+        out = _git("rev-list", "--count", "@{u}..HEAD", cwd=repo_dir())
+        return int(out or 0)
+    except (BrainRepoError, ValueError):
+        return 0
+
+
+def working_tree_dirty() -> bool:
+    try:
+        return bool(_git("status", "--porcelain", cwd=repo_dir()))
+    except BrainRepoError:  # pragma: no cover - defensive
+        return False
+
+
+def replace_clone(*, force: bool = False) -> dict[str, str]:
+    """Discard the clone on disk and re-clone from the configured URL.
+
+    The repair for an origin mismatch. Destructive by nature, so it
+    refuses when the existing clone holds work that exists nowhere else —
+    unpushed commits or uncommitted changes — unless explicitly forced.
+    That check is the whole reason this isn't just `rm -rf`: an approval
+    that committed but failed to push lives only here.
+    """
+    url = (settings.BRAIN_REPO_URL or "").strip()
+    if not url:
+        raise BrainRepoError(
+            "BRAIN_REPO_URL is not set — there is nothing to re-clone from."
+        )
+    d = repo_dir()
+    with repo_lock():
+        if is_valid_repo() and not force:
+            ahead = local_only_commits()
+            dirty = working_tree_dirty()
+            if ahead or dirty:
+                bits = []
+                if ahead:
+                    bits.append(f"{ahead} commit(s) not pushed to its origin")
+                if dirty:
+                    bits.append("uncommitted changes")
+                raise BrainRepoError(
+                    f"The clone at {d} has {' and '.join(bits)}. Replacing it "
+                    "would destroy work that exists nowhere else. Push or "
+                    "discard those changes first, or re-run with force."
+                )
+        if d.exists():
+            shutil.rmtree(d)
+        d.parent.mkdir(parents=True, exist_ok=True)
+        log.warning("brain: replacing clone at %s from %s", d, _redact(url))
+        _git("clone", "--single-branch", url, str(d))
+        verify_contract()
+        _assert_origin_matches()
+        sha = head_sha()
+    log.info("brain: clone replaced, now at %s", sha)
+    return {"action": "replaced", "head": sha, "dir": str(d)}

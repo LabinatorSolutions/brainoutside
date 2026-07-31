@@ -33,7 +33,12 @@ def healthz(request):
 
 
 def readyz(request):
-    """Readiness: DB reachable + brain clone valid with the contract present."""
+    """Readiness: DB reachable + the RIGHT brain clone, with the contract.
+
+    `origin_ok` is part of readiness, not a warning: a clone whose origin
+    is not the configured repo answers every question from the wrong mind,
+    which is worse than answering nothing.
+    """
     from apps.brain.services import gitrepo
 
     checks: dict[str, object] = {}
@@ -45,7 +50,7 @@ def readyz(request):
         checks["db"] = f"fail: {exc.__class__.__name__}"
         status = 503
     brain = gitrepo.status_probe()
-    if brain.get("valid") and brain.get("contract_ok"):
+    if brain.get("valid") and brain.get("contract_ok") and brain.get("origin_ok", True):
         checks["brain"] = {"head": str(brain.get("head", ""))[:12]}
     else:
         checks["brain"] = brain

@@ -514,10 +514,12 @@ M4, with 3.5.4–.5 landing whenever their data exists.
   gated as always). *Check: card indexed and served.*
 
 ### M5 — Open-source beta (decided 2026-07-30: after M3/M3.5, MIT)
-The project goes public as a self-hosted "build your own brain" tool:
-single-user, single-brain by design — multi-user is a different product.
-Running checklist lives in `docs/OPEN-SOURCE.md` (updated as we build;
-de-Hasanify happens continuously from now, not as a big-bang at M5).
+The project goes public as **BrainOutside** (brainoutside.com), a
+self-hosted "build your own brain" tool: single-user, single-brain by
+design — multi-user is a different product. Running checklist lives in
+`docs/OPEN-SOURCE.md`; the setup/deployment rebuild that 5.3 and 5.4
+carry out is designed in `docs/SETUP-DESIGN.md` (de-Hasanify happened
+continuously, not as a big-bang at M5).
 
 - **5.1** De-Hasanify the engine: commit identity/email → setting, theme
   naming generic, no personal URLs/paths in code. *Check: grep for

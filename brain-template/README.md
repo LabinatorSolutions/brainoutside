@@ -5,9 +5,10 @@ your AI agents read from for context, facts, and voice. Plain markdown, one
 idea per file, with a contract strict enough that agents can be trusted to
 retrieve from it — and to propose additions to it.
 
-It is designed to be served by a brain server, which clones this repo and
-exposes it over REST + MCP with visibility tiers and a human-gated write
-path. It also works perfectly well on its own, read directly by Claude Code.
+It is designed to be served by [BrainOutside](https://brainoutside.com),
+which clones this repo and exposes it over REST + MCP with visibility
+tiers and a human-gated write path. It also works perfectly well on its
+own, read directly by Claude Code.
 
 **`CLAUDE.md` is the contract.** Read it before anything else. Two skills in
 `.claude/skills/` are the only interfaces: `mind-feeder` writes (gated),

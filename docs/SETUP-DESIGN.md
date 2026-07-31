@@ -5,11 +5,32 @@ project a stranger can install. Written before the public release so the
 decisions are deliberate; implementation follows this doc.
 
 **Decided 2026-07-30:**
+0. **The project is `BrainOutside`** — brainoutside.com. Your brain, kept
+   outside your head, where your agents can read it.
 1. **GitHub from day one.** No local-only brain mode. One code path, the
    repo is the source of truth and backed up from the first minute.
 2. **Credentials live in encrypted settings**, with env/file overrides
    that win when present.
 3. **Prebuilt versioned images on GHCR.** Users pull, they don't build.
+
+### Fixed identifiers
+
+Everything below assumes these; change them here, not inline.
+
+| Thing | Value |
+|---|---|
+| Brand / product | **BrainOutside** |
+| Domain | `brainoutside.com` |
+| App repo | `github.com/<owner>/brainoutside` |
+| Starter repo | `github.com/<owner>/brain-template` |
+| Container image | `ghcr.io/<owner>/brainoutside:vX.Y.Z` |
+| `APP_NAME` default | `BrainOutside` (already set in `settings/base.py`) |
+
+`brain-template` keeps its generic name on purpose: it is a *brain*
+template, usable without this server, and the URL a newcomer sees is
+`…/brain-template/generate`, which reads as what it does. Rename to
+`brainoutside-template` before publishing if brand consistency matters
+more — it is a one-line change here and in the wizard link.
 
 ---
 
@@ -165,8 +186,8 @@ to tier snapshots with no Bash, no network and no DB.
 
 ## Distribution & updates
 
-- **GHCR, multi-arch (amd64 + arm64), semver tags** — `:v1.2.0` and
-  `:latest`, built by GitHub Actions on tag.
+- **`ghcr.io/<owner>/brainoutside`**, multi-arch (amd64 + arm64), semver
+  tags — `:v1.2.0` and `:latest`, built by GitHub Actions on tag.
 - `docker-compose.yml` references the published image; a `build:` override
   stays for contributors.
 - **Update = change the tag and redeploy.** Migrations run in the
@@ -198,7 +219,7 @@ after.
 | 4 | Verify/repair actions | Real git errors surfaced, not swallowed |
 | 5 | Dashboard setup-health panel | Where security actually gets enforced |
 | 6 | GHCR release workflow + CHANGELOG | Before any public link exists |
-| 7 | README / INSTALL / SECURITY | Needs the project name |
+| 7 | INSTALL / SECURITY docs | README done; these two remain |
 | 8 | bash + Makefile twin of `dev.ps1` | Linux/macOS parity |
 | 9 | Optional PAT automation for key + webhook | Convenience, never required |
 

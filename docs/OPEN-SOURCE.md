@@ -5,6 +5,12 @@ Decided 2026-07-30: the app goes open source as a self-hosted
 M4 eval then runs in public. Scope: single-user, single-brain — that is
 the product's identity, not a limitation to fix.
 
+**Name (decided 2026-07-30): `BrainOutside` — brainoutside.com.**
+Repos `brainoutside` + `brain-template`; image
+`ghcr.io/<owner>/brainoutside`. Identifier table lives in
+[SETUP-DESIGN.md](SETUP-DESIGN.md); the onboarding flow is designed
+there too.
+
 This is a *running* checklist: items get ticked (and added) continuously
 as we build, so M5 is a release step, not an excavation. Rule for every
 new feature from now on: **"is this engine, or is this Hasan-config?"**
@@ -38,10 +44,20 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 - [ ] Decide whether the example project card ships or the template
       starts fully empty (it currently ships one, marked DELETE THIS).
 
-## Setup experience (5.3)
+## Setup experience (5.3) — designed in SETUP-DESIGN.md
 
-- [ ] First-run wizard: admin → brain repo URL + credential → Anthropic
-      key OR `sk-ant-oat` subscription token → bootstrap clone → done.
+- [ ] Auto-generate + PERSIST boot secrets, so required env drops to 2
+      (`POSTGRES_PASSWORD` + domain). Persistence is load-bearing: a
+      regenerating `FIELD_ENCRYPTION_KEY` silently destroys every stored
+      credential.
+- [ ] First-run wizard at `/setup`: admin → create brain repo (deep link
+      to `brain-template/generate`, no token needed) → deploy key with
+      copy button + Verify → write PAT → Claude key OR `sk-ant-oat` →
+      bootstrap. No `docker exec` anywhere.
+- [ ] Git credentials → encrypted settings (+ app-generated SSH keypair),
+      env/file overrides win when present.
+- [ ] Dashboard setup-health panel — the ops-UI-is-public warning is the
+      one that actually protects novices.
 - [ ] Subscription-token support is a headline feature (no API billing).
 - [ ] `docker compose up` happy path documented in ≤10 lines.
 - [x] First boot with a valid clone + empty DB auto-indexes + builds
@@ -51,9 +67,18 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 
 ## Cross-platform + docs (5.4)
 
+- [ ] Publish `ghcr.io/<owner>/brainoutside` — multi-arch, semver, built
+      on tag by GitHub Actions. + CHANGELOG.
+- [ ] Design the contract-version story BEFORE v1.0: users' brains are
+      copies of `brain-template` that never update, and we cannot migrate
+      a repo we don't own. Plan: `contract-version:` in CLAUDE.md,
+      startup check warns (never fails), `upgrade_brain` proposes the
+      diff through the normal approval queue.
 - [ ] bash/Makefile twin of `dev.ps1`.
-- [ ] README: what/why, rings hero GIF (rings shipped in M3.5.2 — the
-      dashboard centrepiece is the shot to capture), quickstart.
+- [x] README: what/why, quickstart — rewritten as BrainOutside.
+- [ ] Rings hero image for the README (M3.5.2 dashboard centrepiece is
+      the shot; do NOT film the graph explorer until the lens/click bug
+      above is fixed).
 - [ ] INSTALL (Coolify/compose), SECURITY (the §9 honest truths —
       "private notes are only as private as your VPS").
 - [ ] Verify clean setup on a fresh Linux/macOS box.

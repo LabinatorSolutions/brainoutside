@@ -18,7 +18,7 @@ from .env import settings as _env
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # ----- Core --------------------------------------------------------------------
-APP_NAME = _env.APP_NAME or "BrainServer"
+APP_NAME = _env.APP_NAME or "BrainOutside"
 SECRET_KEY = _env.SECRET_KEY.get_secret_value()
 DEBUG = False  # overridden in dev.py
 ALLOWED_HOSTS: list[str] = list(_env.ALLOWED_HOSTS)

@@ -100,8 +100,16 @@
   </div>
 
   {# --- main split: brain on the left, pulse on the right -------------- #}
+  {% comment %}
+    min-w-0 on every grid item below: a truncate span's nowrap text
+    still bubbles its full one-line width up as the item's min-content,
+    and on mobile the single column track adopts it — one long entity
+    id pushed the whole column (and the rings card) past the viewport.
+    min-width:0 on the item is what actually caps the track at the
+    container; truncation then happens where it should.
+  {% endcomment %}
   <div class="mt-4 grid gap-4 xl:mt-6 xl:grid-cols-12 xl:gap-6">
-    <div class="space-y-4 xl:col-span-8 xl:space-y-6">
+    <div class="min-w-0 space-y-4 xl:col-span-8 xl:space-y-6">
       {# --- the brain, drawn (M3.5.2) --- #}
       {% include "ops/_rings.html" %}
 
@@ -110,26 +118,31 @@
         {% comment %}
           The bars wear the same kind colours as the rings (.rings-kind-*
           sets --kind-color; rings.css is on this page), which makes this
-          table the readable twin of the viz. Widths are SVG width
+          list the readable twin of the viz. Widths are SVG width
           attributes, not style= — the CSP drops inline styles.
+
+          Flex rows, NOT a table: an SVG's intrinsic width (300px) sets
+          the min-content of an auto-layout table cell, which forced the
+          whole left column ~30px past the phone viewport. min-w-0 on
+          the flex track is what kills that floor.
         {% endcomment %}
-        <div class="card p-4">
+        <div class="card min-w-0 p-4">
           <h2 class="card-title">Entity mix</h2>
-          <table class="mt-3 w-full text-sm">
+          <ul class="mt-3 space-y-2 text-sm">
             {% for row in kind_counts %}
-              <tr>
-                <td class="py-1 pe-3 whitespace-nowrap"><a class="text-accent" href="{% url 'brainconfig:browser' %}?kind={{ row.kind }}">{{ row.kind }}</a></td>
-                <td class="w-full py-1">
+              <li class="flex items-center gap-3">
+                <a class="w-16 shrink-0 truncate text-accent" title="{{ row.kind }}" href="{% url 'brainconfig:browser' %}?kind={{ row.kind }}">{{ row.kind }}</a>
+                <div class="min-w-0 flex-1">
                   <svg class="block h-1 w-full" aria-hidden="true"><rect class="viz-bar rings-kind-{{ row.kind }}" width="{% widthratio row.n kind_counts.0.n 100 %}%" height="100%" rx="2"></rect></svg>
-                </td>
-                <td class="py-1 ps-3 text-right font-mono">{{ row.n }}</td>
-              </tr>
+                </div>
+                <span class="w-6 shrink-0 text-right font-mono">{{ row.n }}</span>
+              </li>
             {% endfor %}
-          </table>
+          </ul>
         </div>
 
         {# --- staleness ------------------------------------------------ #}
-        <div class="card p-4">
+        <div class="card min-w-0 p-4">
           <h2 class="card-title">
             Stale project cards <span class="font-normal text-muted">(last-verified &gt; {{ stale_after }}d)</span>
           </h2>
@@ -153,7 +166,7 @@
       </div>
     </div>
 
-    <div class="space-y-4 xl:col-span-4 xl:space-y-6">
+    <div class="min-w-0 space-y-4 xl:col-span-4 xl:space-y-6">
       {# --- most served ------------------------------------------------ #}
       <div class="card p-4">
         <h2 class="card-title">Most-served notes <span class="font-normal text-muted">(30d)</span></h2>

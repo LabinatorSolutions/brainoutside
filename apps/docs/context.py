@@ -117,7 +117,12 @@ def _server_nav_section() -> dict[str, Any]:
         "items": [
             {
                 "label": "Dashboard",
-                "url": _safe_url("dashboard"),
+                # `brainconfig:dashboard`, NOT `dashboard` — the ops
+                # urlconf sets app_name, so the bare name has never
+                # reversed. `_safe_url` swallowed the NoReverseMatch and
+                # returned "#", so the link rendered and did nothing;
+                # it was already dead in the topbar this moved out of.
+                "url": _safe_url("brainconfig:dashboard"),
                 "icon": "dashboard",
                 "active": False,
                 "badge": 0,
@@ -164,7 +169,7 @@ def build_top_links(*, is_staff: bool = False) -> list[dict[str, Any]]:
     if not is_staff:
         return []
     return [
-        {"label": "Dashboard", "url": _safe_url("dashboard"), "active": False},
+        {"label": "Dashboard", "url": _safe_url("brainconfig:dashboard"), "active": False},
     ]
 
 

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import datetime as dt
 from collections import Counter
+from urllib.parse import urlencode
 
 import markdown as md
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
 from django.http import Http404, JsonResponse
@@ -216,12 +218,35 @@ def browser(request):
             | Q(projects__icontains=q)
         )
 
-    rows = [{"e": e, "stale": _is_stale(e)} for e in qs]
+    # Page AFTER filtering; the filter form carries no `page` input, so
+    # changing a filter naturally lands back on page 1. get_page clamps
+    # junk and out-of-range values instead of 404ing.
+    paginator = Paginator(qs, BROWSER_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    rows = [{"e": e, "stale": _is_stale(e)} for e in page_obj]
+
+    # The filters re-encoded WITHOUT `page`, so pager links compose as
+    # "?{filter_qs}&page=N" and never carry a stale page number.
+    filter_qs = urlencode(
+        {
+            k: v
+            for k, v in (
+                ("kind", kind),
+                ("visibility", visibility),
+                ("status", status),
+                ("q", q),
+            )
+            if v
+        }
+    )
+
     return render(
         request,
         "ops/browser.html",
         {
             "rows": rows,
+            "page_obj": page_obj,
+            "filter_qs": filter_qs,
             "total": Entity.objects.count(),
             "kinds": [k for k, _ in Entity.KINDS],
             "visibilities": [v for v, _ in Entity.VISIBILITIES],
@@ -233,6 +258,10 @@ def browser(request):
         },
     )
 
+
+# Browser page size. 50 keeps the page fast at a few thousand notes
+# while a fresh brain (dozens of entities) never sees a pager at all.
+BROWSER_PAGE_SIZE = 50
 
 _FRONTMATTER_END = "\n---"
 

@@ -4,7 +4,13 @@
 {% block page_title %}Brain browser{% endblock %}
 {% block page_subtitle %}
   <p class="mt-1 text-sm text-muted">
-    {{ rows|length }} of {{ total }} entities — the index as the server sees it (full private view).
+    {% if page_obj.paginator.count %}
+      Showing {{ page_obj.start_index }}&ndash;{{ page_obj.end_index }} of {{ page_obj.paginator.count }}
+      entit{{ page_obj.paginator.count|pluralize:"y,ies" }}{% if page_obj.paginator.count != total %} (filtered from {{ total }}){% endif %}
+    {% else %}
+      No matches among {{ total }} entities
+    {% endif %}
+    — the index as the server sees it (full private view).
   </p>
 {% endblock %}
 {% block content_width %}max-w-[1600px]{% endblock %}
@@ -92,4 +98,18 @@
       </tbody>
     </table>
   </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-4 flex flex-wrap items-center justify-between gap-3" aria-label="Pagination">
+      <span class="text-xs text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+      <div class="flex gap-2">
+        {% if page_obj.has_previous %}
+          <a class="btn-ghost btn-sm" href="?{% if filter_qs %}{{ filter_qs }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">&larr; Previous</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+          <a class="btn-ghost btn-sm" href="?{% if filter_qs %}{{ filter_qs }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Next &rarr;</a>
+        {% endif %}
+      </div>
+    </nav>
+  {% endif %}
 {% endblock %}

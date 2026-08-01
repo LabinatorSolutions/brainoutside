@@ -612,6 +612,18 @@
     font-weight: 500;
   }
 
+  /* ----- Drawer scrim -----
+   * Like the terminal panes, a deliberate exception to "semantic tokens
+   * only": a scrim is dark in BOTH themes by design (--ink would flip
+   * to near-white in dark mode and wash the screen instead of dimming
+   * it). Sits under the sidebar (z-40) and over the sticky topbar. */
+  .scrim {
+    @apply fixed inset-0 lg:hidden;
+    /* Between the sticky topbar (30) and the sidebar drawer (40). */
+    z-index: 35;
+    background: rgba(0, 0, 0, 0.45);
+  }
+
   /* ----- Sparkline (stat tiles) -----
    * Geometry comes pre-baked from the view as polyline points in a
    * 100×28 viewBox; preserveAspectRatio=none stretches it to the tile

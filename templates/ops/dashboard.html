@@ -19,8 +19,10 @@
     <span class="dot {% if probe.valid and probe.contract_ok %}dot-ok{% else %}dot-danger{% endif %}"></span>
     {% if probe.valid and probe.contract_ok %}Sync healthy{% else %}Sync degraded{% endif %}
     {% if last_sync %}
-      · {{ last_sync.trigger }} · <span class="font-mono">{{ last_sync.commit_sha|slice:":8" }}</span>
-      · {{ last_sync.started_at|date:"M j, H:i" }}{% if last_sync.drift_detected %} · drift{% endif %}
+      <span class="hidden sm:inline">· {{ last_sync.trigger }}</span>
+      · <span class="font-mono">{{ last_sync.commit_sha|slice:":8" }}</span>
+      <span class="hidden sm:inline">· {{ last_sync.started_at|date:"M j, H:i" }}</span>
+      {% if last_sync.drift_detected %} · drift{% endif %}
     {% else %}
       · never synced
     {% endif %}
@@ -46,7 +48,7 @@
     saw on the main page.
   {% endcomment %}
   {% if health_problems %}
-    <div class="card mb-6">
+    <div class="card mb-4 xl:mb-6">
       <div class="card-header">
         <h2 class="card-title">Setup &amp; health</h2>
         <a href="{% url 'brainconfig:health' %}" class="text-xs link-accent">Review and fix &rarr;</a>
@@ -98,12 +100,12 @@
   </div>
 
   {# --- main split: brain on the left, pulse on the right -------------- #}
-  <div class="mt-6 grid gap-6 xl:grid-cols-12">
-    <div class="space-y-6 xl:col-span-8">
+  <div class="mt-4 grid gap-4 xl:mt-6 xl:grid-cols-12 xl:gap-6">
+    <div class="space-y-4 xl:col-span-8 xl:space-y-6">
       {# --- the brain, drawn (M3.5.2) --- #}
       {% include "ops/_rings.html" %}
 
-      <div class="grid gap-6 md:grid-cols-2">
+      <div class="grid gap-4 md:grid-cols-2 xl:gap-6">
         {# --- entity mix ---------------------------------------------- #}
         {% comment %}
           The bars wear the same kind colours as the rings (.rings-kind-*
@@ -151,7 +153,7 @@
       </div>
     </div>
 
-    <div class="space-y-6 xl:col-span-4">
+    <div class="space-y-4 xl:col-span-4 xl:space-y-6">
       {# --- most served ------------------------------------------------ #}
       <div class="card p-4">
         <h2 class="card-title">Most-served notes <span class="font-normal text-muted">(30d)</span></h2>

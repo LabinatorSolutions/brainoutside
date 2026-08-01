@@ -21,6 +21,22 @@
   overflow: visible;
 }
 
+/* Phone widths scale the 760-unit viewBox down to ~0.4×, taking the
+   12px (SVG-unit) tier labels to ~5px and the dots to specks. Rescale
+   both: labels get bigger units, dots scale around their own centre
+   (fill-box keeps position). The ping halo is untouched — it animates
+   transform and must start from scale(1). */
+@media (max-width: 639px) {
+  .rings-label {
+    font-size: 22px;
+  }
+  .rings-dot {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(1.75);
+  }
+}
+
 /* Hero layout: figure beside its legend once there is room, so the card
    holds ~half the height it needed with everything stacked. The legend
    wrap (.rings-side, built by rings.js) becomes the right rail. */

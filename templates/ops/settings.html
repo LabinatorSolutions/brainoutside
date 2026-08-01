@@ -4,26 +4,45 @@
 {% block page_title %}Settings{% endblock %}
 {% block page_subtitle %}
   <p class="mt-1 text-sm text-muted">
-    App name, Claude SDK key, models, budgets. Stored Fernet-encrypted;
-    secrets are write-only.
+    App name, Claude credential, models and budgets. Values save encrypted
+    to the database; secrets are write-only.
   </p>
+{% endblock %}
+{% block content_width %}max-w-[1600px]{% endblock %}
+
+{% comment %}
+  Test connection lives on the title line (the dashboard's sync-chip slot):
+  it is the page's one action on the world, and keeping its <form> out of
+  the big save <form> below avoids illegal nesting. The hidden input — not
+  the button's name/value — carries the action, so disabling the submitter
+  while the ping runs cannot drop it from the POST (the Alpine gotcha).
+{% endcomment %}
+{% block page_actions %}
+  <div class="flex flex-wrap items-center gap-3">
+    <span class="badge badge-muted">SDK spend today · <span class="font-mono">${{ today_cost|floatformat:4 }}</span></span>
+    <form method="post" x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="test_connection" />
+      <button type="submit" class="btn-primary" :disabled="busy">Test connection</button>
+    </form>
+  </div>
 {% endblock %}
 
 {% block content %}
   {% if test_result %}
-    <div class="notice mb-6 p-4 {% if test_result.ok %}notice-ok{% else %}notice-danger{% endif %}">
+    <div class="notice mb-4 xl:mb-6 {% if test_result.ok %}notice-ok{% else %}notice-danger{% endif %}">
       {% if test_result.ok %}
         <div class="font-semibold text-signal-ink">Connection OK</div>
-        <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4 font-mono">
-          <div><dt class="text-muted" >model</dt><dd>{{ test_result.model }}</dd></div>
-          <div><dt class="text-muted" >latency</dt><dd>{{ test_result.duration_ms }} ms</dd></div>
-          <div><dt class="text-muted" >tokens in/out</dt><dd>{{ test_result.input_tokens }}/{{ test_result.output_tokens }}</dd></div>
-          <div><dt class="text-muted" >cost</dt><dd>${{ test_result.cost_usd|floatformat:4 }}</dd></div>
+        <dl class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 font-mono text-sm sm:grid-cols-4">
+          <div><dt class="text-xs text-muted">model</dt><dd>{{ test_result.model }}</dd></div>
+          <div><dt class="text-xs text-muted">latency</dt><dd>{{ test_result.duration_ms }} ms</dd></div>
+          <div><dt class="text-xs text-muted">tokens in/out</dt><dd>{{ test_result.input_tokens }}/{{ test_result.output_tokens }}</dd></div>
+          <div><dt class="text-xs text-muted">cost</dt><dd>${{ test_result.cost_usd|floatformat:4 }}</dd></div>
         </dl>
-        <div class="mt-2 text-sm text-muted">reply: “{{ test_result.text }}” · op #{{ test_result.operation_id }}</div>
+        <div class="mt-2 text-sm text-muted">reply: “{{ test_result.text }}” · logged as op #{{ test_result.operation_id }}</div>
       {% else %}
         <div class="font-semibold text-danger-ink">Connection failed</div>
-        <div class="mt-1 text-sm font-mono">{{ test_result.error }}</div>
+        <div class="mt-1 font-mono text-sm">{{ test_result.error }}</div>
         {% if test_result.operation_id %}
           <div class="mt-1 text-sm text-muted">logged as op #{{ test_result.operation_id }}</div>
         {% endif %}
@@ -31,70 +50,94 @@
     </div>
   {% endif %}
 
-  <div class="mb-6 flex items-center justify-between rounded-xl border p-4 border-line bg-surface">
-    <div class="text-sm">
-      <span class="text-muted" >SDK spend today:</span>
-      <span class="font-mono" >${{ today_cost|floatformat:4 }}</span>
-    </div>
-    <form method="post">
-      {% csrf_token %}
-      <button type="submit" name="action" value="test_connection"
-              class="btn-primary">
-        Test connection
-      </button>
-    </form>
-  </div>
+  {% comment %}
+    One form, three cards: the registry grouped by what the operator is
+    doing (branding / the SDK loop / the git side). Grouping is computed
+    in the view; a key missing from its map still renders in a trailing
+    "Other settings" card, and _save iterates the registry, so nothing
+    can silently drop out of either path.
 
-  <form method="post" class="rounded-xl border border-line bg-surface">
+    Row anatomy replaces the old 4-column <table>, whose nowrap header
+    forced an 858px floor at a 375px viewport. Zones stack below xl
+    (tiny eyebrow labels appear in place of the lost column headers);
+    at xl they line up 5/4/3 on the 12-col grid. min-w-0 on every zone
+    so a long mono value (the repo URL) breaks instead of widening the
+    track — .meta-value carries the word-break.
+  {% endcomment %}
+  <form method="post" class="space-y-4 xl:space-y-6" x-data="{saving: false}" @submit="setTimeout(() => saving = true)">
     {% csrf_token %}
-    <table class="w-full text-sm">
-      <thead>
-        <tr class="border-b text-left border-line text-muted">
-          <th class="px-4 py-3 font-medium">Setting</th>
-          <th class="px-4 py-3 font-medium">Effective value</th>
-          <th class="px-4 py-3 font-medium">New value</th>
-          <th class="px-4 py-3 font-medium">Clear</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-          <tr class="border-b align-top border-line">
-            <td class="px-4 py-3">
-              <div class="font-medium">{{ row.spec.label }}</div>
-              <div class="mt-0.5 text-xs text-muted font-mono">{{ row.spec.key }}</div>
-              <div class="mt-1 max-w-xs text-xs text-muted">{{ row.spec.help }}</div>
-            </td>
-            <td class="px-4 py-3 font-mono">
-              {% if row.effective %}{{ row.effective }}{% else %}<span class="text-muted" >unset</span>{% endif %}
-              <div class="text-xs text-muted">
-                {% if row.source == "db" %}db · {{ row.updated_at|date:"Y-m-d H:i" }}
-                {% elif row.source == "env" %}env/compose
-                {% elif row.source == "default" %}built-in default
-                {% endif %}
-              </div>
-              {% if row.shadowed %}
-                <div class="mt-1 text-xs text-warn-ink">
-                  A value is stored here but the environment overrides it.
-                  Remove it from your env/compose to use the stored one.
-                </div>
+    {% for section in sections %}
+      <section class="card">
+        <div class="card-header">
+          <h2 class="card-title">{{ section.title }}</h2>
+          {% if section.note %}<span class="text-xs text-muted">{{ section.note }}</span>{% endif %}
+        </div>
+        {% for row in section.rows %}
+          <div class="card-row grid gap-x-6 gap-y-3 xl:grid-cols-12">
+            <div class="min-w-0 xl:col-span-5">
+              <label class="text-sm font-medium" for="value__{{ row.spec.key }}">{{ row.spec.label }}</label>
+              <div class="mt-0.5 font-mono text-xs text-muted">{{ row.spec.key }}</div>
+              <p class="mt-1.5 max-w-md text-xs text-muted">{{ row.spec.help }}</p>
+            </div>
+
+            <div class="min-w-0 xl:col-span-4">
+              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted xl:hidden">Effective value</div>
+              {% if row.effective %}
+                <div class="meta-value text-sm">{{ row.effective }}</div>
+              {% else %}
+                <div class="text-sm text-muted">unset</div>
               {% endif %}
-            </td>
-            <td class="px-4 py-3">
+              {% if row.source == "db" %}
+                <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span class="badge badge-info">stored</span>
+                  {% if row.updated_at %}<span>updated {{ row.updated_at|date:"M j, H:i" }}</span>{% endif %}
+                </div>
+              {% elif row.source == "env" %}
+                <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span class="badge badge-muted">env/compose</span>
+                </div>
+              {% elif row.source == "default" %}
+                <div class="mt-1.5 text-xs text-muted">built-in default</div>
+              {% endif %}
+              {% if row.shadowed %}
+                <p class="mt-1.5 max-w-md text-xs text-warn-ink">
+                  A value is stored here, but the environment wins for this
+                  key — remove {{ row.spec.key }} from your env/compose to
+                  use the stored one.
+                </p>
+              {% endif %}
+            </div>
+
+            <div class="min-w-0 xl:col-span-3">
+              <div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted xl:hidden">New value</div>
               <input type="{% if row.spec.secret %}password{% else %}text{% endif %}"
-                     name="value__{{ row.spec.key }}" autocomplete="off"
+                     id="value__{{ row.spec.key }}" name="value__{{ row.spec.key }}"
+                     autocomplete="off" spellcheck="false"
                      placeholder="{% if row.spec.secret %}write-only{% else %}leave blank to keep{% endif %}"
-                     class="w-56 rounded-lg border px-2 py-1.5 border-line bg-surface-2 font-mono" />
-            </td>
-            <td class="px-4 py-3 text-center">
-              <input type="checkbox" name="clear__{{ row.spec.key }}" title="Clear the stored value" />
-            </td>
-          </tr>
+                     class="field-input field-mono" />
+              {% comment %}
+                The clear checkbox only exists when there is a stored value
+                to clear — on any other row it would be inert (the save path
+                skips it), and ten dead checkboxes read as ten decisions.
+              {% endcomment %}
+              {% if row.db_set %}
+                <label class="mt-2 flex items-center gap-2 text-xs text-muted">
+                  <input type="checkbox" name="clear__{{ row.spec.key }}" />
+                  Clear the stored value
+                </label>
+              {% endif %}
+            </div>
+          </div>
         {% endfor %}
-      </tbody>
-    </table>
-    <div class="flex justify-end px-4 py-3">
-      <button type="submit" name="action" value="save"
-              class="btn-ink">
+      </section>
+    {% endfor %}
+
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-xs text-muted">
+        Blank fields keep their current values. Secrets can be replaced or
+        cleared, never shown.
+      </p>
+      <button type="submit" name="action" value="save" class="btn-ink" :disabled="saving">
         Save changes
       </button>
     </div>

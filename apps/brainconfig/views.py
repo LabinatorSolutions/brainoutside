@@ -18,6 +18,52 @@ from . import services
 from .models import AppSetting
 from .nav import ops_context
 
+# Display grouping for the Settings page — purely presentational, so it
+# lives here rather than on SettingSpec (the registry is what SdkRunner
+# and the wizard read; they have no use for page layout). `_save` iterates
+# the registry, not this map, so a key missing here still saves — and
+# `_sectioned` renders it in a trailing "Other settings" card, so it
+# cannot silently drop out of the display path either.
+_SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("Branding", "", ("APP_NAME",)),
+    (
+        "Claude SDK",
+        "",
+        (
+            "ANTHROPIC_API_KEY",
+            "CLAUDE_MODEL_READER",
+            "CLAUDE_MODEL_FEEDER",
+            "MAX_BUDGET_USD_READER",
+            "MAX_BUDGET_USD_FEEDER",
+            "MAX_TURNS_READER",
+            "MAX_TURNS_FEEDER",
+            "SDK_TIMEOUT_SECONDS",
+            "DAILY_COST_CAP",
+        ),
+    ),
+    (
+        "Brain repo",
+        "env/compose wins for these keys",
+        ("BRAIN_REPO_URL", "GITHUB_WEBHOOK_SECRET", "BRAIN_GIT_WRITE_PAT"),
+    ),
+)
+
+
+def _sectioned(rows: list[dict]) -> list[dict]:
+    """Group registry rows into the page's cards, registry order kept."""
+    by_key = {row["spec"].key: row for row in rows}
+    placed: set[str] = set()
+    sections = []
+    for title, note, keys in _SECTIONS:
+        section_rows = [by_key[k] for k in keys if k in by_key]
+        placed.update(k for k in keys if k in by_key)
+        if section_rows:
+            sections.append({"title": title, "note": note, "rows": section_rows})
+    leftovers = [row for row in rows if row["spec"].key not in placed]
+    if leftovers:
+        sections.append({"title": "Other settings", "note": "", "rows": leftovers})
+    return sections
+
 
 @staff_member_required(login_url="login")
 @require_http_methods(["GET", "POST"])
@@ -55,7 +101,7 @@ def settings_page(request):
         request,
         "ops/settings.html",
         {
-            "rows": rows,
+            "sections": _sectioned(rows),
             "today_cost": sdk_runner.today_cost_usd(),
             "test_result": request.session.pop("test_result", None),
             **ops_context(request),

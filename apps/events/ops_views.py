@@ -143,6 +143,7 @@ def activity_json(request):
 
 
 DAY_CHOICES = (1, 7, 30, 90)
+LOGS_PAGE_SIZE = 50
 
 
 @staff_member_required(login_url="login")
@@ -151,7 +152,9 @@ def logs(request):
     SdkOperation ledger aggregated by kind, most-served entities, and
     spend-vs-cap with the breaker state. Aggregates use plain ORM sums
     so they reconcile with raw queries by construction (the M3.4 check
-    verifies exactly that)."""
+    verifies exactly that). The stream pages at 50 (M5.6 polish): an
+    event log grows without bound, and a flat newest-200 cap silently
+    hid everything older."""
     from apps.brainconfig import services as config
     from apps.reader.services.sdk_runner import today_cost_usd
 
@@ -167,15 +170,26 @@ def logs(request):
     events_qs = Event.objects.select_related("consumer").filter(created_at__gte=since)
     if etype:
         events_qs = events_qs.filter(type=etype)
+
+    # Page AFTER filtering (the browser pattern): the filter form carries
+    # no `page` input, so changing a filter lands back on page 1, and
+    # get_page clamps junk and out-of-range values instead of 404ing.
+    paginator = Paginator(events_qs, LOGS_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
     event_rows = [
         {
             "e": e,
             "details_json": json.dumps(e.details, ensure_ascii=False, default=str)[:300],
             "n_entities": len(e.entity_ids or []),
         }
-        for e in events_qs[:200]
+        for e in page_obj
     ]
     event_types = sorted(set(Event.objects.values_list("type", flat=True).distinct()))
+
+    # The filters re-encoded WITHOUT `page`, so pager links compose as
+    # "?{filter_qs}&page=N" and never carry a stale page number. `days`
+    # is always present, so the template joins unconditionally.
+    filter_qs = urlencode({"days": days, **({"type": etype} if etype else {})})
 
     ops = SdkOperation.objects.filter(created_at__gte=since)
     agg = dict(
@@ -208,7 +222,8 @@ def logs(request):
             "etype": etype,
             "event_types": event_types,
             "event_rows": event_rows,
-            "event_total": events_qs.count(),
+            "page_obj": page_obj,
+            "filter_qs": filter_qs,
             "by_kind": by_kind,
             "totals": totals,
             "most_served": served.most_common(10),

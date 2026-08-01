@@ -99,10 +99,40 @@ def _guides_nav_section(active: str) -> dict[str, Any]:
     return {"label": "Guides", "items": items}
 
 
+def _server_nav_section() -> dict[str, Any]:
+    """The cross-app pivot back to the ops UI.
+
+    Mirrors the ops sidebar's "Public" section, which points the other
+    way. It lived in the topbar until the docs topbar went mobile-only —
+    on desktop that bar held this one link, so the link moved rather
+    than disappearing.
+
+    Staff-only, which is what `build_top_links` always claimed ("the
+    partial hides the link when the user is anon") and the topbar
+    partial never actually did: /docs/ is public, and an anonymous
+    reader following this only reaches a login redirect.
+    """
+    return {
+        "label": "Server",
+        "items": [
+            {
+                "label": "Dashboard",
+                "url": _safe_url("dashboard"),
+                "icon": "dashboard",
+                "active": False,
+                "badge": 0,
+            },
+        ],
+    }
+
+
 def build_nav_sections(
-    active: str, *, hidden_slugs: frozenset[str] = frozenset()
+    active: str,
+    *,
+    hidden_slugs: frozenset[str] = frozenset(),
+    is_staff: bool = False,
 ) -> list[dict[str, Any]]:
-    return [
+    sections = [
         {
             "label": "",
             "items": [
@@ -118,14 +148,21 @@ def build_nav_sections(
         _endpoint_nav_section(active, hidden_slugs=hidden_slugs),
         _guides_nav_section(active),
     ]
+    if is_staff:
+        sections.append(_server_nav_section())
+    return sections
 
 
-def build_top_links() -> list[dict[str, Any]]:
-    """Topbar nav links — `Dashboard` jump-back + `Sign in` shows for
-    anonymous users on the topbar already (via the partial). The
-    docs-side topbar surfaces the cross-app pivot to /dashboard/ for
-    authed users; the partial hides the link when the user is anon
-    (no harm — it'd 302 to /auth/login/ anyway)."""
+def build_top_links(*, is_staff: bool = False) -> list[dict[str, Any]]:
+    """Topbar nav links — the mobile-only bar's copy of the ops pivot.
+
+    The old docstring here claimed "the partial hides the link when the
+    user is anon"; it never did, so every public visitor was offered a
+    link that only 302s to the login page. Gating happens here now, and
+    matches the sidebar's "Server" section so the same visitor sees the
+    same nav on both sides of the `lg` breakpoint."""
+    if not is_staff:
+        return []
     return [
         {"label": "Dashboard", "url": _safe_url("dashboard"), "active": False},
     ]
@@ -145,8 +182,10 @@ def build_layout_context(request, *, active: str) -> dict[str, Any]:
         except Exception:
             hidden = frozenset()
     return {
-        "docs_nav_sections": build_nav_sections(active, hidden_slugs=hidden),
-        "docs_top_links": build_top_links(),
+        "docs_nav_sections": build_nav_sections(
+            active, hidden_slugs=hidden, is_staff=is_staff
+        ),
+        "docs_top_links": build_top_links(is_staff=is_staff),
         "active_section": active,
     }
 

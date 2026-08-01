@@ -58,7 +58,13 @@
               href="{% url 'docs:endpoint-detail' card.slug %}"
               data-blob="{{ card.search_blob }}"
               x-show="matches('{{ card.search_blob|escapejs }}')"
-              class="block rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-brand-700"
+              {% comment %}
+                min-w-0 on the GRID ITEM: the truncating slug below reports its
+                full nowrap width as min-content, the single-column mobile track
+                adopts it, and every card widens past the viewport (408px at 375).
+                min-w-0 on the inner flex row alone does not stop the propagation.
+              {% endcomment %}
+              class="block min-w-0 rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-brand-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-brand-700"
             >
               <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0">

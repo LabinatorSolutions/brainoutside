@@ -7,6 +7,7 @@
     {{ rows|length }} of {{ total }} entities — the index as the server sees it (full private view).
   </p>
 {% endblock %}
+{% block content_width %}max-w-[1600px]{% endblock %}
 
 {% block content %}
   <form method="get" class="card mb-4 flex flex-wrap items-end gap-3 p-4">

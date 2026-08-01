@@ -62,6 +62,9 @@ def ops_context(request) -> dict:
             "label": "Public",
             "items": [
                 {"label": "API docs", "icon": "docs", "url": "/docs/"},
+                # The raw machine probe. Lived in the topbar; the topbar
+                # is mobile-only now, so desktop reaches it from here.
+                {"label": "Health probe", "icon": "health", "url": "/readyz"},
             ],
         },
     ]

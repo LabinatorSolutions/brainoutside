@@ -16,7 +16,8 @@
   {% include "partials/_sidebar.html" with nav_sections=ops_nav_sections %}
 
   <div class="lg:ps-64">
-    {% include "partials/_topbar.html" with title=APP_NAME nav_links=ops_top_links show_drawer=True %}
+    {# Mobile-only: it carries the drawer toggle; on lg+ content starts at the top. #}
+    {% include "partials/_topbar.html" with title=APP_NAME nav_links=ops_top_links show_drawer=True topbar_class="lg:hidden" %}
 
     <main id="main-content" class="px-4 py-6 sm:px-6 lg:px-8 lg:py-8" role="main">
       {# Pages override content_width when max-w-4xl is too tight. #}

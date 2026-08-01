@@ -3,7 +3,8 @@
   dashboard/account/i18n routes this app doesn't mount). Included by the
   docs layout with: title, nav_links, show_drawer.
 {% endcomment %}
-<header class="sticky top-0 z-30 border-b border-line bg-surface" role="banner">
+{# topbar_class: layout extras — ops passes lg:hidden (sidebar is the chrome there). #}
+<header class="sticky top-0 z-30 border-b border-line bg-surface {{ topbar_class|default:'' }}" role="banner">
   <div class="flex h-14 items-center gap-4 px-4 sm:px-6 lg:px-8">
     {% if show_drawer %}
       <button type="button" class="lg:hidden" aria-label="Open navigation"

@@ -13,6 +13,7 @@ from collections import Counter
 import markdown as md
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -53,6 +54,30 @@ def dashboard(request):
 
     reads_day = Event.objects.filter(type="read", created_at__gte=day_ago).count()
     reads_week = Event.objects.filter(type="read", created_at__gte=week_ago).count()
+
+    # 14-day read counts, pre-baked into SVG polyline points (a 100×28
+    # viewBox, 1px padding) — the template can't do arithmetic and the
+    # CSP forbids style= widths, so geometry is computed here.
+    spark_days = 14
+    spark_start = (now - dt.timedelta(days=spark_days - 1)).date()
+    per_day = {
+        row["d"]: row["n"]
+        for row in Event.objects.filter(
+            type="read", created_at__date__gte=spark_start
+        )
+        .annotate(d=TruncDate("created_at"))
+        .values("d")
+        .annotate(n=Count("id"))
+    }
+    series = [
+        per_day.get(spark_start + dt.timedelta(days=i), 0)
+        for i in range(spark_days)
+    ]
+    peak = max(series) or 1
+    reads_spark = " ".join(
+        f"{i * 100 / (spark_days - 1):.1f},{27 - (v / peak) * 24:.1f}"
+        for i, v in enumerate(series)
+    )
 
     served = Counter()
     for ids in Event.objects.filter(
@@ -120,6 +145,7 @@ def dashboard(request):
             "stale_after": STALE_AFTER_DAYS,
             "reads_day": reads_day,
             "reads_week": reads_week,
+            "reads_spark": reads_spark,
             "most_served": most_served,
             "spend_day": spend(day_ago),
             "spend_week": spend(week_ago),

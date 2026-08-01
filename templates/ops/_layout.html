@@ -21,11 +21,15 @@
     <main id="main-content" class="px-4 py-8 sm:px-6 lg:px-8" role="main">
       {# Pages override content_width when max-w-4xl is too tight. #}
       <div class="mx-auto {% block content_width %}max-w-4xl{% endblock %}">
-        <header class="mb-6">
-          <h1 class="page-title">
-            {% block page_title %}Ops{% endblock %}
-          </h1>
-          {% block page_subtitle %}{% endblock %}
+        {# page_actions: status chips / actions on the title line. #}
+        <header class="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 class="page-title">
+              {% block page_title %}Ops{% endblock %}
+            </h1>
+            {% block page_subtitle %}{% endblock %}
+          </div>
+          {% block page_actions %}{% endblock %}
         </header>
 
         {% include "partials/_flash.html" %}

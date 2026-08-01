@@ -408,6 +408,7 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
   }
   .card-header {
     @apply flex items-center justify-between gap-3 px-4 py-3;
@@ -530,10 +531,14 @@
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
   }
   .stat-value {
     @apply text-2xl font-semibold leading-none;
     font-family: var(--font-display);
+    /* Digits on a grid: values in a KPI row line up and don't jitter
+       when they tick over. */
+    font-variant-numeric: tabular-nums;
   }
   .stat-label {
     @apply text-xs uppercase tracking-wide;
@@ -605,6 +610,24 @@
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
     font-weight: 500;
+  }
+
+  /* ----- Sparkline (stat tiles) -----
+   * Geometry comes pre-baked from the view as polyline points in a
+   * 100×28 viewBox; preserveAspectRatio=none stretches it to the tile
+   * and non-scaling-stroke keeps the line hairline-crisp. */
+  .spark {
+    display: block;
+    width: 100%;
+    height: 28px;
+  }
+  .spark-line {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
   }
 
   /* ----- Kind-coloured micro-bar (entity mix and ranked lists) -----

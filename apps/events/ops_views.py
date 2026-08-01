@@ -12,9 +12,11 @@ from __future__ import annotations
 import json
 from collections import Counter
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -49,11 +51,22 @@ def tasks(request):
     except Exception:  # broker down — the page still renders
         pass
 
-    q_tasks = []
+    # Both ledgers grow without bound, so both paginate at 50. Separate
+    # page params (`page` / `wpage`) because they live on one page; each
+    # nav preserves the other's position. `worker_page` is None (not an
+    # empty page) when django_q's table can't be read — the template
+    # tells those two states apart.
+    recent_page = Paginator(
+        SdkOperation.objects.filter(ok__isnull=False), 50
+    ).get_page(request.GET.get("page"))
+
+    worker_page = None
     try:
         from django_q.models import Task
 
-        q_tasks = list(Task.objects.order_by("-started")[:15])
+        worker_page = Paginator(Task.objects.order_by("-started"), 50).get_page(
+            request.GET.get("wpage")
+        )
     except Exception:
         pass
 
@@ -76,11 +89,12 @@ def tasks(request):
         "ops/tasks.html",
         {
             "running": running,
-            "recent": SdkOperation.objects.filter(ok__isnull=False)[:25],
+            "recent_page": recent_page,
             "extracting": extracting,
             "approving": approving,
             "queue_depth": queue_depth,
-            "q_tasks": q_tasks,
+            "worker_page": worker_page,
+            "worker_page_num": worker_page.number if worker_page else 1,
             "ops_jobs": ops_job_rows,
             "busy": busy,
             **ops_context(request),

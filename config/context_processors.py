@@ -1,11 +1,16 @@
 """Template context processors that inject project-wide values."""
 from django.conf import settings
 from django.http import HttpRequest
+from django.urls import NoReverseMatch, reverse
 
 
-def app_meta(_request: HttpRequest) -> dict[str, object]:
+def app_meta(request: HttpRequest) -> dict[str, object]:
     """Expose `APP_NAME` (and later DEBUG / version) to every template."""
     return {
+        # Where the sidebar/topbar wordmark points. Both partials had
+        # `/docs/` hardcoded, so clicking the brand inside the ops UI
+        # navigated OUT to the public API reference.
+        "brand_url": _brand_url(request),
         # Operator-editable on /ops/settings/, falling back to the env
         # value. `app_name()` swallows DB errors, so a page still renders
         # branded when the database is what's broken.
@@ -23,6 +28,31 @@ def app_meta(_request: HttpRequest) -> dict[str, object]:
         # "Dev login (skip 2FA)" button when set; always False in prod.
         "dev_login_enabled": _dev_login_enabled(),
     }
+
+
+def _brand_url(request: HttpRequest) -> str:
+    """The brand's destination: the ops dashboard for the operator.
+
+    Staff-gated for the same reason the docs "Server" pivot is: /ops/ is
+    session-authed, so pointing a public reader's logo at it would send
+    them to a login page. Anonymous visitors keep the docs home, which
+    is where the hardcoded link went before — no regression for them.
+
+    Reverse failures fall back rather than 500ing: this runs on EVERY
+    template render, including the error pages, where a broken urlconf
+    is a plausible reason we got there at all. `request.user` is absent
+    when auth middleware hasn't run (hand-built requests in tests).
+    """
+    user = getattr(request, "user", None)
+    if user is not None and user.is_authenticated and user.is_staff:
+        try:
+            return reverse("brainconfig:dashboard")
+        except NoReverseMatch:
+            pass
+    try:
+        return reverse("docs:index")
+    except NoReverseMatch:
+        return "/"
 
 
 def _app_name() -> str:

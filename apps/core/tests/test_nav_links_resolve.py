@@ -13,6 +13,7 @@ and read `request.user` flags.
 """
 from __future__ import annotations
 
+from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory
 from django.urls import reverse
 
@@ -54,6 +55,23 @@ def test_docs_nav_has_no_dead_links():
     assert rows, "docs nav built empty"
     dead = [label for label, url in rows if not url or url == "#"]
     assert not dead, f"docs nav links that reverse to '#': {dead}"
+
+
+def test_brand_url_takes_staff_to_the_dashboard_and_readers_to_docs():
+    """The wordmark had `/docs/` hardcoded in both shell partials, so
+    clicking the brand inside the ops UI navigated out to the public
+    API reference."""
+    from config.context_processors import app_meta
+
+    staff = app_meta(_staff_request("/ops/"))["brand_url"]
+    assert staff == reverse("brainconfig:dashboard")
+
+    anon_request = RequestFactory().get("/docs/")
+    anon_request.user = AnonymousUser()
+    assert app_meta(anon_request)["brand_url"] == reverse("docs:index")
+
+    # No auth middleware (error pages, hand-built requests): still resolves.
+    assert app_meta(RequestFactory().get("/"))["brand_url"] == reverse("docs:index")
 
 
 def test_docs_dashboard_pivot_points_at_the_ops_dashboard():

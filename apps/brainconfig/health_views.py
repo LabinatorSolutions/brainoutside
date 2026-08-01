@@ -22,9 +22,13 @@ def health_page(request):
         return _act(request)
 
     checks = health.all_checks(request)
+    problems = health.problems(checks)
     return render(request, "ops/health.html", {
         "checks": checks,
-        "problems": health.problems(checks),
+        "problems": problems,
+        "passing": [c for c in checks if c["level"] not in ("danger", "warn")],
+        "n_danger": sum(1 for c in problems if c["level"] == "danger"),
+        "n_warn": sum(1 for c in problems if c["level"] == "warn"),
         "jobs": jobs.active(),
         "runnable": maintenance.RUNNABLE,
         "repo_url": gitrepo.configured_url(),

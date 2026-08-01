@@ -46,13 +46,13 @@
     return node;
   }
 
-  /* Colour rides on a CSS class (rings.css maps .rings-kind-* onto the
-     --viz-* tokens), NOT on fill attributes: the theme toggle then
+  /* Colour rides on a CSS class (.viz-kind-*, compiled app.css, from
+     the --viz-* tokens), NOT on fill attributes: the theme toggle then
      recolours an already-drawn SVG for free, and the palette stays a
      one-file edit in tokens.css. Unknown kinds get no class and fall
      back to the catalog slot via the CSS var() default. */
   function kindClass(kind) {
-    return VIZ.KIND_ORDER.indexOf(kind) === -1 ? "" : " rings-kind-" + kind;
+    return VIZ.KIND_ORDER.indexOf(kind) === -1 ? "" : " viz-kind-" + kind;
   }
 
   function dotRadius(reads) {

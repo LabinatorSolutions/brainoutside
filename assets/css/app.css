@@ -487,6 +487,13 @@
     border-color: var(--line);
     color: var(--muted);
   }
+  /* The private tier: protected, not broken. Red implies a problem;
+   * ink matches the rings' private core. */
+  .badge-ink {
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+    border-color: color-mix(in srgb, var(--ink) 35%, transparent);
+    color: var(--ink);
+  }
 
   /* ----- Status dots ----- */
   .dot { @apply inline-block h-2 w-2 shrink-0 rounded-pill; }
@@ -656,10 +663,29 @@
     vector-effect: non-scaling-stroke;
   }
 
-  /* ----- Kind-coloured micro-bar (entity mix and ranked lists) -----
-   * Reads the --kind-color custom property the .rings-kind-* classes
-   * set (rings.css), so a bar and the dot it summarises can never
-   * disagree. Falls back to the accent for rows with no kind class. */
+  /* ----- Entity-kind colours -----
+   * One class per kind carries the categorical colour as a custom
+   * property; bars, dots, ring dots and legend swatches all read
+   * --kind-color, so two views of the same kind can never disagree.
+   * Values are the validated --viz-* tokens (tokens.css, both themes).
+   * Lived in rings.css originally; promoted here so every page gets
+   * them without loading the rings bundle. */
+  .viz-kind-identity { --kind-color: var(--viz-identity); }
+  .viz-kind-project  { --kind-color: var(--viz-project); }
+  .viz-kind-take     { --kind-color: var(--viz-take); }
+  .viz-kind-story    { --kind-color: var(--viz-story); }
+  .viz-kind-lesson   { --kind-color: var(--viz-lesson); }
+  .viz-kind-fact     { --kind-color: var(--viz-fact); }
+  .viz-kind-lens     { --kind-color: var(--viz-lens); }
+  .viz-kind-catalog  { --kind-color: var(--viz-catalog); }
+
+  /* Kind-coloured dot (pairs with the .dot base class). */
+  .dot-kind {
+    background: var(--kind-color, var(--muted));
+  }
+
+  /* Kind-coloured micro-bar (entity mix and ranked lists). Falls back
+   * to the accent for rows with no kind class. */
   .viz-bar {
     fill: var(--kind-color, var(--accent));
     opacity: 0.75;

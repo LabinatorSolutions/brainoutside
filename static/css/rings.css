@@ -53,20 +53,11 @@
 }
 
 /* ---- Kind colours ----
-   One class per entity kind carries the categorical colour as a custom
-   property; dot fill, hollow stroke, ping halo and legend swatch all
-   read it. The values live in tokens.css (light AND dark sets), so the
-   theme toggle recolours a drawn SVG with no JS redraw. Unknown kinds
-   fall back to the catalog slot via var()'s second argument. */
-.rings-kind-identity { --kind-color: var(--viz-identity); }
-.rings-kind-project  { --kind-color: var(--viz-project); }
-.rings-kind-take     { --kind-color: var(--viz-take); }
-.rings-kind-story    { --kind-color: var(--viz-story); }
-.rings-kind-lesson   { --kind-color: var(--viz-lesson); }
-.rings-kind-fact     { --kind-color: var(--viz-fact); }
-.rings-kind-lens     { --kind-color: var(--viz-lens); }
-.rings-kind-catalog  { --kind-color: var(--viz-catalog); }
-
+   The .viz-kind-* classes (compiled app.css, from the --viz-* tokens
+   in tokens.css) put the categorical colour in --kind-color; dot fill,
+   hollow stroke, ping halo and legend swatch all read it, so the theme
+   toggle recolours a drawn SVG with no JS redraw. Unknown kinds fall
+   back to the catalog slot via var()'s second argument. */
 .rings-dot {
   cursor: pointer;
   transition: opacity 0.12s ease;

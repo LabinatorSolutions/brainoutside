@@ -14,18 +14,21 @@
       {{ APP_NAME }}
     </a>
   </div>
-  <nav class="px-2 pb-8">
+  <nav class="px-3 pb-8">
     {% for section in nav_sections %}
-      <div class="mt-4">
-        <div class="px-2 text-xs font-medium uppercase tracking-wide text-muted">
+      <div class="mt-6 first:mt-4">
+        <div class="px-2.5 text-xs font-medium uppercase tracking-wider text-muted">
           {{ section.label }}
         </div>
-        <ul class="mt-1">
+        <ul class="mt-1.5 space-y-0.5">
           {% for item in section.items %}
             <li>
               <a href="{{ item.url }}"
                  class="nav-item{% if item.active %} nav-item-active{% endif %}"
-                 {% if item.active %}aria-current="page"{% endif %}>{{ item.label }}</a>
+                 {% if item.active %}aria-current="page"{% endif %}>
+                {% if item.icon %}{% include "partials/_nav_icon.html" with name=item.icon %}{% endif %}
+                <span class="truncate">{{ item.label }}</span>
+              </a>
             </li>
           {% endfor %}
         </ul>

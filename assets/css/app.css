@@ -600,7 +600,7 @@
    * `item.active`; nav.py starts setting that flag in M5.6.3, which is
    * when the sidebar finally shows where you are. */
   .nav-item {
-    @apply block rounded-control px-2 py-1.5 text-sm;
+    @apply flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm;
     color: var(--ink);
   }
   .nav-item:hover {
@@ -610,6 +610,20 @@
     background: color-mix(in srgb, var(--accent) 12%, transparent);
     color: var(--accent);
     font-weight: 500;
+  }
+  /* Icons sit quieter than their labels until the row earns attention:
+   * muted at rest, ink on hover, accent when active (kept through
+   * hover — the later rule outranks the hover one on purpose). */
+  .nav-item .nav-icon {
+    @apply shrink-0;
+    color: var(--muted);
+  }
+  .nav-item:hover .nav-icon {
+    color: var(--ink);
+  }
+  .nav-item-active .nav-icon,
+  .nav-item-active:hover .nav-icon {
+    color: var(--accent);
   }
 
   /* ----- Drawer scrim -----

@@ -39,27 +39,29 @@ def _mark_active(sections: list[dict], path: str) -> None:
 def ops_context(request) -> dict:
     settings_url = reverse("brainconfig:settings")
     base = settings_url.rsplit("settings/", 1)[0]
+    # `icon` names resolve in templates/partials/_nav_icon.html; items
+    # without one (the docs endpoint catalog) render label-only.
     sections = [
         {
             "label": "Ops",
             "items": [
-                {"label": "Dashboard", "url": reverse("brainconfig:dashboard")},
-                {"label": "Brain browser", "url": reverse("brainconfig:browser")},
-                {"label": "Graph", "url": reverse("brainconfig:graph")},
-                {"label": "Timeline", "url": reverse("brainconfig:timeline")},
-                {"label": "Feed queue", "url": reverse("brainconfig:feeds")},
-                {"label": "Chat", "url": reverse("brainconfig:chat")},
-                {"label": "Tasks", "url": reverse("brainconfig:tasks")},
-                {"label": "Logs", "url": reverse("brainconfig:logs")},
-                {"label": "API keys", "url": reverse("brainconfig:consumers")},
-                {"label": "Settings", "url": settings_url},
-                {"label": "Setup & health", "url": reverse("brainconfig:health")},
+                {"label": "Dashboard", "icon": "dashboard", "url": reverse("brainconfig:dashboard")},
+                {"label": "Brain browser", "icon": "browser", "url": reverse("brainconfig:browser")},
+                {"label": "Graph", "icon": "graph", "url": reverse("brainconfig:graph")},
+                {"label": "Timeline", "icon": "timeline", "url": reverse("brainconfig:timeline")},
+                {"label": "Feed queue", "icon": "feeds", "url": reverse("brainconfig:feeds")},
+                {"label": "Chat", "icon": "chat", "url": reverse("brainconfig:chat")},
+                {"label": "Tasks", "icon": "tasks", "url": reverse("brainconfig:tasks")},
+                {"label": "Logs", "icon": "logs", "url": reverse("brainconfig:logs")},
+                {"label": "API keys", "icon": "keys", "url": reverse("brainconfig:consumers")},
+                {"label": "Settings", "icon": "settings", "url": settings_url},
+                {"label": "Setup & health", "icon": "health", "url": reverse("brainconfig:health")},
             ],
         },
         {
             "label": "Public",
             "items": [
-                {"label": "API docs", "url": "/docs/"},
+                {"label": "API docs", "icon": "docs", "url": "/docs/"},
             ],
         },
     ]

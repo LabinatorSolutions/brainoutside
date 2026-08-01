@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -29,13 +30,23 @@ def consumers_page(request):
         _act(request)
         return redirect(request.path)
 
-    rows = consumers.rows(request.user)
+    all_rows = consumers.rows(request.user)
+    # Live keys first, dead ones sink. Rotation revokes a row every time
+    # it runs, so the revoked pile grows for the life of the install and
+    # would otherwise interleave with the keys you can still act on.
+    # list.sort is stable, so newest-first (from the API layer) survives
+    # within each band.
+    _rank = {"active": 0, "expired": 1, "revoked": 2}
+    all_rows.sort(key=lambda r: _rank.get(r["state"], 3))
+    page_obj = Paginator(all_rows, 50).get_page(request.GET.get("page"))
     return render(
         request,
         "ops/consumers.html",
         {
-            "rows": rows,
-            "active_count": sum(1 for r in rows if r["state"] == "active"),
+            "rows": page_obj.object_list,
+            "page_obj": page_obj,
+            "total": len(all_rows),
+            "active_count": sum(1 for r in all_rows if r["state"] == "active"),
             # Paired with the prose here rather than looked up in the
             # template: Django has no dict-by-key lookup without a custom
             # filter, and a filter is not worth writing for three strings.

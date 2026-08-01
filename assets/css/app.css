@@ -257,6 +257,44 @@
     @apply bg-brand-500/30;
   }
 
+  /* ----- Scrollbars -----
+   * The default is a ~17px chrome slab that ignores the theme: on the
+   * cream surface it reads as a grey seam beside the sidebar, and in
+   * dark mode Chromium paints it LIGHT, because `color-scheme: light
+   * dark` above hands the decision to the OS.
+   *
+   * Two mechanisms, because no single one covers every engine:
+   *   - `scrollbar-width`/`scrollbar-color` — the standard. Firefox and
+   *     Chromium 121+, which once these are set IGNORES the ::-webkit-
+   *     pseudo-elements entirely.
+   *   - `::-webkit-scrollbar` — Safari and older Chromium, and the only
+   *     way to get a rounded thumb and a hover state.
+   * Both resolve through --ink, so the thumb inverts with the theme and
+   * neither needs a `dark:` variant. `scrollbar-color` INHERITS, so
+   * setting it on html reaches every scroll container below — which is
+   * what lets the terminal-pane override further down work.
+   */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ink) 22%, transparent);
+    border-radius: var(--radius-pill);
+    /* A transparent border plus padding-box clipping is the only way to
+       inset a thumb — it reads as a floating pill with the surface
+       showing through, not a full-bleed bar. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--ink) 40%, transparent);
+    background-clip: padding-box;
+  }
+
   /* ----- App shell type + surface -----
    * Moved here from tokens.css in M5.6.0.2. These are RULES, and living
    * in an unlayered stylesheet meant they beat every Tailwind utility
@@ -761,6 +799,33 @@
     border-radius: var(--radius-control);
     font-family: var(--font-mono);
   }
+  /* The pane is dark in BOTH themes, so the inherited --ink thumb is
+     wrong in light mode — a near-black pill on a near-black pane. These
+     point at the fixed terminal scale like the pane itself does. */
+  .brain-ui .pane-terminal {
+    scrollbar-color: var(--c-ink-600) transparent;
+  }
+  .brain-ui .pane-terminal::-webkit-scrollbar-thumb {
+    background: var(--c-ink-600);
+    background-clip: padding-box;
+  }
+  .brain-ui .pane-terminal::-webkit-scrollbar-thumb:hover {
+    background: var(--c-ink-400);
+    background-clip: padding-box;
+  }
+
+  /* Markdown tables arrive from the guide renderer with no wrapper to
+     scroll inside — nothing to hang `.table-wrap` on — so a 5-column
+     table sets a min-content floor and pushes the whole PAGE sideways
+     on a phone (the auth guide measured 380px at a 375 viewport).
+     `display: block` is the standard fix: the table becomes its own
+     scroll box, so the overflow stays inside the table where the
+     reader expects it. */
+  .prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
 
   /* Code-block container — wraps Pygments-highlighted fenced blocks
      from the codehilite extension. The `.highlight` div is the outer
@@ -779,10 +844,11 @@
     @apply bg-transparent p-0 text-sm font-mono font-normal;
     color: inherit;
   }
-  .prose .highlight code::before,
-  .prose .highlight code::after {
-    content: none;
-  }
+  /* Was: `.prose .highlight code::before { content: none }`. That rule
+     never did anything — see the @layer utilities block below for why —
+     and the effect it was credited with actually comes from the
+     typography plugin's own `:where(pre code)` reset. Removed rather
+     than left as decoration. */
 
   /* Header strip: language label (left) + copy button (right). The
      JS prepends this to `.highlight`. Hidden when empty (no language
@@ -829,6 +895,43 @@
   }
   .code-copy-btn[data-copied="true"] .icon-check {
     display: inline-block;
+  }
+}
+
+/* ----- Overrides of the typography plugin -------------------------------
+ *
+ * These MUST live in `utilities`, not `components`, and that is the whole
+ * point of this block. The typography plugin emits its `prose` rules into
+ * the utilities layer; a later layer beats an earlier one no matter how
+ * specific the earlier selector is. The override below is (0,1,2) against
+ * the plugin's (0,1,1) — it still lost silently for as long as it sat in
+ * `components`, which is where the obvious place to put it is.
+ *
+ * What it fixes: the plugin decorates every inline <code> with a literal
+ * backtick before and after, so rendered markdown reads `/api/v1/*` in
+ * the guides and the endpoint catalog shows `assemble-context`. The
+ * backticks were markdown SOURCE syntax; the text already became a <code>
+ * element, and printing them again is just wrong. (The plugin resets its
+ * own decoration for `pre code`, which is why fenced blocks always looked
+ * right and inline spans did not.)
+ */
+@layer utilities {
+  .prose code::before,
+  .prose code::after {
+    content: none;
+  }
+
+  /* The same trap, and this one was an accessibility bug: the plugin
+     paints `pre` text zinc-200 because it assumes ITS pre background
+     (zinc-800). We make that background transparent so the Pygments
+     theme shows through — which in LIGHT mode is #f8f8f8, leaving code
+     samples at a measured 1.19:1. The `color: inherit` meant to fix it
+     has been sitting in `components`, losing to the plugin, since the
+     docs shipped; dark mode hid it because `html.dark .highlight` sets
+     a colour explicitly. */
+  .prose .highlight pre,
+  .prose .highlight code {
+    color: inherit;
   }
 }
 

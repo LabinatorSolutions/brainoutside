@@ -9,6 +9,7 @@
     Pick a lens to see exactly what that lens scopes; click a note to open it.
   </p>
 {% endblock %}
+{% block content_width %}max-w-[1600px]{% endblock %}
 
 {% block head_extra %}
   <link rel="stylesheet" href="{% static 'css/explorer.css' %}" />
@@ -22,19 +23,16 @@
   <div class="gx" data-graph-explorer
        data-graph-url="{% url 'brainconfig:graph-json' %}"
        data-activity-url="{% url 'brainconfig:activity-json' %}">
-    <div class="gx-bar">
-      <label class="gx-field">
-        <span class="gx-field-label">Lens</span>
-        <select class="gx-select" data-lens-picker>
+    <div class="card mb-4 flex flex-wrap items-end gap-3 p-3">
+      <label class="text-sm">
+        <span class="mb-1 block text-xs text-muted">Lens</span>
+        <select class="field-select" data-lens-picker>
           <option value="">no lens — whole brain</option>
         </select>
       </label>
-      <button type="button" class="gx-button" data-graph-reset>Reset view</button>
-      <div class="gx-field">
-        <span class="gx-field-label">Scope</span>
-        <div class="gx-scope" data-lens-scope></div>
-      </div>
-      <div class="ms-auto gx-status" data-graph-status>Reading the index…</div>
+      <button type="button" class="btn-ghost" data-graph-reset>Reset view</button>
+      <div class="gx-scope self-center" data-lens-scope></div>
+      <div class="ms-auto gx-status self-center" data-graph-status>Reading the index…</div>
     </div>
 
     <div class="gx-canvas" data-graph-canvas></div>

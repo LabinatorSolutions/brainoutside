@@ -45,8 +45,20 @@
     KIND_ORDER: KIND_ORDER,
     TOPIC_COLOR: "#b9b9c6",
 
+    /* Theme-aware: the --viz-* tokens (tokens.css) carry a separately
+       validated set per theme, so a canvas painted at draw time gets
+       the right palette for the theme it draws under. The hex map is
+       the fallback for unknown kinds and token-less contexts. */
     color: function (kind) {
-      return KIND_COLOR[kind] || FALLBACK_COLOR;
+      var fallback = KIND_COLOR[kind] || FALLBACK_COLOR;
+      try {
+        var token = getComputedStyle(document.documentElement)
+          .getPropertyValue("--viz-" + kind)
+          .trim();
+        return token || fallback;
+      } catch (err) {
+        return fallback;
+      }
     },
 
     kindRank: function (kind) {

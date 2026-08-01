@@ -9,48 +9,19 @@
 
 .gx-canvas {
   width: 100%;
-  height: 620px;
+  /* Grows with the viewport now the page is full-width; never so tall
+     the toolbar scrolls away, never letterboxed on a laptop. */
+  height: clamp(440px, 66vh, 780px);
   border: 1px solid var(--line);
   border-radius: var(--radius-control);
   background: var(--surface);
 }
 
-.gx-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.gx-field {
-  font-size: 13px;
-}
-.gx-field-label {
-  display: block;
-  font-size: 11px;
-  color: var(--muted);
-}
-.gx-select,
-.gx-button {
-  margin-top: 4px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  background: var(--surface-2);
-  color: var(--ink);
-  font-size: 13px;
-}
-.gx-button {
-  cursor: pointer;
-}
-.gx-button:hover {
-  border-color: var(--accent);
-}
-
 /* Reserve the caption's line even when empty. Otherwise picking a lens
    grows the toolbar, which shrinks the canvas, which makes the whole
-   graph jump under the cursor at the exact moment you're aiming at it. */
+   graph jump under the cursor at the exact moment you're aiming at it.
+   (The toolbar chrome itself is card + field-select + btn-ghost —
+   shared components, not gx-specific styles.) */
 .gx-scope {
   font-family: var(--font-mono);
   font-size: 12px;
@@ -144,6 +115,7 @@
   height: 9px;
   border-radius: 999px;
   display: inline-block;
+  background: var(--kind-color, var(--muted));
 }
 .gx-key-n {
   font-family: var(--font-mono);
@@ -157,7 +129,9 @@
   border-top-style: solid;
   display: inline-block;
 }
-.gx-edge-topic { border-top-color: #c9c9d4; }
-.gx-edge-project { border-top-color: #e8a07a; }
-.gx-edge-source { border-top-color: #9b7cc4; border-top-style: dashed; }
-.gx-edge-superseded { border-top-color: #c0392b; }
+/* Same tokens the canvas edges are painted from (explorer.js
+   edgePalette) — the key never lies about the picture. */
+.gx-edge-topic { border-top-color: var(--line); }
+.gx-edge-project { border-top-color: var(--viz-project); }
+.gx-edge-source { border-top-color: var(--accent-2); border-top-style: dashed; }
+.gx-edge-superseded { border-top-color: var(--danger-ink); }

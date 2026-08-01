@@ -15,14 +15,39 @@
 
   var VIZ = window.BrainViz;
 
-  var EDGE_STYLE = {
-    topic: { color: "#c9c9d4", width: 1, dashed: false },
-    project: { color: "#e8a07a", width: 1.6, dashed: false },
-    source: { color: "#9b7cc4", width: 1.2, dashed: true },
-    superseded: { color: "#c0392b", width: 1.6, dashed: false }
-  };
+  /* Cytoscape paints a canvas — CSS custom properties cannot reach into
+     it, so every colour is read from the theme tokens at draw time and
+     re-applied when the theme toggles (see applyTheme + the class
+     observer in draw()). Hardcoded hexes here were exactly how dark
+     mode ended up with light-grey topic boxes and glaring white edges. */
+  function themeTokens() {
+    var cs = getComputedStyle(document.documentElement);
+    function v(name, fallback) {
+      var val = cs.getPropertyValue(name).trim();
+      return val || fallback;
+    }
+    return {
+      surface: v("--surface", "#fffef7"),
+      surface2: v("--surface-2", "#faf8f5"),
+      line: v("--line", "rgba(26, 26, 46, 0.12)"),
+      muted: v("--muted", "#6b6b7b"),
+      accent: v("--accent", "#6366f1"),
+      accent2: v("--accent-2", "#9b7cc4"),
+      dangerInk: v("--danger-ink", "#c0392b"),
+      project: v("--viz-project", "#c9673a")
+    };
+  }
 
-  function nodeElements(data) {
+  function edgePalette(t) {
+    return {
+      topic: { color: t.line, width: 1, dashed: false },
+      project: { color: t.project, width: 1.6, dashed: false },
+      source: { color: t.accent2, width: 1.2, dashed: true },
+      superseded: { color: t.dangerInk, width: 1.6, dashed: false }
+    };
+  }
+
+  function nodeElements(data, t) {
     return data.nodes.map(function (n) {
       if (n.type === "topic") {
         return {
@@ -30,8 +55,7 @@
             id: n.id,
             type: "topic",
             label: n.label,
-            size: Math.min(46, 16 + n.size * 1.5),
-            color: VIZ.TOPIC_COLOR
+            size: Math.min(46, 16 + n.size * 1.5)
           }
         };
       }
@@ -50,16 +74,17 @@
           color: VIZ.color(n.kind),
           // Superseded notes are history, never a current position
           // (CLAUDE.md §6.6) — hollow here as on the rings.
-          fill: n.current ? VIZ.color(n.kind) : "#fffef7",
+          fill: n.current ? VIZ.color(n.kind) : t.surface,
           border: n.current ? 0 : 1.6
         }
       };
     });
   }
 
-  function edgeElements(data) {
+  function edgeElements(data, t) {
+    var palette = edgePalette(t);
     return data.edges.map(function (e, i) {
-      var style = EDGE_STYLE[e.type] || EDGE_STYLE.topic;
+      var style = palette[e.type] || palette.topic;
       return {
         data: {
           id: "e" + i,
@@ -74,75 +99,77 @@
     });
   }
 
-  var STYLE = [
-    {
-      selector: 'node[type="entity"]',
-      style: {
-        "background-color": "data(fill)",
-        "border-width": "data(border)",
-        "border-color": "data(color)",
-        width: "data(size)",
-        height: "data(size)",
-        label: "",
-        "transition-property": "opacity",
-        "transition-duration": "120ms"
+  function buildStyle(t) {
+    return [
+      {
+        selector: 'node[type="entity"]',
+        style: {
+          "background-color": "data(fill)",
+          "border-width": "data(border)",
+          "border-color": "data(color)",
+          width: "data(size)",
+          height: "data(size)",
+          label: "",
+          "transition-property": "opacity",
+          "transition-duration": "120ms"
+        }
+      },
+      {
+        selector: 'node[type="topic"]',
+        style: {
+          "background-color": t.surface2,
+          "background-opacity": 0.92,
+          "border-width": 1,
+          "border-color": t.line,
+          shape: "round-rectangle",
+          width: "data(size)",
+          height: 18,
+          label: "data(label)",
+          "font-size": 10,
+          "font-family": "JetBrains Mono, monospace",
+          color: t.muted,
+          "text-valign": "center",
+          "text-halign": "center"
+        }
+      },
+      {
+        selector: "edge",
+        style: {
+          "line-color": "data(color)",
+          width: "data(width)",
+          "line-style": "data(dash)",
+          "curve-style": "haystack",
+          opacity: 0.5
+        }
+      },
+      { selector: 'edge[type="superseded"]', style: { "curve-style": "bezier", "target-arrow-shape": "triangle", "target-arrow-color": "data(color)" } },
+      {
+        selector: "node.loose",
+        style: {
+          label: "data(label)",
+          "font-size": 9,
+          "font-family": "JetBrains Mono, monospace",
+          color: t.muted,
+          "text-halign": "right",
+          "text-valign": "center",
+          "text-margin-x": 7
+        }
+      },
+      { selector: ".dim", style: { opacity: 0.07 } },
+      { selector: ".pick", style: { "border-width": 3, "border-color": t.accent, opacity: 1 } },
+      // After .dim on purpose: a note being served right now is worth
+      // seeing even when the current lens has it dimmed out.
+      {
+        selector: ".pulse",
+        style: {
+          opacity: 1,
+          "border-width": 10,
+          "border-color": t.accent,
+          "border-opacity": 0.45
+        }
       }
-    },
-    {
-      selector: 'node[type="topic"]',
-      style: {
-        "background-color": "#ffffff",
-        "background-opacity": 0.85,
-        "border-width": 1,
-        "border-color": "data(color)",
-        shape: "round-rectangle",
-        width: "data(size)",
-        height: 18,
-        label: "data(label)",
-        "font-size": 10,
-        "font-family": "JetBrains Mono, monospace",
-        color: "#6b6b7b",
-        "text-valign": "center",
-        "text-halign": "center"
-      }
-    },
-    {
-      selector: "edge",
-      style: {
-        "line-color": "data(color)",
-        width: "data(width)",
-        "line-style": "data(dash)",
-        "curve-style": "haystack",
-        opacity: 0.5
-      }
-    },
-    { selector: 'edge[type="superseded"]', style: { "curve-style": "bezier", "target-arrow-shape": "triangle", "target-arrow-color": "data(color)" } },
-    {
-      selector: "node.loose",
-      style: {
-        label: "data(label)",
-        "font-size": 9,
-        "font-family": "JetBrains Mono, monospace",
-        color: "#6b6b7b",
-        "text-halign": "right",
-        "text-valign": "center",
-        "text-margin-x": 7
-      }
-    },
-    { selector: ".dim", style: { opacity: 0.07 } },
-    { selector: ".pick", style: { "border-width": 3, "border-color": "#4f46e5", opacity: 1 } },
-    // After .dim on purpose: a note being served right now is worth
-    // seeing even when the current lens has it dimmed out.
-    {
-      selector: ".pulse",
-      style: {
-        opacity: 1,
-        "border-width": 10,
-        "border-color": "#4f46e5",
-        "border-opacity": 0.45
-      }
-    }
-  ];
+    ];
+  }
 
   function mount(root) {
     var url = root.getAttribute("data-graph-url");
@@ -172,10 +199,11 @@
         data.counts.entities + " entities · " + data.counts.topics + " topics · " +
         data.counts.edges.total + " links";
 
+      var t0 = themeTokens();
       var cy = cytoscape({
         container: canvas,
-        elements: { nodes: nodeElements(data), edges: edgeElements(data) },
-        style: STYLE,
+        elements: { nodes: nodeElements(data, t0), edges: edgeElements(data, t0) },
+        style: buildStyle(t0),
         wheelSensitivity: 0.2,
         // Entities with no topics (catalogs, identity files) are their own
         // components; left to spread they push the connected core into a
@@ -214,6 +242,31 @@
 
       buildLegend(legend, data);
       buildPicker(picker, data);
+
+      /* Theme toggle = re-read the tokens and repaint in place. Data
+         colours (kind fill, hollow fill, edge colours) live on the
+         elements, so both the data and the stylesheet are rebuilt; the
+         layout is untouched. */
+      function applyTheme() {
+        var t = themeTokens();
+        var palette = edgePalette(t);
+        cy.batch(function () {
+          cy.nodes('[type="entity"]').forEach(function (n) {
+            var c = VIZ.color(n.data("kind"));
+            n.data("color", c);
+            n.data("fill", n.data("current") ? c : t.surface);
+          });
+          cy.edges().forEach(function (e) {
+            var s = palette[e.data("type")] || palette.topic;
+            e.data("color", s.color);
+          });
+        });
+        cy.style(buildStyle(t));
+      }
+      new MutationObserver(applyTheme).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"]
+      });
 
       var lensById = {};
       data.lenses.forEach(function (l) {
@@ -417,8 +470,11 @@
         var item = document.createElement("span");
         item.className = "gx-key-item";
         var swatch = document.createElement("span");
-        swatch.className = "gx-swatch";
-        swatch.style.background = VIZ.color(kind);
+        // Class-based colour (--kind-color via .viz-kind-*) so the
+        // HTML legend follows the theme live, like the rings legend.
+        swatch.className =
+          "gx-swatch" +
+          (VIZ.KIND_ORDER.indexOf(kind) === -1 ? "" : " viz-kind-" + kind);
         item.appendChild(swatch);
         item.appendChild(document.createTextNode(kind + " "));
         var n = document.createElement("span");

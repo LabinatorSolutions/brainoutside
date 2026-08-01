@@ -3,49 +3,80 @@
 {% block page_title_tag %}Chat · {{ session.tier }}{% endblock %}
 {% block page_title %}{{ session.title|default:"New session"|truncatechars:60 }}{% endblock %}
 {% block page_subtitle %}
-  <p class="mt-1 text-sm text-muted">
-    tier <span class="badge {% if session.tier == 'public' %}badge-ok{% elif session.tier == 'agents-only' %}badge-warn{% else %}badge-danger{% endif %}">{{ session.tier }}</span>
-    · {{ session.total_input_tokens }} / {{ session.total_output_tokens }} tokens
-    · every answer comes from this tier's snapshot only
-  </p>
+  {% comment %}
+    Meta as chips, matching the entity page's subtitle row. Tier colours
+    follow the browser mapping: public = ok, agents-only = info,
+    private = ink — red stays reserved for problems.
+  {% endcomment %}
+  <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+    <span class="badge {% if session.tier == 'public' %}badge-ok{% elif session.tier == 'private' %}badge-ink{% else %}badge-info{% endif %}">{{ session.tier }}</span>
+    <span class="rounded-pill border border-line bg-surface px-2 py-0.5 font-mono" title="session totals: input / output tokens">{{ session.total_input_tokens }} in / {{ session.total_output_tokens }} out</span>
+    {% if session.total_cost_usd %}<span class="rounded-pill border border-line bg-surface px-2 py-0.5 font-mono">${{ session.total_cost_usd|floatformat:4 }}</span>{% endif %}
+    <span class="text-muted">every answer comes from the {{ session.tier }} snapshot only</span>
+  </div>
 {% endblock %}
+{% block content_width %}max-w-[1600px]{% endblock %}
 
 {% block content %}
-  <div class="mb-4 flex items-center justify-between">
-    <a href="{% url 'brainconfig:chat' %}" class="text-sm text-muted">← all sessions</a>
-    <form method="post" onsubmit="return confirm('Delete this session and its messages?');">
-      {% csrf_token %}
-      <input type="hidden" name="action" value="delete" />
-      <button type="submit" class="text-xs text-danger-ink">delete session</button>
-    </form>
-  </div>
+  {% comment %}
+    The page opts into the full-width column like every polished ops page,
+    but the conversation keeps a reading measure: a 1500px line of prose
+    is unreadable, so thread + composer centre at max-w-4xl (the chrome —
+    title, meta chips — spans the page).
+  {% endcomment %}
+  <div class="mx-auto w-full max-w-4xl">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <a href="{% url 'brainconfig:chat' %}" class="text-sm text-muted">&larr; All sessions</a>
+      {# The confirm() lives in the nonce'd script below — an inline onsubmit= is refused by the enforced CSP and silently never ran. #}
+      <form id="delete-form" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete" />
+        <button type="submit" class="btn-danger-ghost btn-sm">Delete session</button>
+      </form>
+    </div>
 
-  <div id="thread" class="mb-4 grid gap-3">
-    {% for m in chat_messages %}
-      <div class="rounded-card border border-line p-4 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]
-                  {% if m.role == 'user' %}ml-12 bg-surface-2{% else %}mr-12 bg-surface{% endif %}">{{ m.content }}{% if m.error %}
-        <div class="mt-2 text-xs text-danger-ink">run error: {{ m.error }}</div>{% endif %}
-        {% if m.sources %}
-          <div class="mt-3 flex flex-wrap gap-1.5">
-            {% for s in m.sources %}
-              <a href="{% url 'brainconfig:entity' s.entity_id %}" class="rounded-full border px-2 py-0.5 text-xs border-line font-mono text-muted"
-                 title="visibility: {{ s.visibility }}{% if s.stale %} · STALE >45d{% endif %}">
-                {{ s.entity_id }}{% if s.stale %} ⚠{% endif %}
-              </a>
-            {% endfor %}
+    {% comment %}
+      Bubbles: the reader's answers are the content, so they wear .card
+      (surface + shadow) and sit left; your prompts recede on surface-2
+      and sit right. Content lives in a NESTED pre-wrap div — pre-wrap on
+      the bubble itself preserved template indentation inside the source
+      chips and stretched them across the bubble.
+    {% endcomment %}
+    <div id="thread" class="grid gap-3">
+      {% for m in chat_messages %}
+        <div class="{% if m.role == 'user' %}ml-12 rounded-card border border-line bg-surface-2 p-4{% else %}card mr-12 p-4{% endif %}">
+          <div class="flex items-baseline justify-between gap-3 text-xs text-muted">
+            <span class="font-medium uppercase tracking-wide">{% if m.role == 'user' %}You{% else %}Reader{% endif %}</span>
+            <span class="font-mono">{{ m.created_at|date:"M j, H:i" }}</span>
           </div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
+          <div class="mt-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]">{{ m.content }}</div>
+          {% if m.error %}<div class="mt-2 text-xs text-danger-ink">run error: {{ m.error }}</div>{% endif %}
+          {% if m.sources %}
+            <div class="mt-3 flex flex-wrap items-center gap-1.5">
+              <span class="text-xs text-muted">sources</span>
+              {% for s in m.sources %}<a href="{% url 'brainconfig:entity' s.entity_id %}" class="rounded-pill border border-line bg-surface px-2 py-0.5 text-xs font-mono text-muted transition-colors hover:border-accent/40" title="visibility: {{ s.visibility }}{% if s.stale %} · STALE >45d{% endif %}">{{ s.entity_id }}{% if s.stale %} ⚠{% endif %}</a>{% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% empty %}
+        <div id="thread-empty" class="empty-state">
+          <p class="empty-state-title">No turns yet</p>
+          <p class="max-w-md text-sm">
+            Ask the first question below — the reader agent answers from the
+            {{ session.tier }} snapshot, citing the files it actually opened.
+          </p>
+        </div>
+      {% endfor %}
+    </div>
 
-  <form id="send-form" class="flex items-end gap-3">
-    {% csrf_token %}
-    <textarea id="message" rows="3" placeholder="Ask the mind… (Ctrl/Cmd+Enter to send)"
-              class="grow rounded-xl border px-3 py-2 text-sm border-line bg-surface-2"></textarea>
-    <button id="send-btn" type="submit" class="btn-primary">Send</button>
-  </form>
-  <p class="mt-2 text-xs text-muted">Each turn runs the reader agent (5–30 s). Sources under each answer are the files the agent actually opened.</p>
+    <form id="send-form" class="mt-4 flex items-end gap-3">
+      {% csrf_token %}
+      <textarea id="message" rows="3" placeholder="Ask the mind… (Ctrl/Cmd+Enter to send)"
+                class="field-textarea grow"></textarea>
+      <button id="send-btn" type="submit" class="btn-primary">Send</button>
+    </form>
+    <p class="field-hint mt-2">Each turn runs the reader agent (5–30 s). Sources under each answer are the files the agent actually opened.</p>
+  </div>
 
   {% comment %}
     Nonce REQUIRED. Without it the enforced CSP refuses this whole block,
@@ -63,29 +94,54 @@
       const sendUrl = "{% url 'brainconfig:chat-send' session.pk %}";
       const entityUrlTpl = "{% url 'brainconfig:entity' 'EID' %}";
 
-      // Same classes the server-rendered bubbles use, so a streamed message
-      // and a reloaded one are indistinguishable and both follow the theme.
-      // (These were hand-set style properties duplicating the template.)
+      // Mirrors Django's date:"M j, H:i" so a streamed bubble and a
+      // reloaded one read the same (browser-local vs server TZ aside).
+      function stamp() {
+        const d = new Date();
+        return d.toLocaleString("en", { month: "short" }) + " " + d.getDate() + ", " +
+          String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+      }
+
+      // Same markup the server renders, so a streamed message and a
+      // reloaded one are indistinguishable and both follow the theme.
       function bubble(role) {
-        const d = document.createElement("div");
-        d.className =
-          "rounded-card border border-line p-4 text-sm whitespace-pre-wrap " +
-          "[overflow-wrap:anywhere] " +
-          (role === "user" ? "ml-12 bg-surface-2" : "mr-12 bg-surface");
-        thread.appendChild(d);
-        d.scrollIntoView({ block: "end" });
-        return d;
+        const empty = document.getElementById("thread-empty");
+        if (empty) empty.remove();
+        const root = document.createElement("div");
+        root.className = role === "user"
+          ? "ml-12 rounded-card border border-line bg-surface-2 p-4"
+          : "card mr-12 p-4";
+        const head = document.createElement("div");
+        head.className = "flex items-baseline justify-between gap-3 text-xs text-muted";
+        const who = document.createElement("span");
+        who.className = "font-medium uppercase tracking-wide";
+        who.textContent = role === "user" ? "You" : "Reader";
+        const when = document.createElement("span");
+        when.className = "font-mono";
+        when.textContent = stamp();
+        head.appendChild(who);
+        head.appendChild(when);
+        const body = document.createElement("div");
+        body.className = "mt-2 text-sm whitespace-pre-wrap [overflow-wrap:anywhere]";
+        root.appendChild(head);
+        root.appendChild(body);
+        thread.appendChild(root);
+        root.scrollIntoView({ block: "end" });
+        return { root: root, body: body };
       }
 
       function sources(el, list) {
         if (!list || !list.length) return;
         const wrap = document.createElement("div");
-        wrap.className = "mt-3 flex flex-wrap gap-1.5";
+        wrap.className = "mt-3 flex flex-wrap items-center gap-1.5";
+        const label = document.createElement("span");
+        label.className = "text-xs text-muted";
+        label.textContent = "sources";
+        wrap.appendChild(label);
         list.forEach(function (s) {
           const a = document.createElement("a");
           a.href = entityUrlTpl.replace("EID", encodeURIComponent(s.entity_id));
-          a.className =
-            "rounded-pill border border-line px-2 py-0.5 text-xs font-mono text-muted";
+          a.className = "rounded-pill border border-line bg-surface px-2 py-0.5 text-xs font-mono text-muted transition-colors hover:border-accent/40";
           a.title = "visibility: " + s.visibility + (s.stale ? " · STALE >45d" : "");
           a.textContent = s.entity_id + (s.stale ? " ⚠" : "");
           wrap.appendChild(a);
@@ -107,9 +163,9 @@
         btn.textContent = "Streaming…";
         input.disabled = true;
 
-        bubble("user").textContent = text;
+        bubble("user").body.textContent = text;
         const out = bubble("assistant");
-        out.textContent = "";
+        out.body.textContent = "";
 
         try {
           const body = new URLSearchParams({ message: text });
@@ -139,19 +195,19 @@
               if (!data) continue;
               const p = JSON.parse(data);
               if (ev === "delta") {
-                out.textContent += p.text;
-                out.scrollIntoView({ block: "end" });
+                out.body.textContent += p.text;
+                out.root.scrollIntoView({ block: "end" });
               } else if (ev === "done") {
-                sources(out, p.sources);
-                note(out, (p.model || "") + " · " + (p.tokens.input ?? "?") + "/" + (p.tokens.output ?? "?") + " tokens · " + Math.round((p.duration_ms || 0) / 1000) + "s", false);
+                sources(out.root, p.sources);
+                note(out.root, (p.model || "") + " · " + (p.tokens.input ?? "?") + "/" + (p.tokens.output ?? "?") + " tokens · " + Math.round((p.duration_ms || 0) / 1000) + "s", false);
               } else if (ev === "error") {
-                if (p.partial && !out.textContent) out.textContent = p.partial;
-                note(out, p.message, true);
+                if (p.partial && !out.body.textContent) out.body.textContent = p.partial;
+                note(out.root, p.message, true);
               }
             }
           }
         } catch (e) {
-          note(out, "stream failed: " + e.message, true);
+          note(out.root, "stream failed: " + e.message, true);
         } finally {
           btn.disabled = false;
           btn.textContent = "Send";
@@ -170,6 +226,17 @@
       input.addEventListener("keydown", function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") form.requestSubmit();
       });
+
+      // Destructive action gets a confirm — wired HERE because an inline
+      // onsubmit= attribute is dead under the enforced CSP (script-src
+      // carries no 'unsafe-hashes'): the old confirm never ran and the
+      // session deleted without asking.
+      const del = document.getElementById("delete-form");
+      if (del) {
+        del.addEventListener("submit", function (e) {
+          if (!window.confirm("Delete this session and its messages?")) e.preventDefault();
+        });
+      }
     })();
   </script>
 {% endblock %}

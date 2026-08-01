@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponseForbidden, StreamingHttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
@@ -13,6 +14,10 @@ from django.views.decorators.http import require_http_methods
 from apps.brainconfig.nav import ops_context
 
 from .models import ChatMessage, ChatSession
+
+# Sessions accumulate forever (a test bench is used daily); page like the
+# brain browser instead of silently truncating at an arbitrary slice.
+CHAT_PAGE_SIZE = 50
 
 
 @staff_member_required(login_url="login")
@@ -24,11 +29,15 @@ def chat_home(request):
             tier = "agents-only"
         session = ChatSession.objects.create(tier=tier)
         return redirect("brainconfig:chat-session", pk=session.pk)
+    # get_page clamps junk and out-of-range values instead of 404ing.
+    paginator = Paginator(ChatSession.objects.all(), CHAT_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
     return render(
         request,
         "ops/chat.html",
         {
-            "sessions": ChatSession.objects.all()[:50],
+            "sessions": list(page_obj),
+            "page_obj": page_obj,
             "tiers": [t for t, _ in ChatSession.TIERS],
             **ops_context(request),
         },

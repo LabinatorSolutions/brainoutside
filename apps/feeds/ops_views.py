@@ -8,9 +8,11 @@ approve/reject) land in M2.4 — for now the queue lists and inspects.
 from __future__ import annotations
 
 import json
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.http import Http404
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -58,11 +60,23 @@ def queue(request):
     feeds = Feed.objects.all()
     if f_status:
         feeds = feeds.filter(status=f_status)
+
+    # Page AFTER filtering; the filter form carries no `page` input, so
+    # changing the status naturally lands back on page 1. get_page clamps
+    # junk and out-of-range values instead of 404ing (browser pattern).
+    paginator = Paginator(feeds, 50)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    # Filters re-encoded WITHOUT `page`, so pager links compose as
+    # "?{filter_qs}&page=N" and never carry a stale page number.
+    filter_qs = urlencode({"status": f_status}) if f_status else ""
+
     return render(
         request,
         "ops/feeds.html",
         {
-            "feeds": feeds[:200],
+            "feeds": page_obj.object_list,
+            "page_obj": page_obj,
+            "filter_qs": filter_qs,
             "total": Feed.objects.count(),
             "pending_count": Feed.objects.filter(status="pending").count(),
             "statuses": [s for s, _ in Feed.STATUSES],

@@ -15,7 +15,8 @@
   <div class="mx-auto max-w-3xl">
 
     <div class="flex items-center gap-3">
-      <img src="{% static 'img/brain-hero.svg' %}" alt="" class="h-10 w-10" draggable="false" />
+      {# The mark, not the hero: at 40px the hero's synapse nodes are ~1px of mud. #}
+      {% include "partials/_brand_mark.html" with size="h-10 w-10" %}
       <h1 class="text-2xl font-bold tracking-tight font-display">
         Set up {{ APP_NAME }}
       </h1>

@@ -16,7 +16,7 @@
     {% endif %}
     {# lg:hidden — once the sidebar shows, it already carries the brand. #}
     <a href="{{ brand_url|default:'/docs/' }}" class="flex items-center gap-2 font-display font-semibold text-ink lg:hidden">
-      <span class="inline-block h-2.5 w-2.5 rounded-pill bg-accent"></span>
+      {% include "partials/_brand_mark.html" with size="h-5 w-5" %}
       {{ title|default:APP_NAME }}
     </a>
     <nav class="ms-auto flex items-center gap-4 text-sm">

@@ -11,7 +11,7 @@
   <div class="flex h-14 items-center border-b border-line px-4 font-display font-semibold">
     {# brand_url: the ops dashboard for staff, docs home for public readers. #}
     <a href="{{ brand_url|default:'/docs/' }}" class="flex items-center gap-2">
-      <span class="inline-block h-2.5 w-2.5 rounded-pill bg-accent"></span>
+      {% include "partials/_brand_mark.html" with size="h-5 w-5" %}
       {{ APP_NAME }}
     </a>
   </div>

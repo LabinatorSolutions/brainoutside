@@ -6,6 +6,21 @@
   <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}{{ APP_NAME }} — the online head of a git-backed mind.{% endblock %}" />
   <meta name="robots" content="noindex, nofollow" />
+  {% comment %}
+    Icons. There was no favicon at all, so every tab showed the browser's
+    blank-page glyph.
+
+    Order matters: the SVG comes first because browsers that support it
+    prefer it, and it is the only one that follows the OS light/dark
+    scheme (see the media query inside the file). The .ico is the
+    fallback for everything else and carries NATIVE 16/32/48 renders
+    rather than one image downscaled — at 16px a downscale turns the
+    fissure to grey mush. `sizes="any"` stops Chrome preferring the .ico
+    over the SVG.
+  {% endcomment %}
+  <link rel="icon" href="{% static 'img/brain-mark.svg' %}" type="image/svg+xml" sizes="any" />
+  <link rel="icon" href="{% static 'favicon.ico' %}" sizes="16x16 32x32 48x48" />
+  <link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}" />
   <link rel="stylesheet" href="{% static 'css/tokens.css' %}" />
   <link rel="stylesheet" href="{% static 'css/tw.css' %}" />
   <script defer src="{% static 'vendor/alpine.min.js' %}" nonce="{{ csp_nonce }}"></script>

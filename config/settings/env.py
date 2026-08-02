@@ -362,9 +362,15 @@ class Settings(BaseSettings):
     #   - the dashboard "URL tokens" page is hidden;
     #   - already-minted tokens stop authenticating (the proxy view
     #     refuses to dispatch them).
-    # Default True per the PLAN2 locked decision — operators with
-    # stricter policies (header-auth only) flip to False in env.
-    MCP_URL_AUTH_ENABLED: bool = True
+    # Default False here, inverting the PLAN2 default: the token app
+    # (`apps.url_mcp_tokens`) is not vendored yet, so the surface resolves
+    # ordinary `mcpsk_` bearer keys from the path. That is enough to test
+    # a Claude.ai custom connector and NOT enough to run, because the
+    # prefix lockout only covers `mcpurl_*` (see
+    # `apps.core.security.lockout.extract_url_token_prefix`) and nothing
+    # scrubs the token out of `request.path` before the access log.
+    # On until you have a reason means a credential in your logs.
+    MCP_URL_AUTH_ENABLED: bool = False
     # Default TTL applied by the dashboard mint flow when the user picks
     # "default". 90d matches the PLAN2 spec; operators can lower for
     # stricter rotation. The mint flow always allows shorter/longer

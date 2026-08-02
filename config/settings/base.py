@@ -208,9 +208,12 @@ MCP_LOOPBACK_PORT = _env.MCP_LOOPBACK_PORT
 MCP_LOOPBACK_SECRET = (
     _env.MCP_LOOPBACK_SECRET.get_secret_value() if _env.MCP_LOOPBACK_SECRET else ""
 )
-# URL-path MCP tokens are NOT vendored — hard off so the proxy view's
-# url-token branch (lazy import of apps.url_mcp_tokens) can never fire.
-MCP_URL_AUTH_ENABLED = False
+# URL-path MCP tokens are half-vendored: the proxy view's url-token
+# branch and the lockout gate are here, `apps.url_mcp_tokens` is not.
+# The branch survives that — its only import of the missing app is the
+# `record_use` call, inside a try/except. Env-driven and off by default
+# (see the field in env.py for why on is not a resting state).
+MCP_URL_AUTH_ENABLED = _env.MCP_URL_AUTH_ENABLED
 # OAuth flows are not vendored; issuer is still announced in 401 hints.
 OAUTH_ISSUER = _env.OAUTH_ISSUER.rstrip("/")
 MCP_OAUTH_DCR_MODE = "off"

@@ -13,6 +13,37 @@ limitation waiting to be fixed.
 > experience described in [`docs/SETUP-DESIGN.md`](docs/SETUP-DESIGN.md)
 > is being implemented before the public beta.
 
+## Where this came from
+
+This project grew out of [Andrej Karpathy's llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+and the wave of markdown knowledge bases around it. The core insight
+there is right, and it is the foundation this builds on: plain markdown
+plus a coding agent beats RAG for personal knowledge — compile
+knowledge in at ingestion time and the artifact compounds, instead of
+being re-assembled from chunks on every query.
+
+Building mine, I kept hitting four walls, and they became this project:
+
+- **A wiki holds knowledge, not you.** An agent could recall from mine,
+  but it couldn't *write as me* — there was no identity, no voice, no
+  beliefs in it. Here `identity/` is first-class, and the note kinds
+  (`take`, `story`, `lesson`, `fact`) are shaped for creating content,
+  not just referencing it.
+- **No safe way to grow.** A wiki that maintains itself fills up with
+  unreviewed extractions, and a brain you don't trust is a brain you
+  stop using. Here every write is gated: agents propose, you approve,
+  approval is one signed commit.
+- **Recall isn't the point — creation is.** I built this to *make
+  things* from my brain — replies, posts, scripts — in my own voice.
+  Lenses and context packs turn the brain into a writing instrument.
+- **A local folder serves one tool on one machine.** I wanted every
+  agent I run, anywhere, to read my mind. That is this server: the
+  brain's online head — self-hosted, private, with visibility tiers
+  enforced server-side.
+
+The llm-wiki was not the only influence; if you recognize your project
+in this lineage and want a link here, open an issue.
+
 ## Why not just use a vector database
 
 Because you cannot read one. Your brain here is plain markdown in a

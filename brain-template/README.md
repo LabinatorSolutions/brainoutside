@@ -67,3 +67,15 @@ show the shape; the app ignores them when indexing.
 
 Run the eval in `eval/` once you have ~10 notes. If retrieval doesn't
 visibly improve your agents' output, fix the notes before adding more.
+
+## Lineage
+
+This design descends from [Andrej Karpathy's llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+idea — plain markdown that a coding agent compiles knowledge into, so
+the artifact compounds instead of being re-retrieved per query. The
+template adds what a wiki doesn't have: identity and voice as
+first-class files (so agents can write *as* you, not just recall),
+content-shaped note kinds, and a hard human gate on every write. And
+when you want this brain readable by every agent you run — not just
+the one on this machine — [BrainOutside](https://brainoutside.com) is
+its online head.

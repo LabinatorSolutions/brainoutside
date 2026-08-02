@@ -259,8 +259,8 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Repo hygiene (5.5)
 
-- [x] History audit — **CLEAN; publish with full history** (run
-      2026-08-02: 109 commits, single branch, no tags, no stash).
+- [x] History audit — **CLEAN** (run 2026-08-02: 109 commits, single
+      branch, no tags, no stash).
       Method: full `git log --all -p` dump grepped for key shapes
       (`sk-ant`/`ghp_`/`github_pat_`/`AKIA`/`AIza`/`xox*`/`glpat`),
       private-key blocks, and secret-shaped `X=<long-value>`
@@ -271,11 +271,17 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       brain content ever landed. All IP-shaped strings are example.com
       / TEST-NET test fixtures. Personal *references* in docs and old
       code versions exist and are acceptable per the 5.1 rule.
-      **One open decision:** all 109 commits are authored
-      `hassan.cs91@gmail.com` — publishing makes that address
-      permanently public. Rewriting authorship is a full-history
-      rewrite (all hashes change), cheap only while the repo is
-      private. NOT verified: nothing — every claim above was
+      **Decided 2026-08-02: publish with FRESH history anyway.** All
+      109 commits carry the personal commit email; fresh history closes
+      that categorically instead of via rewrite, clean-by-construction
+      beats clean-by-grep for a privacy-branded project, and the
+      private-era log had no public audience to lose. Mechanics at
+      release: current tree → one initial commit (orphan branch or
+      fresh clone) → pushed public; the public repo becomes the working
+      repo, this one is archived as private pre-history; configure the
+      GitHub noreply commit email in the new repo BEFORE the first
+      public commit. The audit still mattered: it proved the *tree* is
+      publishable. NOT verified: nothing — every claim above was
       independently grepped, not assumed.
 - [ ] LICENSE (MIT), CONTRIBUTING, issue templates.
 - [ ] Vendored template code (mcp-api-starter-template) license header —

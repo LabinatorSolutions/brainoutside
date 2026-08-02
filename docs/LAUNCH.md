@@ -11,7 +11,7 @@ brainoutside.com website. The server-repo release checklist stays in
 |---|---|---|
 | `my-brain` | private, forever | Hasan's actual brain. Never published; the generalized version is `brain-template`, not a cleaned copy of this. |
 | `brain-template` | public, template-flagged | The local-brain product. Split out from `brain-template/` in this repo. |
-| `brainoutside` | public (this repo) | The server — the online head. Full history if the audit is clean. |
+| `brainoutside` | public (this repo) | The server — the online head. Publishes with fresh history (decided 2026-08-02). |
 | site repo | **private** | Django site serving brainoutside.com (landing + docs). The site is public; its source is not. |
 
 ---
@@ -107,10 +107,13 @@ there. This planning round adds only:
 
 - [ ] README gains the short-form story (§1) and links: site, template
       repo, and the two-paths framing up top.
-- [ ] Publish-mode decision executes the history-audit outcome: clean →
-      publish with full history (the build log is on-brand for
-      build-in-public); anything found → fresh history from a chosen
-      commit. Audit is 5.5 in OPEN-SOURCE.md.
+- [x] Publish mode — decided 2026-08-02: **fresh history**, even though
+      the audit (5.5) came back clean. It closes the commit-email
+      exposure categorically and matches how `brain-template` launches.
+      At release: current tree → one initial commit → public repo
+      becomes the working repo; this one is archived as private
+      pre-history. GitHub noreply commit email set in the new repo
+      before the first public commit.
 
 ## 4. The website — private repo, public site
 
@@ -155,7 +158,8 @@ pointable at the VPS before building against the name.
 
 ## 5. Sequence
 
-1. **History audit** (gates the server repo's publish mode — do first).
+1. **History audit** — done 2026-08-02, clean; publish mode decided:
+   fresh history.
 2. **`brain-template` live** (unblocks the wizard deep link; smallest
    full product).
 3. **Server release checklist** (OPEN-SOURCE.md 5.1–5.5 remainder).

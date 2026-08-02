@@ -2,6 +2,7 @@
 
 Public surface: / (landing page, reveals nothing), /api/ (registry REST,
 key-authed), /mcp (proxy → FastMCP subprocess, key-authed),
+/mcp/k/<token> (same proxy, key in the path, off by default),
 /webhooks/github (HMAC), /healthz, /readyz. Everything else — /docs/ and
 the whole ops UI — is staff-session-only AND behind the IP-allowlist
 perimeter in prod (nothing-public decision, 2026-07-28; PLAN.md §9).
@@ -85,6 +86,13 @@ urlpatterns: list = [
     # Both slash forms: MCP clients POST without the trailing slash.
     path("mcp/", mcp_proxy_view, name="mcp"),
     path("mcp", mcp_proxy_view),
+    # Same view, credential in the path instead of the header — the only
+    # shape Claude.ai's custom connector (web + mobile) can authenticate
+    # with, since its dialog has nowhere to put an Authorization header.
+    # The view checks MCP_URL_AUTH_ENABLED itself and 404s when off, so
+    # the surface is invisible rather than merely closed.
+    path("mcp/k/<str:token>/", mcp_proxy_view, name="mcp-url-token"),
+    path("mcp/k/<str:token>", mcp_proxy_view),
     # Docs site (registry-driven catalog + per-endpoint detail).
     # Staff-only; in prod also inside the IP-allowlist perimeter.
     path("docs/", include("apps.docs.urls", namespace="docs")),

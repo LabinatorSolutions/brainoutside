@@ -1,3 +1,7 @@
+---
+contract-version: "1.0"
+---
+
 # YOUR MIND — Schema & Operating Contract
 
 This repo is your brain: the single knowledge base all of your AI agents
@@ -169,3 +173,13 @@ newsletter/blog/video pipelines, remix tasks (an external proven
 title/hook + your substance), niche-platform agents, and — via an MCP/API
 door with server-side visibility filtering — audience-facing chatbots. The
 repo structure never changes per consumer; only the lens does.
+
+## 9. Contract version
+
+The frontmatter at the top of this file carries `contract-version`.
+Your brain is a copy of the template and never auto-updates, so this
+records which contract your copy speaks. A server that ships a newer
+contract will WARN — never refuse to boot — and may propose the upgrade
+as a diff through the normal approval queue, where you review it like
+any other write. Don't bump the version by hand: it changes only when
+the template's contract itself changes.

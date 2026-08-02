@@ -14,6 +14,26 @@ own, read directly by Claude Code.
 `.claude/skills/` are the only interfaces: `mind-feeder` writes (gated),
 `mind-reader` reads.
 
+## Get the loop running (10 minutes)
+
+1. **Use this template** (the GitHub button) to create your copy —
+   and **make it private**. This repo will hold your unpublished
+   thinking; private is not optional.
+2. Clone it and open the folder in VS Code (or any editor) with
+   [Claude Code](https://claude.com/claude-code).
+3. Feed something: say *"feed this into my brain"* with a link, a
+   transcript, or just a raw thought. `mind-feeder` proposes 2–4 notes
+   and stops — nothing is written until you approve.
+4. Ask something: *"using my brain, what's my take on …"*.
+   `mind-reader` pulls the right handful of files through a lens and
+   answers in your voice.
+
+That is the whole local loop — no server, no accounts, nothing beyond
+Claude Code. When you want the same brain served to every agent you
+run, over MCP and REST with visibility tiers enforced server-side,
+that's [BrainOutside](https://brainoutside.com) — and this repo is
+already the exact shape it clones.
+
 ## Make it yours (about 20 minutes)
 
 1. **Write your identity core.** `identity/core.md`, `identity/beliefs.md`
@@ -79,3 +99,10 @@ content-shaped note kinds, and a hard human gate on every write. And
 when you want this brain readable by every agent you run — not just
 the one on this machine — [BrainOutside](https://brainoutside.com) is
 its online head.
+
+## License
+
+The scaffolding — the contract, the skills, the templates, the folder
+shape — is [MIT](LICENSE). Everything you put into your copy is yours,
+obviously and entirely: the license governs the template, not your
+mind.

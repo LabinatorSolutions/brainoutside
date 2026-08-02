@@ -41,13 +41,17 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
       (both with server-mode), one example lens, placeholder identity
       files with writing guidance inside, seed INDEX.md.
       Lives in this repo for now; split out to its own public repo at
-      release.
+      release. *Published 2026-08-02 as `hassancs91/brainoutside-template`;
+      the in-tree copy is now the dev fixture (sync deliberately —
+      LAUNCH.md §2).*
 - [x] Generalize the contract text: "the owner" throughout, scope rule
       replaces the Arabic-corpus rule, taxonomy is an editable example.
 - [x] App's startup contract check = template validator (already loud) —
       verified by booting the app against a fresh clone of the template.
-- [ ] Decide whether the example project card ships or the template
+- [x] Decide whether the example project card ships or the template
       starts fully empty (it currently ships one, marked DELETE THIS).
+      *Decided 2026-08-02: ships — one card + one lens, zero knowledge
+      notes; both already carry delete-me guidance.*
 
 ## Setup experience (5.3) — designed in SETUP-DESIGN.md
 
@@ -77,8 +81,10 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 - [ ] `docker compose up` happy path documented in ≤10 lines.
 - [ ] Decide the CSP inline-style question (see the release blocker
       below) — until then a deployed install is functional but unstyled.
-- [ ] The wizard's template deep link 404s until `brainoutside-template` is
-      published as its own repo (5.4).
+- [x] The wizard's template deep link 404s until `brainoutside-template` is
+      published as its own repo (5.4). *Published + template-flagged
+      2026-08-02; final `/generate` click-through pends GitHub web-tier
+      recovery (503s on all HTML pages at check time).*
 - [ ] Changing `BRAIN_REPO_URL` after setup is safe (the server refuses to
       serve a mismatched clone, and "Replace the clone" repairs it), but
       the wizard does not yet offer that repair inline — it only appears

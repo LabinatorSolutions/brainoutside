@@ -72,14 +72,17 @@ VS Code, Claude Code is the interface; `mind-feeder` and `mind-reader`
 work with zero infrastructure. This is Path A on the landing page and a
 complete product on its own.
 
-- [ ] Split `brain-template/` into its own public repo; mark it a
-      **GitHub template repo** (the setup wizard deep-links to
-      `/generate` — currently 404s, this is the unblock).
-      *2026-08-02: assembled and verified at
-      `D:\repos\brainoutside-template` — one commit, noreply author,
-      byte-identical to the in-tree copy, 24 files, the only name
-      occurrence is the LICENSE copyright line. Awaiting Hasan's push,
-      the template flag, and repo meta.*
+- [x] Split `brain-template/` into its own public repo; mark it a
+      **GitHub template repo** — *published 2026-08-02 as
+      `hassancs91/brainoutside-template` (one commit, noreply author)
+      and verified: remote HEAD == the locally-built commit, public,
+      `is_template: true` via API, description set, published tarball
+      byte-identical to the local repo, every server CONTRACT_PATH
+      present. NOT verified: the `/generate` click-through — GitHub's
+      web tier was 503ing on all HTML pages at check time (data plane
+      fine); `is_template: true` is the condition it depends on, so
+      re-check the link when GitHub recovers. Still to do on GitHub:
+      enable Discussions, add topics.*
 - [x] README rewritten local-first — *done 2026-08-02: quickstart
       ("Get the loop running", with the make-it-private warning),
       lineage/story, license/ownership, outgrow-local pointer. NOT
@@ -109,7 +112,10 @@ complete product on its own.
       at this scale.
 - [ ] Release gate: the server boots clean against a **fresh clone of
       the published repo** (re-run of the 5.2 verification, against the
-      real thing).
+      real thing). *(Published content is byte-identical to the tree
+      5.2 boot-verified, but contract-version/LICENSE/README landed
+      after that boot — fold this into the pre-launch wizard walk on a
+      fresh stack.)*
 
 ## 3. `brainoutside` — this repo
 

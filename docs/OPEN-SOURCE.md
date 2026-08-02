@@ -21,11 +21,16 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 - [x] Commit identity → env settings `BRAIN_COMMIT_NAME`/`BRAIN_COMMIT_EMAIL`
       (generic default `brain-app <brain-app@localhost>`; Hasan's value
       lives in his .env).
-- [ ] Theme: `lwh`/learnwithhasan naming → neutral token names (the
-      palette itself can stay — it's just a default theme).
-- [ ] Audit for hardcoded personal values: `learnwithhasan`,
+- [x] Theme: `lwh`/learnwithhasan naming → neutral token names (the
+      palette itself can stay — it's just a default theme). *Verified
+      2026-08-02: `lwh` greps clean in assets/, static/css/, templates/
+      (remaining hits are minified-vendor-JS substrings).*
+- [x] Audit for hardcoded personal values: `learnwithhasan`,
       `hassancs91`, `brain.` domains, Windows paths. Engine code must
-      grep clean; docs/history references are fine.
+      grep clean; docs/history references are fine. *Verified
+      2026-08-02: HEAD engine tree greps clean on all four (one
+      `D:/repos/x` string in a gitrepo.py comment is a generic URL-parse
+      example, not a personal path).*
 - [ ] GitHub-only assumptions (webhook, PAT push URL) — fine for v1,
       documented as such; GitLab/Gitea is post-release territory.
 
@@ -254,9 +259,24 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
 
 ## Repo hygiene (5.5)
 
-- [ ] History audit: confirm no secrets, no `db.sqlite3`, no real brain
-      content in ANY commit. If anything personal ever landed → publish
-      with fresh history from a chosen commit.
+- [x] History audit — **CLEAN; publish with full history** (run
+      2026-08-02: 109 commits, single branch, no tags, no stash).
+      Method: full `git log --all -p` dump grepped for key shapes
+      (`sk-ant`/`ghp_`/`github_pat_`/`AKIA`/`AIza`/`xox*`/`glpat`),
+      private-key blocks, and secret-shaped `X=<long-value>`
+      assignments — zero hits. Every path ever tracked reviewed: no
+      `.env`, no `db.sqlite3`, no dumps, no `data/`; only binaries are
+      fonts + favicons. `.env.example` was placeholder-only in every
+      version. Every `VERBATIM` hit is rule code or templates — no real
+      brain content ever landed. All IP-shaped strings are example.com
+      / TEST-NET test fixtures. Personal *references* in docs and old
+      code versions exist and are acceptable per the 5.1 rule.
+      **One open decision:** all 109 commits are authored
+      `hassan.cs91@gmail.com` — publishing makes that address
+      permanently public. Rewriting authorship is a full-history
+      rewrite (all hashes change), cheap only while the repo is
+      private. NOT verified: nothing — every claim above was
+      independently grepped, not assumed.
 - [ ] LICENSE (MIT), CONTRIBUTING, issue templates.
 - [ ] Vendored template code (mcp-api-starter-template) license header —
       Hasan's own code, confirm relicensing under MIT is clean.

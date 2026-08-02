@@ -134,6 +134,22 @@ there. This planning round adds only:
 
 ## 4. The website — private repo, public site
 
+**Status 2026-08-02: scaffolded, built, verified** at
+`D:\repos\brainoutside-site` (one commit, noreply author, 40 files).
+Landing complete — all 8 sections with real copy; docs shell live —
+index + 7 outline stubs + the API-ref-lives-on-your-instance card. CSP
+enforced with a per-request nonce, dev included. `tw.css` committed
+(60KB). Verified in a real browser: every route 200, dark mode toggles
+and persists across pages, zero console errors in both themes. One
+site-only CSS addition, documented in the file: the typography
+plugin's `.prose` colours are mapped onto the semantic tokens in an
+**unlayered** block — the plugin emits into `@layer utilities`, which
+no layered override can beat (layer order trumps specificity).
+Remaining: write the 7 docs pages, an OG image, Hasan pushes to a
+private GitHub repo, Coolify deploy + DNS. Note: `--font-display` is
+Space Grotesk and still not self-hosted — the product's open font item
+now covers the site too; everyone else sees system-ui until it's fixed.
+
 **Stack (decided 2026-08-02):** a deliberately small Django project —
 a handful of template views, no DB-driven content, no accounts — in a
 **private** repo, deployed as one more Coolify resource on the VPS.

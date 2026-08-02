@@ -119,7 +119,7 @@ def _step_account(request):
 
 # ---- 2. repo -------------------------------------------------------------
 
-TEMPLATE_REPO_URL = "https://github.com/brainoutside/brain-template/generate"
+TEMPLATE_REPO_URL = "https://github.com/hassancs91/brainoutside-template/generate"
 
 
 def _step_repo(request):

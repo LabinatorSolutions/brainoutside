@@ -102,7 +102,10 @@ path is [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Your brain repo
 
-Start from [`brain-template/`](brain-template/): the contract, both agent
+Start from the
+[brainoutside-template](https://github.com/hassancs91/brainoutside-template)
+repo (developed in-tree at [`brain-template/`](brain-template/)): the
+contract, both agent
 skills, note templates and placeholder identity files. It ships with zero
 notes on purpose — an empty brain that is truly yours beats a seeded one
 you have to clean out.

@@ -1,7 +1,7 @@
 # Launch plan — three repos, one story
 
 Decided 2026-08-02. This doc covers what `OPEN-SOURCE.md` does not:
-the public story, `brain-template` as its own product, and the
+the public story, `brainoutside-template` as its own product, and the
 brainoutside.com website. The server-repo release checklist stays in
 [OPEN-SOURCE.md](OPEN-SOURCE.md) — nothing there is duplicated here.
 
@@ -9,8 +9,8 @@ brainoutside.com website. The server-repo release checklist stays in
 
 | Repo | Visibility | Role |
 |---|---|---|
-| `my-brain` | private, forever | Hasan's actual brain. Never published; the generalized version is `brain-template`, not a cleaned copy of this. |
-| `brain-template` | public, template-flagged | The local-brain product. Split out from `brain-template/` in this repo. |
+| `my-brain` | private, forever | Hasan's actual brain. Never published; the generalized version is `brainoutside-template`, not a cleaned copy of this. |
+| `brainoutside-template` | public, template-flagged | The local-brain product. Split out from `brain-template/` in this repo. |
 | `brainoutside` | public (this repo) | The server — the online head. Publishes with fresh history (decided 2026-08-02). |
 | site repo | **private** | Django site serving brainoutside.com (landing + docs). The site is public; its source is not. |
 
@@ -52,15 +52,20 @@ that wave and built on it.
 server clones. Start local today; add the server when you want it;
 nothing to migrate.
 
-**Credits section** (landing page + template README): link the actual
-inspirations, honestly. The llm-wiki gist is verified. The rest of the
-research (the "other projects we relied on") was never written down in
-either repo — **TODO(Hasan): name them**, so the list is real and not
-retro-fitted. "Inspired by" phrasing only; no affiliation implied.
+**Credits section** (landing page + template README) — resolved
+2026-08-02: the research survey (many projects, open source and
+commercial, explored with Claude at the time) was never written down
+and the names are not recoverable, so there will be no retro-fitted
+list. The credit is told exactly as it happened: Karpathy's llm-wiki
+named and linked (verified), plus "we surveyed the landscape of memory
+and knowledge-base tools and built where they stopped", plus the
+standing README invitation — recognize your project in this lineage,
+open an issue, get a link. "Inspired by" phrasing only; no affiliation
+implied.
 
 ---
 
-## 2. `brain-template` — the local brain as a product
+## 2. `brainoutside-template` — the local brain as a product
 
 Goal: someone who never runs the server gets full value. Clone it, open
 VS Code, Claude Code is the interface; `mind-feeder` and `mind-reader`
@@ -110,7 +115,7 @@ there. This planning round adds only:
       repo, and the two-paths framing up top.
 - [x] Publish mode — decided 2026-08-02: **fresh history**, even though
       the audit (5.5) came back clean. It closes the commit-email
-      exposure categorically and matches how `brain-template` launches.
+      exposure categorically and matches how `brainoutside-template` launches.
       At release: current tree → one initial commit → public repo
       becomes the working repo; this one is archived as private
       pre-history. GitHub noreply commit email set in the new repo
@@ -161,7 +166,7 @@ pointable at the VPS before building against the name.
 
 1. **History audit** — done 2026-08-02, clean; publish mode decided:
    fresh history.
-2. **`brain-template` live** (unblocks the wizard deep link; smallest
+2. **`brainoutside-template` live** (unblocks the wizard deep link; smallest
    full product).
 3. **Server release checklist** (OPEN-SOURCE.md 5.1–5.5 remainder).
 4. **Site build + deploy** (landing + docs on brainoutside.com).
@@ -177,7 +182,8 @@ pointable at the VPS before building against the name.
   account — distribution is Hasan's existing audience, and a later
   transfer to an org is safe (GitHub redirects old URLs). Revisit only
   if contributors multiply.
-- **Credits list** — TODO(Hasan) in §1; blocks the landing page's story
-  section and the template README, nothing else.
+- ~~Credits list~~ — resolved 2026-08-02 (see §1): honest survey
+  phrasing + the open-issue invitation; the original name list is not
+  recoverable and won't be faked.
 - Example content, canonical copy — recommendations inline in §2;
   treated as decided unless vetoed.

@@ -22,15 +22,16 @@ Everything below assumes these; change them here, not inline.
 | Brand / product | **BrainOutside** |
 | Domain | `brainoutside.com` |
 | App repo | `github.com/<owner>/brainoutside` |
-| Starter repo | `github.com/<owner>/brain-template` |
+| Starter repo | `github.com/hassancs91/brainoutside-template` |
 | Container image | `ghcr.io/<owner>/brainoutside:vX.Y.Z` |
 | `APP_NAME` default | `BrainOutside` (already set in `settings/base.py`) |
 
-`brain-template` keeps its generic name on purpose: it is a *brain*
-template, usable without this server, and the URL a newcomer sees is
-`…/brain-template/generate`, which reads as what it does. Rename to
-`brainoutside-template` before publishing if brand consistency matters
-more — it is a one-line change here and in the wizard link.
+Renamed 2026-08-02: brand consistency won, exactly the trade this
+paragraph reserved — the starter repo publishes as
+`brainoutside-template` (not `brainoutside-local`: the same repo powers
+both the local and the served path, so "local" would mislabel the thing
+the server clones). The in-tree dev copy keeps the folder name
+`brain-template/`; the wizard link in `setup_views.py` is updated.
 
 ---
 
@@ -59,7 +60,7 @@ than one click on a button they already trust.
 
 GitHub's own template button does the same job with **no token at all**:
 
-    https://github.com/<owner>/brain-template/generate
+    https://github.com/<owner>/brainoutside-template/generate
 
 That link lands on a prefilled "create repository from template" form.
 One click, repo exists, private by default if they choose it.
@@ -163,7 +164,7 @@ Zero users in the DB → every route redirects to `/setup`. No
 > it. You can read it, edit it, and take it with you.
 
 - Primary: **[ Create my brain repo ]** → opens
-  `github.com/<owner>/brain-template/generate` in a new tab. They name it,
+  `github.com/<owner>/brainoutside-template/generate` in a new tab. They name it,
   choose private, click Create.
 - Then: paste `owner/name` (accept a full URL too and normalise it).
 - Secondary: "I already have one" → same field.

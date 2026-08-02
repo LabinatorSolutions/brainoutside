@@ -6,7 +6,7 @@ M4 eval then runs in public. Scope: single-user, single-brain — that is
 the product's identity, not a limitation to fix.
 
 **Name (decided 2026-07-30): `BrainOutside` — brainoutside.com.**
-Repos `brainoutside` + `brain-template`; image
+Repos `brainoutside` + `brainoutside-template` (renamed from `brain-template` 2026-08-02; in-tree dev folder keeps its name); image
 `ghcr.io/<owner>/brainoutside`. Identifier table lives in
 [SETUP-DESIGN.md](SETUP-DESIGN.md); the onboarding flow is designed
 there too.
@@ -77,7 +77,7 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
 - [ ] `docker compose up` happy path documented in ≤10 lines.
 - [ ] Decide the CSP inline-style question (see the release blocker
       below) — until then a deployed install is functional but unstyled.
-- [ ] The wizard's template deep link 404s until `brain-template` is
+- [ ] The wizard's template deep link 404s until `brainoutside-template` is
       published as its own repo (5.4).
 - [ ] Changing `BRAIN_REPO_URL` after setup is safe (the server refuses to
       serve a mismatched clone, and "Replace the clone" repairs it), but

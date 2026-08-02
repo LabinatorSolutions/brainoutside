@@ -10,3 +10,4 @@ node_modules/
 staticfiles/
 .DS_Store
 secrets/
+.vscode/

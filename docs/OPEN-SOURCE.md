@@ -141,7 +141,10 @@ engineering commentary above the fold on the dashboard.
       copies of `brain-template` that never update, and we cannot migrate
       a repo we don't own. Plan: `contract-version:` in CLAUDE.md,
       startup check warns (never fails), `upgrade_brain` proposes the
-      diff through the normal approval queue.
+      diff through the normal approval queue. *(2026-08-02: the template
+      half is done — `contract-version: "1.0"` frontmatter + §9 in
+      brain-template/CLAUDE.md. The startup warn and `upgrade_brain`
+      are still to build.)*
 - [ ] bash/Makefile twin of `dev.ps1`.
 - [x] README: what/why, quickstart — rewritten as BrainOutside.
 - [ ] Rings hero image for the README (M3.5.2 dashboard centrepiece is

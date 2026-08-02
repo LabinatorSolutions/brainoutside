@@ -70,23 +70,24 @@ complete product on its own.
 - [ ] Split `brain-template/` into its own public repo; mark it a
       **GitHub template repo** (the setup wizard deep-links to
       `/generate` — currently 404s, this is the unblock).
-- [ ] README rewritten local-first: what a brain repo is; the story
-      (short form, §1); a 10-minute quickstart (Use this template →
-      clone → open in VS Code → feed a first source → approve → ask
-      through a lens); a "when you outgrow local" section pointing at
-      the server; a real screenshot/GIF of a local feed+read session.
-- [ ] `contract-version:` field in CLAUDE.md + the upgrade story
-      (server warns, never fails; `upgrade_brain` proposes diffs
-      through the approval queue). Must land BEFORE v1.0 — users'
-      brains are copies that never update (already flagged in
-      OPEN-SOURCE.md 5.4; it ships with the template, so it lands here).
-- [ ] Example-content decision (OPEN-SOURCE.md 5.2 open item).
-      Recommendation: ship exactly one example project card and one
-      example lens, both marked DELETE THIS; zero knowledge notes. An
-      utterly empty repo gives the feeder nothing to pattern-match; the
-      README's "zero notes on purpose" promise stays true.
-- [ ] LICENSE (MIT) + a README line making explicit that content the
-      user adds is theirs, obviously and entirely.
+- [x] README rewritten local-first — *done 2026-08-02: quickstart
+      ("Get the loop running", with the make-it-private warning),
+      lineage/story, license/ownership, outgrow-local pointer. NOT
+      done: the screenshot/GIF of a real local session — that is a
+      launch asset, made once against the final flow (§5.5).*
+- [x] `contract-version:` field in CLAUDE.md + the upgrade story —
+      *done 2026-08-02: `contract-version: "1.0"` frontmatter + §9 in
+      the template CLAUDE.md. Verified both server taxonomy parsers
+      anchor to the §7 heading (position-independent), so top-of-file
+      frontmatter cannot break them. The server-side warn check +
+      `upgrade_brain` remain 5.4 work in OPEN-SOURCE.md.*
+- [x] Example-content decision — *decided 2026-08-02: ships as
+      recommended (one project card + one lens, zero knowledge notes).
+      Both files were already DELETE-THIS/edit-or-delete marked — the
+      card even demos the staleness rule deliberately. No change was
+      needed.*
+- [x] LICENSE (MIT) + README ownership line — *done 2026-08-02: "the
+      license governs the template, not your mind."*
 - [ ] Issue templates; Discussions on (questions will be contract
       questions, not bug reports).
 - [ ] Repo meta: description, topics, social-preview image.

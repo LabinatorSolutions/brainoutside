@@ -75,6 +75,11 @@ complete product on its own.
 - [ ] Split `brain-template/` into its own public repo; mark it a
       **GitHub template repo** (the setup wizard deep-links to
       `/generate` — currently 404s, this is the unblock).
+      *2026-08-02: assembled and verified at
+      `D:\repos\brainoutside-template` — one commit, noreply author,
+      byte-identical to the in-tree copy, 24 files, the only name
+      occurrence is the LICENSE copyright line. Awaiting Hasan's push,
+      the template flag, and repo meta.*
 - [x] README rewritten local-first — *done 2026-08-02: quickstart
       ("Get the loop running", with the make-it-private warning),
       lineage/story, license/ownership, outgrow-local pointer. NOT

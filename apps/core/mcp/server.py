@@ -7,7 +7,8 @@ MCP request to this subprocess on `MCP_LOOPBACK_HOST:MCP_LOOPBACK_PORT`.
 Trust model
 -----------
 The subprocess accepts requests *only* from `127.0.0.1` / `::1`. The
-`X-MCP-User-Id` / `X-MCP-Credential-Id` / `X-MCP-Request-Id` headers carry
+`X-MCP-User-Id` / `X-MCP-Credential-Id` / `X-MCP-Credential-Kind` /
+`X-MCP-Request-Id` headers carry
 the resolved Principal across the hop. Because Django is the only loopback
 caller (production hardening pins the listener to localhost), those headers
 cannot be forged externally — anything not from loopback is 403'd before
@@ -34,6 +35,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from apps.core.mcp.identity import (
+    mcp_credential_kind_var,
     mcp_credential_var,
     mcp_request_id_var,
     mcp_user_id_var,
@@ -93,12 +95,16 @@ class LoopbackIdentityMiddleware(BaseHTTPMiddleware):
 
         token_user = mcp_user_id_var.set(request.headers.get("x-mcp-user-id"))
         token_cred = mcp_credential_var.set(request.headers.get("x-mcp-credential-id"))
+        token_kind = mcp_credential_kind_var.set(
+            request.headers.get("x-mcp-credential-kind")
+        )
         token_rid = mcp_request_id_var.set(request.headers.get("x-mcp-request-id"))
         try:
             return await call_next(request)
         finally:
             mcp_user_id_var.reset(token_user)
             mcp_credential_var.reset(token_cred)
+            mcp_credential_kind_var.reset(token_kind)
             mcp_request_id_var.reset(token_rid)
 
 

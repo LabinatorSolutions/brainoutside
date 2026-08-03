@@ -9,6 +9,11 @@ headers on the loopback hop:
 - `X-MCP-Credential-Id`  — pk of `api_keys.APIKey` or `mcp_oauth.AccessToken`
                             (set from the authenticated principal; `None` for
                             anonymous callers)
+- `X-MCP-Credential-Kind`— which of those `X-MCP-Credential-Id` is a pk *of*
+                            ("api_key" | "oauth_token" | …). A pk is
+                            meaningless without it: `APIKey` 3 and
+                            `AccessToken` 3 are different credentials with
+                            different tiers.
 - `X-MCP-Request-Id`     — uuid4 hex; echoed across the trace boundary
 
 The subprocess's loopback ASGI middleware (`apps/core/mcp/server.py`) reads
@@ -26,4 +31,7 @@ from contextvars import ContextVar
 
 mcp_user_id_var: ContextVar[str | None] = ContextVar("mcp_user_id", default=None)
 mcp_credential_var: ContextVar[str | None] = ContextVar("mcp_credential", default=None)
+mcp_credential_kind_var: ContextVar[str | None] = ContextVar(
+    "mcp_credential_kind", default=None
+)
 mcp_request_id_var: ContextVar[str | None] = ContextVar("mcp_request_id", default=None)

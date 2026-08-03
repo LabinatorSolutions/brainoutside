@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from django.utils import timezone
+
 from apps.api_keys.models import APIKey
 
 if TYPE_CHECKING:
@@ -36,6 +38,35 @@ def get_user_key(user: "AbstractBaseUser", *, key_id: int) -> APIKey | None:
     return (
         APIKey.objects.for_user(user).filter(pk=key_id, is_deleted=False).first()
     )
+
+
+def get_live_key_by_id(key_id: str | int) -> APIKey | None:
+    """Resolve a key by pk alone, applying every liveness guard
+    `auth_backend.authenticate_token` applies.
+
+    The bearer rehydrator (registered in `AppConfig.ready`). There is no
+    `user` to scope by: the only caller is the MCP subprocess rebuilding
+    an identity the Django proxy already authenticated on this same
+    request, and it holds a pk rather than a token. The guards are
+    re-applied rather than assumed — this function grants a tier, so it
+    must not hand back a revoked key just because someone knows its id.
+
+    Returns None on a non-integer id, an unknown pk, or any dead key.
+    """
+    try:
+        pk = int(key_id)
+    except (TypeError, ValueError):
+        return None
+    api_key = APIKey.objects.select_related("user").filter(pk=pk).first()
+    if api_key is None:
+        return None
+    if api_key.revoked_at is not None or api_key.is_deleted:
+        return None
+    if api_key.expires_at is not None and api_key.expires_at <= timezone.now():
+        return None
+    if not api_key.user.is_active:
+        return None
+    return api_key
 
 
 def get_user_key_or_404(user: "AbstractBaseUser", *, key_id: int) -> APIKey:

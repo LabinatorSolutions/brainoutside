@@ -4,7 +4,10 @@ Each `EndpointSpec` becomes one FastMCP tool with a flat input schema
 matching the endpoint's `Input` Pydantic model. The handler:
 
 1. Reads the request envelope from the identity contextvars (set by the
-   loopback ASGI middleware on the inbound hop).
+   loopback ASGI middleware on the inbound hop) and rehydrates the
+   `(user, credential)` pair they name — see `_identity_from_headers`.
+   This step is what gives an MCP caller the same tier its key gets over
+   REST; without it every caller reads as unprofiled.
 2. Builds a `Ctx` with `source="mcp"`.
 3. Validates the JSON-RPC payload against `spec.input_model`.
 4. Awaits `spec.cls().run(inp, ctx)`.
@@ -24,9 +27,10 @@ from typing import Any, Callable
 from fastmcp import FastMCP
 from pydantic import ValidationError
 
-from apps.core import endpoint_gating
+from apps.core import bearer, endpoint_gating
 from apps.core.ctx import build_ctx
 from apps.core.mcp.identity import (
+    mcp_credential_kind_var,
     mcp_credential_var,
     mcp_request_id_var,
     mcp_user_id_var,
@@ -52,6 +56,75 @@ def register_all(mcp: FastMCP) -> int:
         )(handler)
         count += 1
     return count
+
+
+async def _identity_from_headers() -> tuple[Any, Any]:
+    """Rebuild `(user, credential)` from the identity contextvars.
+
+    This is the far side of the proxy hop. The Django view authenticated
+    the bearer token, then stripped it — all that crosses is
+    `(user_id, credential_kind, credential_id)`, so the row objects have
+    to be looked up again here.
+
+    Skipping this is not a no-op. `ctx.credential = None` is exactly what
+    an unprofiled key looks like to `tiers.tier_for_credential`, so every
+    MCP caller silently reads at `public` and `propose-feed` refuses
+    everyone. It fails closed, which is why it survived: the symptom is
+    an agent reporting an empty brain, not a leak.
+
+    Returns `(None, None)` for an anonymous or unresolvable caller —
+    the same least-privilege shape, but now only when it is true.
+    """
+    credential = await _credential_from_headers()
+    user = await _user_from_header(credential)
+    return user, credential
+
+
+async def _credential_from_headers() -> Any:
+    """Rehydrate the credential row named by `(kind, pk)`, or None."""
+    credential_id = mcp_credential_var.get()
+    if not credential_id:
+        return None
+    kind = mcp_credential_kind_var.get() or ""
+    credential = await bearer.rehydrate(kind, credential_id)
+    if credential is None:
+        # A live proxy hop always carries a resolvable pair. Landing here
+        # means an unregistered credential_kind or a row that died
+        # between the two hops — both drop the caller to `public`, so say
+        # so rather than let it look like an empty brain.
+        log.warning(
+            "mcp bridge: could not rehydrate credential kind=%r id=%r — "
+            "this caller will be treated as unprofiled (public tier)",
+            kind,
+            credential_id,
+        )
+    return credential
+
+
+async def _user_from_header(credential: Any) -> Any:
+    """Resolve the caller's User, preferring the one already joined onto
+    `credential` so the common path costs no second query."""
+    user_id = mcp_user_id_var.get()
+    if not user_id:
+        return None
+    if credential is not None and str(getattr(credential, "user_id", "")) == str(user_id):
+        return credential.user
+
+    from django.contrib.auth import get_user_model
+
+    def _load() -> Any:
+        return (
+            get_user_model()
+            .objects.filter(pk=user_id, is_active=True)
+            .first()
+        )
+
+    from asgiref.sync import sync_to_async
+
+    try:
+        return await sync_to_async(_load, thread_sensitive=True)()
+    except (TypeError, ValueError):  # non-integer pk on a custom User model
+        return None
 
 
 def build_handler(spec: EndpointSpec) -> Callable[..., Any]:
@@ -92,11 +165,12 @@ def build_handler(spec: EndpointSpec) -> Callable[..., Any]:
             )
             raise RuntimeError(message)
 
+        user, credential = await _identity_from_headers()
         ctx = build_ctx(
             request_id=request_id,
             source="mcp",
-            user=None,  # Phase 3 resolves accounts.User from mcp_user_id_var
-            credential=None,  # Phase 3.3 / 4.3 resolves APIKey or AccessToken
+            user=user,
+            credential=credential,
         )
 
         try:

@@ -15,6 +15,7 @@ from apps.api_keys.services.generate import (
     rotate,
 )
 from apps.api_keys.services.listing import (
+    get_live_key_by_id,
     get_user_key,
     get_user_key_or_404,
     list_for_user,
@@ -24,6 +25,7 @@ __all__ = [
     "GeneratedKey",
     "authenticate_token",
     "generate",
+    "get_live_key_by_id",
     "get_user_key",
     "get_user_key_or_404",
     "list_for_user",

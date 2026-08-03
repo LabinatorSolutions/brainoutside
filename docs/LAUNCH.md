@@ -38,7 +38,8 @@ that wave and built on it.
 2. **No safe way to grow.** A self-maintaining wiki fills itself with
    unreviewed extractions, and a brain you don't trust is a brain you
    stop using. Our write path is gated: agents *propose*, a human
-   approves, approval is one signed commit. Supersede, never delete.
+   approves, approval is one commit authored by the server — so its
+   writes are always distinguishable from yours. Supersede, never delete.
 3. **Creation, not just recall.** The point is to *make things* from
    the brain — replies, posts, scripts — in your own voice. Lenses
    (named retrieval scopes) and context packs turn the brain into a

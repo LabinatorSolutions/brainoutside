@@ -96,9 +96,14 @@ Six steps, no terminal, no `docker exec`:
 6. **Build your brain** — clone, index, and materialise one snapshot per
    visibility tier. Runs on the worker; safe to close the tab.
 
-**Known rough edge:** the "generate from template" deep link on step 2
-404s until `brain-template` is published as its own public repo (M5.4).
-Create the repo yourself from the template contents for now.
+**On step 2's "generate from template" link:** it works.
+`brainoutside-template` was published on 2026-08-02 — public,
+`is_template: true`, and the `/generate` deep link returns 200. Note
+that GitHub creates the repo *asynchronously*: for a moment after you
+click Create, the repo exists but is empty (`size: 0`), and a server
+pointed at it in that window clones nothing. Measured at ~0.7s. If Read
+→ Verify says the repo is not a brain yet, wait a second and press it
+again.
 
 ## 5. Lock down the ops UI
 
@@ -185,6 +190,7 @@ Tracked separately; it is not something this page can work around.)
 - [ ] `/ops/` unreachable from the open internet, reachable through your
       boundary
 - [ ] Settings → Test connection returns model/latency/tokens
-- [ ] Push to your brain repo → the server reindexes within seconds
-      (webhook) or minutes (periodic pull)
+- [ ] Push to your brain repo → the server reindexes within seconds.
+      Only the webhook does this; see §7. If nothing happens, the webhook
+      is not wired, and nothing else will pick the change up.
 - [ ] Restore-from-backup drill into a scratch Postgres, `/readyz` green

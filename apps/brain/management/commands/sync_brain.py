@@ -1,7 +1,15 @@
-"""Manual/beat sync: pull → drift check → reindex → snapshots.
+"""Manual sync: pull → drift check → reindex → snapshots.
 
-The 15-minute fallback beat (PLAN.md §4) schedules this via django-q2 at
-deploy; it is also the operator's by-hand sync.
+PLAN.md §4 describes a 15-minute fallback beat scheduling this via
+django-q2 at deploy. **There is no such beat.** It would be registered
+from `config/scheduled.py`, and that file is not in the repo, so
+`manage.py sync_scheduled` has nothing to declare — a real deploy comes
+up with zero Q2 `Schedule` rows (measured on a fresh prod stack).
+
+So this command is the operator's by-hand sync, and along with the
+GitHub webhook and the "Pull from GitHub" button on `/ops/health/` it is
+one of only three things that will ever move the clone forward. See
+docs/DEPLOY.md §7.
 """
 from django.core.management.base import BaseCommand, CommandError
 

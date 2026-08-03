@@ -37,6 +37,7 @@ import logging
 import re
 from typing import Callable
 
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction
 from django.http import HttpRequest, HttpResponse
 
 # Group 1 captures the 8-char prefix slice we keep visible. The full
@@ -63,47 +64,67 @@ def scrub_url_token(s: str) -> str:
 
 
 class URLTokenScrubMiddleware:
-    """Strip `mcpurl_*` plaintext out of `request.path*` before anything
-    downstream reads them.
+    """Publish a log-safe copy of the path, and the plaintext token, on
+    every request that carries a `mcpurl_*` credential in its URL.
 
-    Ordering: install BEFORE `RequestIdMiddleware` so that even the
-    first log line emitted by inner middleware (request received, request
-    id bound) sees the scrubbed path. The view branch that actually
-    needs the plaintext reads `request._url_token_plain`, which we
-    stash before rewriting.
+    It does NOT rewrite `request.path`, and that is the whole design.
+    Middleware runs BEFORE URL dispatch, so a rewritten path is the path
+    the dispatcher then tries to resolve — which 404s the very route this
+    exists to protect. Instead it publishes two attributes alongside the
+    original:
 
-    The proxy view's URL conf passes the (still-plain) token in via the
-    path kwarg `token`, NOT by reading `request.path`. So scrubbing the
-    path here never breaks routing — Django has already parsed the path
-    into a (view_func, args, kwargs) triple before middleware runs the
-    view, and the kwarg carries the plaintext through to the view.
+    - `request._scrubbed_path` — the `mcpurl_<8>***` form. Every writer
+      that persists a path (`ErrorLog` via `apps.core.rest`) reads this
+      instead of `request.path`.
+    - `request._url_token_plain` — the raw token, read by exactly one
+      caller, the proxy view's url-token branch.
 
-    Wait — that ordering is the other way around. Middleware runs
-    BEFORE URL dispatch. So we rewrite `request.path` here; the URL
-    dispatcher then resolves the rewritten path … which would 404.
+    The dispatcher keeps seeing the real path and the view keeps
+    receiving the plaintext through its `token` kwarg, so nothing about
+    routing changes. Log records that captured `request.path` directly
+    are caught downstream by `ScrubLogFilter`, which is the reason that
+    filter exists rather than being redundant with this.
 
-    Solution: we DON'T rewrite the *routed* path. We only stash the
-    plaintext on the request (so the view can read it) and capture a
-    `request._scrubbed_path` ALONGSIDE the original. Downstream loggers
-    + APICallLog / ErrorLog writers consult `request._scrubbed_path`
-    instead of `request.path`. The dispatcher continues to see the
-    original path; the kwarg the view receives still carries the
-    plaintext (Django's standard kwarg passing). This is the only
-    coherent answer that doesn't fight Django's URL resolution.
+    Ordering: install BEFORE `RequestIdMiddleware`, so the attributes are
+    already published when the first inner middleware runs.
+
+    Sync AND async capable, which placement demands. `RequestIdMiddleware`
+    is async-only; a sync-only middleware installed outside it makes
+    Django adapt the entire inner chain with `async_to_sync`, which runs
+    every request through a thread and spins up a second event loop for
+    the proxy's streaming responses. The dual-mode shape below is
+    Django's documented recipe for avoiding that.
     """
+
+    sync_capable = True
+    async_capable = True
 
     def __init__(
         self,
         get_response: Callable[[HttpRequest], HttpResponse],
     ) -> None:
         self.get_response = get_response
+        self._async_mode = iscoroutinefunction(get_response)
+        if self._async_mode:
+            markcoroutinefunction(self)
 
-    def __call__(self, request: HttpRequest) -> HttpResponse:
+    def __call__(self, request: HttpRequest):
+        if self._async_mode:
+            return self.__acall__(request)
+        self._publish(request)
+        return self.get_response(request)
+
+    async def __acall__(self, request: HttpRequest) -> HttpResponse:
+        self._publish(request)
+        return await self.get_response(request)  # type: ignore[misc]
+
+    @staticmethod
+    def _publish(request: HttpRequest) -> None:
         path = request.path or ""
         if "mcpurl_" in path:
-            # Extract the plaintext token (everything between `/mcp/k/`
-            # and the next `/` or end of path) so the proxy view can
-            # resolve it without reading the scrubbed path.
+            # The plaintext token (everything between `/mcp/k/` and the
+            # next `/` or end of path) so the proxy view can resolve it
+            # without reading the scrubbed path.
             m = re.search(
                 r"/mcp/k/(mcpurl_[A-Za-z0-9_\-=]+)", path
             )
@@ -112,7 +133,6 @@ class URLTokenScrubMiddleware:
             request._scrubbed_path = scrub_url_token(path)  # type: ignore[attr-defined]
         else:
             request._scrubbed_path = path  # type: ignore[attr-defined]
-        return self.get_response(request)
 
 
 # ----- Logging filter (defense in depth) ------------------------------------

@@ -58,7 +58,13 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    # Outermost so request_id is bound before anything logs.
+    # Outermost of all: publishes `_scrubbed_path` + `_url_token_plain`
+    # for `/mcp/k/<mcpurl_...>/` requests before any inner middleware can
+    # read a path, and before the first log line of the request. Does not
+    # rewrite `request.path` — see the class docstring; that would 404 the
+    # route it protects.
+    "apps.core.security.log_scrub.URLTokenScrubMiddleware",
+    # Then request_id, bound before anything logs.
     "apps.core.middleware.RequestIdMiddleware",
     # Scanner honeypot: generic 404 for /wp-admin, /.env, etc.
     "apps.core.security.HoneypotMiddleware",

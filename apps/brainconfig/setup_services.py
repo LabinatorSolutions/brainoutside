@@ -14,13 +14,22 @@ Two things here earn their keep:
   wrong" is useless here — the whole failure surface is *other people's*
   systems (key not installed yet, wrong repo name, repo is private and
   the key is on a different repo), and only git knows which.
+
+- `verify_write_access` asks the remote whether this token may push,
+  without pushing. Read access is not evidence of write access, and the
+  gap between them is the single most confusing failure this app has:
+  a token that clones fine surfaces as a *failed feed* long after setup,
+  when the operator has stopped thinking about credentials.
 """
 from __future__ import annotations
 
+import base64
 import logging
 import re
 import shutil
 import tempfile
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -132,6 +141,132 @@ def verify_read_access(url: str) -> VerifyResult:
         return VerifyResult(ok=True, message="The server can read your brain.", head=head)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _https_repo_base(url: str) -> str:
+    """`git@host:owner/name.git` (or any remote form) → `https://host/owner/name`.
+
+    Mirrors `apps.feeds.services.approval._tokenized_origin_url`, which is
+    what the real push uses — the point of this check is to interrogate
+    the same endpoint the push will, so the two must derive the same
+    address. Returns "" for a remote with no https form (`file://`
+    mirrors, used by tests and air-gapped installs).
+    """
+    m = re.match(r"^git@([^:]+):(.+?)(?:\.git)?/?$", url or "") or re.match(
+        r"^(?:ssh|https?)://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$", url or ""
+    )
+    if not m:
+        return ""
+    return f"https://{m.group(1)}/{m.group(2)}"
+
+
+def verify_write_access(url: str, pat: str) -> VerifyResult:
+    """Can this token push to this repo? Asked without pushing anything.
+
+    Git's smart-HTTP push begins by requesting the `git-receive-pack`
+    service advertisement, and *that* is where the server decides whether
+    you may write. So we make exactly that request and read the status
+    code. Nothing is cloned, nothing is sent, no ref is touched — the
+    operator can press this as often as they like while fixing a token's
+    scopes.
+
+    Measured against GitHub, which is the surface this diagnoses:
+
+        | token / repo                     | upload-pack | receive-pack |
+        | valid, push allowed              | 200         | 200          |
+        | invalid or expired               | —           | 401          |
+        | valid, no write on this repo     | 200         | 403          |
+
+    The 403 row is the failure this exists to catch. It is the one a
+    fine-grained PAT produces when the repo is simply not ticked under
+    *Repository access* — the token authenticates perfectly, clones
+    perfectly, and cannot push. Left unverified it reappears much later
+    as a failed feed:
+
+        remote: Write access to repository not granted.
+        fatal: ... The requested URL returned error: 403
+
+    A `--dry-run` push would be the more literal test, but it needs a
+    local clone that does not exist yet at this point in the wizard, and
+    it would make the operator wait for one just to answer a yes/no.
+    """
+    if not url:
+        return VerifyResult(ok=False, message="No repository is configured yet.")
+    if not pat:
+        return VerifyResult(ok=False, message="Paste a token first, or skip this step.")
+
+    base = _https_repo_base(url)
+    if not base:
+        return VerifyResult(
+            ok=False,
+            message=(
+                f"{url} has no https form, so a token cannot be checked against "
+                "it. This is normal for a local or mirrored remote."
+            ),
+        )
+
+    probe = f"{base}.git/info/refs?service=git-receive-pack"
+    # Git authenticates as `x-access-token:<pat>`; same here, so a token
+    # that passes this passes the push.
+    auth = base64.b64encode(f"x-access-token:{pat}".encode()).decode()
+    request = urllib.request.Request(
+        probe,
+        headers={"Authorization": f"Basic {auth}", "User-Agent": "git/brainoutside-setup"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            if response.status == 200:
+                return VerifyResult(
+                    ok=True, message="The server can push to your brain."
+                )
+            return VerifyResult(
+                ok=False,
+                message=f"Unexpected response from the repository ({response.status}).",
+            )
+    except urllib.error.HTTPError as exc:
+        return VerifyResult(ok=False, **_write_failure(exc, base))
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        # Network-shaped, not permission-shaped. Say so, so the operator
+        # doesn't go re-cutting a token that was never the problem.
+        return VerifyResult(
+            ok=False,
+            message="Could not reach the repository to check the token.",
+            git_error=str(exc),
+        )
+
+
+def _write_failure(exc: "urllib.error.HTTPError", base: str) -> dict:
+    """Turn a receive-pack status into something worth acting on."""
+    if exc.code == 401:
+        return {
+            "message": (
+                "That token was not accepted. It may be expired, revoked, or "
+                "pasted incompletely."
+            ),
+            "git_error": "401 Unauthorized",
+        }
+    if exc.code == 403:
+        return {
+            "message": (
+                "The token is valid but cannot write to this repository. For a "
+                "fine-grained token, add this repository under Repository "
+                "access and give it Contents: Read and write."
+            ),
+            "git_error": f"403 Forbidden — {base}",
+        }
+    if exc.code == 404:
+        return {
+            "message": (
+                "This token cannot see that repository at all. Check the "
+                "repository name, and that the token grants access to it."
+            ),
+            "git_error": f"404 Not Found — {base}",
+        }
+    return {
+        "message": "The repository refused the write check.",
+        "git_error": f"HTTP {exc.code}",
+    }
 
 
 # ---- the Build step ------------------------------------------------------

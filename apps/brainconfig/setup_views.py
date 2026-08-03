@@ -201,6 +201,7 @@ def _step_read(request):
 
 
 def _step_write(request):
+    result = request.session.pop("write_verify_result", None)
     if request.method == "POST":
         action = request.POST.get("action", "")
         if action == "skip":
@@ -212,10 +213,41 @@ def _step_write(request):
             )
             return redirect("setup:step", slug="claude")
         pat = (request.POST.get("pat") or "").strip()
+        if action == "verify":
+            # Check the pasted token if there is one, otherwise whatever is
+            # already stored — the same button has to work for "I just typed
+            # this" and "is the thing I saved last week still good".
+            outcome = setup_services.verify_write_access(
+                gitrepo.configured_url(), pat or gitcreds.write_pat()
+            )
+            request.session["write_verify_result"] = {
+                "ok": outcome.ok,
+                "message": outcome.message,
+                "git_error": outcome.git_error,
+            }
+            # Deliberately NOT saved on verify. A token that fails the check
+            # should not end up stored because someone pressed the button to
+            # find out.
+            return redirect(request.path)
         if pat:
             gitcreds.set_write_pat(pat, actor=request.user)
             setup_state.set_write_skipped(False)
-            messages.success(request, "Write credential saved.")
+            # Save still checks, so the credential cannot pass through this
+            # step unexamined — that was the whole gap. It is a warning, not
+            # a block: a network blip must not strand setup, and the
+            # operator may be fixing the token's scopes in another tab.
+            outcome = setup_services.verify_write_access(
+                gitrepo.configured_url(), pat
+            )
+            if outcome.ok:
+                messages.success(request, "Write credential saved and verified.")
+            else:
+                messages.warning(
+                    request,
+                    f"Write credential saved, but it did not pass the check. "
+                    f"{outcome.message} Approved feeds will fail to push until "
+                    f"this is fixed.",
+                )
             return redirect("setup:step", slug="claude")
         messages.error(request, "Paste a token, or choose 'Skip for now'.")
         return redirect(request.path)
@@ -229,6 +261,7 @@ def _step_write(request):
         token_url="https://github.com/settings/personal-access-tokens/new",
         configured=status["configured"],
         source=status["source"],
+        result=result,
     ))
 
 

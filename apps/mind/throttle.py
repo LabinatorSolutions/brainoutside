@@ -108,6 +108,20 @@ def check(
     **_: object,
 ) -> ThrottleResult:
     if credential is not None:
+        # URL-path tokens carry their own limit and get their own bucket
+        # namespace. Sharing `brainrl:{pk}` with API keys would collide on
+        # every pk that exists in both tables — token 3 and key 3 are
+        # different credentials and would eat each other's budget.
+        from apps.url_mcp_tokens import api as url_tokens
+
+        url_limit = url_tokens.rate_limit_for(credential)
+        if url_limit is not None:
+            return _consume(
+                f"brainrl:urltok:{getattr(credential, 'pk', 'x')}",
+                url_limit,
+                "per-token limit exceeded",
+            )
+
         profile = Consumer.objects.filter(api_key=credential).first()
         limit = profile.rate_limit_per_min if profile else DEFAULT_RATE_LIMIT_PER_MIN
         return _consume(

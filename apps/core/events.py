@@ -174,6 +174,13 @@ class EndpointCalled(Event):
     latency_ms: int
     user_id: int | None = None
     credential_id: int | None = None
+    # Which table `credential_id` is a pk in — "api_key", "url_token", …
+    # A bare pk is ambiguous now that two credential types authenticate
+    # MCP callers: APIKey 3 and URLMCPToken 3 are different rows, and a
+    # subscriber that assumes its own table would stamp the wrong one.
+    # Empty means "not stated"; subscribers predating this field read
+    # that as their own kind.
+    credential_kind: str = ""
     error_class: str = ""
     ip: str | None = None
     user_agent: str = ""

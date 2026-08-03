@@ -22,6 +22,21 @@ from apps.feeds.services import intake
 from apps.mind import tiers
 
 
+def _api_key_or_none(credential):
+    """`Feed.consumer` and `Event.consumer` are FKs to `api_keys.APIKey`.
+
+    A `URLMCPToken` caller is authenticated and can be above the tier
+    gate, but assigning it to either FK raises ValueError — so the
+    proposal would 500 for the exact credential claude.ai uses. Attribute
+    it to NULL instead, the same way the ops UI form does, and let the
+    proposal through. The token's own `last_used_at` records that it
+    called; the queue row simply doesn't name a key.
+    """
+    from apps.api_keys.models import APIKey
+
+    return credential if isinstance(credential, APIKey) else None
+
+
 @endpoint(
     slug="propose-feed",
     description=(
@@ -76,7 +91,7 @@ class ProposeFeed(Endpoint):
         if tier == "public":
             emit(
                 "auth_denied",
-                consumer=ctx.credential if ctx.credential is not None else None,
+                consumer=_api_key_or_none(ctx.credential),
                 surface="propose-feed",
                 tier=tier,
             )
@@ -89,7 +104,7 @@ class ProposeFeed(Endpoint):
             content=inp.content,
             notes=inp.notes,
             source_id=inp.source_id,
-            consumer=ctx.credential,
+            consumer=_api_key_or_none(ctx.credential),
         )
         return self.Output(
             feed_id=feed.pk,

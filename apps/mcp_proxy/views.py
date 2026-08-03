@@ -1051,6 +1051,10 @@ async def _safe_record(
                     if principal and principal.credential is not None
                     else None
                 ),
+                # Names the table that pk belongs to. Without it the
+                # api_keys subscriber stamps `last_used_*` on whichever
+                # APIKey happens to share the number with a URL token.
+                credential_kind=(principal.credential_kind if principal else ""),
                 credits_charged=credits_charged,
                 consume_idempotency_key=consume_idempotency_key or "",
                 ip=ip,

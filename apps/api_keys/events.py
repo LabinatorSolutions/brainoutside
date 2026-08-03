@@ -57,6 +57,13 @@ class APIKeyRevoked(Event):
 def _stamp_last_used(event: EndpointCalled) -> None:
     if event.credential_id is None:
         return
+    # `credential_id` is a pk in whichever table `credential_kind` names.
+    # A URL-path MCP token with the same pk as one of these keys would
+    # otherwise stamp that key as freshly used — the one fact an operator
+    # checks before revoking something. Empty kind means a fire site that
+    # predates the field, and every one of those was an API key.
+    if event.credential_kind not in ("", "api_key"):
+        return
     # Late import — keeps test-only callers (which don't always have the DB
     # ready at module import time) on the lazy path.
     from django.utils import timezone

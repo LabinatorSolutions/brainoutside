@@ -10,13 +10,22 @@ The lab: a fresh `config.settings.prod` stack on empty volumes (compose project
 published `brainoutside-template`, with the `/setup` wizard walked in a real
 browser. That is also the boot gate `LAUNCH.md` §2 left open — **it passes**.
 
-Opened 2026-08-02. Nothing here has been fixed; this is a work list.
+Opened 2026-08-02. Worked through 2026-08-03 — each item now carries its
+own status line.
+
+**Note on the lab.** It was rebuilt from `origin/main` on 2026-08-03 to
+verify these fixes, so its port moved (`43331` → `45939`; it is assigned
+fresh on each `up`). Read the current one from
+`docker compose -p bo-docs-getting-started ps`. Volumes untouched: the
+brain, the wizard's answers and the one approved feed are all still there.
 
 ---
 
 ## 1. MCP does not apply the consumer's tier — REST does
 
 **Severity: high.** Blocks the getting-started page's MCP section.
+
+> **FIXED** — commit `879d3f0`. Re-verified live; see *Fix* below.
 
 The same consumer key resolves to a different tier depending on the door:
 
@@ -37,6 +46,74 @@ more — so this is not a disclosure bug. But MCP is the headline integration,
 and an agent pointed at a real brain answers *"there are no takes here"*.
 
 Evidence: `evidence/e5-mcp.txt`, `scripts/e5_mcp_query.py`.
+
+### What the list got wrong: `propose-feed` was dead over MCP entirely
+
+Worse than reported, and in a way that matters more. `propose-feed`
+raises below `agents-only` (`apps/feeds/endpoints.py:75`), and every MCP
+caller resolved to `public` — so **no key of any tier could propose a
+feed over MCP**, only over REST:
+
+```
+propose-feed over MCP -> 200 isError: True
+  "propose-feed requires an agents-only key or above."
+```
+
+The read side degraded quietly; the write side was simply unavailable.
+Same root cause, one fix.
+
+### Cause
+
+Not the hand-off — the headers were fine. `apps/core/mcp/bridge.py`
+built **every** `Ctx` with `user=None, credential=None`, under a
+`# Phase 3 resolves accounts.User from mcp_user_id_var` comment. The
+contextvars were set by the middleware and never read. The module
+docstring already described the code that was missing, which is why
+reading it does not find this.
+
+`tiers.tier_for_credential(None)` returns `public` — identical to an
+unprofiled key — so the failure had no distinguishing symptom.
+
+### Fix
+
+The proxy strips the bearer token deliberately, so the subprocess has to
+re-look-up the rows from `(user_id, credential_id)`. Two pieces:
+
+- **`X-MCP-Credential-Kind` now crosses the hop and is read.** The proxy
+  was already sending it (`views.py:170`); nothing consumed it. A bare pk
+  is ambiguous — `APIKey` 3 and an OAuth `AccessToken` 3 are different
+  credentials with different tiers.
+- **A rehydrator registry on `apps.core.bearer`.** `apps.core` cannot
+  import `apps.api_keys` (Contract 1), so this follows the pattern that
+  module already uses for resolvers: core owns the registry, the owning
+  app registers into it from `AppConfig.ready()`. The rehydrator
+  re-applies every liveness guard `authenticate_token` applies —
+  it hands out a tier, so a revoked key must not resolve just because
+  someone holds its id.
+
+Unknown kind or dead row → no credential → `public`, with a logged
+warning. Same direction as the bug, now only when it is true.
+
+### Verified
+
+Tier parity across every tier, on the live lab, after rebuild — and the
+counter-check that this grants tier rather than bypassing it:
+
+| key tier | REST tier / notes | MCP tier / notes | propose-feed over MCP |
+|---|---|---|---|
+| `public` | public / 2 | public / 2 | denied |
+| `agents-only` | agents-only / 7 | agents-only / 7 | accepted |
+| `private` | private / 7 | private / 7 | accepted |
+| *unprofiled* | public / 2 | public / 2 | denied |
+
+A `public` key still sees 2 of 7. Least privilege for an unprofiled key
+still holds. 123 host tests pass, including
+`apps/core/mcp/tests/test_bridge_identity.py` — new, and DB-free by
+registering a fake credential kind against the rehydrator registry.
+
+Probe keys and the two probe feed proposals were deleted from the lab
+afterwards; its consumer list and feed queue are as the docs work left
+them.
 
 ## 2. "Approval is one **signed** commit" is not literally true
 

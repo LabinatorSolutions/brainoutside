@@ -547,11 +547,26 @@ class Settings(BaseSettings):
         # `_derive_public_origin` fills it in from ALLOWED_HOSTS anyway.
         # Refusing to boot over it would add a third required env var
         # (SETUP-DESIGN.md: the target is two), so it warns instead.
+        # Only worth saying when it is not simply true. `_derive_public_origin`
+        # has already run, and it overwrites a localhost issuer whenever
+        # ALLOWED_HOSTS names a real host — so reaching here with a localhost
+        # issuer means ALLOWED_HOSTS named none. If the operator listed only
+        # loopback, they are running locally on purpose (the getting-started
+        # path does exactly this) and a localhost issuer is the correct
+        # answer, not a misconfiguration to warn them about three times
+        # before they have even seen the wizard.
+        #
+        # What is still worth flagging is a deployment that looks public but
+        # gave us no hostname to derive from — `ALLOWED_HOSTS=*` being the
+        # usual way in. There the advice is actionable.
         from urllib.parse import urlparse
 
         issuer = (self.OAUTH_ISSUER or "").strip()
         issuer_host = urlparse(issuer).hostname or ""
-        if not issuer or issuer_host in ("localhost", "127.0.0.1", "::1"):
+        _LOOPBACK = ("localhost", "127.0.0.1", "::1")
+        entries = [h.strip() for h in self.ALLOWED_HOSTS if h.strip()]
+        running_locally = bool(entries) and all(h in _LOOPBACK for h in entries)
+        if (not issuer or issuer_host in _LOOPBACK) and not running_locally:
             import logging
 
             logging.getLogger(__name__).warning(

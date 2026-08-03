@@ -12,6 +12,7 @@ from apps.events import ops_views as events_ops
 from apps.feeds import ops_views as feeds_ops
 from apps.mind import ops_views as mind_ops
 from apps.reader import ops_views as reader_ops
+from apps.url_mcp_tokens import ops_views as url_token_ops
 
 from . import health_views, styleguide_views, views
 
@@ -40,6 +41,11 @@ urlpatterns = [
     # that app owns Consumer; routed here so the ops surface keeps one
     # prefix and one nav.
     path("consumers/", mind_ops.consumers_page, name="consumers"),
+    # The `/mcp/k/<token>/` credentials — claude.ai web + mobile. Its own
+    # page, not a tab on API keys: the secret is a URL pasted into someone
+    # else's product, which is a different thing to reason about than a
+    # bearer key you hold.
+    path("connectors/", url_token_ops.connectors_page, name="connectors"),
     path("settings/", views.settings_page, name="settings"),
     # Setup health + the repair actions (M5.3). Separate page rather than a
     # Settings tab: these are *actions on the world* (re-clone, rotate a

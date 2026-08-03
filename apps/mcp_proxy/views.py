@@ -569,9 +569,14 @@ async def mcp_proxy_view(
                 {
                     "error": {
                         "code": "unauthorized",
+                        # No URL in the hint. `/dashboard/url-tokens/` was
+                        # a route this app never had; the real page is under
+                        # the operator-configurable ops prefix, and naming
+                        # that prefix to an unauthenticated caller gives away
+                        # the one surface the IP allowlist exists to hide.
                         "message": (
-                            "Invalid or expired URL token. Mint a new one at "
-                            "/dashboard/url-tokens/."
+                            "Invalid, revoked or expired URL token. Mint a new "
+                            "connector URL from the ops UI."
                         ),
                     }
                 },

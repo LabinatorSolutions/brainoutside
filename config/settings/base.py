@@ -218,12 +218,14 @@ MCP_LOOPBACK_PORT = _env.MCP_LOOPBACK_PORT
 MCP_LOOPBACK_SECRET = (
     _env.MCP_LOOPBACK_SECRET.get_secret_value() if _env.MCP_LOOPBACK_SECRET else ""
 )
-# URL-path MCP tokens are half-vendored: the proxy view's url-token
-# branch and the lockout gate are here, `apps.url_mcp_tokens` is not.
-# The branch survives that — its only import of the missing app is the
-# `record_use` call, inside a try/except. Env-driven and off by default
-# (see the field in env.py for why on is not a resting state).
+# URL-path MCP tokens. Env-driven and off by default — see the field in
+# env.py for why on is not a resting state. Off means the proxy 404s
+# `/mcp/k/...`, so the surface is invisible rather than merely closed.
 MCP_URL_AUTH_ENABLED = _env.MCP_URL_AUTH_ENABLED
+# Expiry the mint form preselects. It was defined in env.py and never
+# exported, so the ops picker read its own fallback and an operator who
+# set the env var got 90 days anyway.
+URL_TOKEN_DEFAULT_TTL_DAYS = _env.URL_TOKEN_DEFAULT_TTL_DAYS
 # OAuth flows are not vendored; issuer is still announced in 401 hints.
 OAUTH_ISSUER = _env.OAUTH_ISSUER.rstrip("/")
 MCP_OAUTH_DCR_MODE = "off"

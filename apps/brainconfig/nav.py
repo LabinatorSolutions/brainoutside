@@ -54,6 +54,7 @@ def ops_context(request) -> dict:
                 {"label": "Tasks", "icon": "tasks", "url": reverse("brainconfig:tasks")},
                 {"label": "Logs", "icon": "logs", "url": reverse("brainconfig:logs")},
                 {"label": "API keys", "icon": "keys", "url": reverse("brainconfig:consumers")},
+                {"label": "Connectors", "icon": "link", "url": reverse("brainconfig:connectors")},
                 {"label": "Settings", "icon": "settings", "url": settings_url},
                 {"label": "Setup & health", "icon": "health", "url": reverse("brainconfig:health")},
             ],

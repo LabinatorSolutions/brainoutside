@@ -12,10 +12,15 @@ Two things are pinned here, both DB-free:
   is unreachable code and the connector gets a 404 that looks like the flag.
 - **The flag is off by default, and off means 404** — not 401. A closed door
   that answers "wrong key" confirms the surface exists; this one denies that
-  the address is real. `apps.url_mcp_tokens` is not vendored yet, so while
-  the flag is on the path resolves ordinary `mcpsk_` keys with neither the
-  prefix lockout (`extract_url_token_prefix` ignores non-`mcpurl_` tokens)
-  nor any scrub of the token out of `request.path`.
+  the address is real.
+
+`apps.url_mcp_tokens` is vendored now, so with the flag on the route resolves
+purpose-built `mcpurl_` tokens: prefix lockout on its own scope, scrubbed out
+of the logs, expiring, revocable without touching your bearer keys. The
+credential itself is covered by `test_url_token_credential.py`. Ordinary
+`mcpsk_` keys still resolve here too — the bearer registry is shared — and
+that path has none of those properties, which is why the connector should be
+pointed at a `mcpurl_` token.
 
 What is NOT covered: the flag-on path. It runs `resolve_bearer`, which hits
 the credential tables, and these tests stay off the DB (the host venv has no

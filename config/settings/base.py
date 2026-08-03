@@ -42,6 +42,10 @@ INSTALLED_APPS = [
     # Vendored framework apps
     "apps.core",
     "apps.api_keys",
+    # The `/mcp/k/<token>/` credential. Separate app from api_keys because
+    # it is a separate credential: it expires by default, it is scrubbed
+    # out of every log, and revoking it does not touch your bearer keys.
+    "apps.url_mcp_tokens",
     "apps.mcp_proxy",
     "apps.docs",
     # Brain apps

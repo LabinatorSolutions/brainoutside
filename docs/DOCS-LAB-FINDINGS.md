@@ -117,6 +117,24 @@ newcomer reads in the log, and it reads like a misconfiguration.
 
 Evidence: `evidence/e2-fresh-boot.txt`.
 
+## 6. `DEPLOY.md` §4 is stale about the template deep link
+
+**Severity: low.** Docs only.
+
+It says the "generate from template" deep link on wizard step 2 "404s until
+`brain-template` is published as its own public repo (M5.4)". It was published
+on 2026-08-02. Either the link works now and that paragraph should go, or it
+still fails for a different reason and the stated cause is wrong.
+
+## 7. `DEPLOY.md` contradicts itself about the periodic pull
+
+**Severity: low.** Docs only, but the two statements are one page apart.
+
+§7 says, in bold: *"There is no periodic pull."* §8's post-deploy checklist then
+says the server reindexes "within seconds (webhook) or minutes (periodic
+pull)". §7 reads like it was written after someone actually checked. The docs
+site follows §7.
+
 ---
 
 ## Not bugs — behaviours the docs must handle

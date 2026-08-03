@@ -96,7 +96,17 @@ class Settings(BaseSettings):
     )
 
     # ----- Admin URL hardening -----
-    ADMIN_PANEL_URL_PATH: str = "admin/"
+    # `ops/`, not `admin/`. This default is the one an operator who never
+    # sets the var actually gets, so it has to match what everything else
+    # says the ops UI is: `.env.example`, every doc, every `or "ops/"`
+    # fallback in the code, `templates/ops/`, the nav tests. It said
+    # `admin/` and a fresh deploy served the panel from a path no
+    # document mentioned.
+    #
+    # It is also the whole point of the setting. `/admin/` is the most
+    # scanned path on the web; defaulting an admin panel there and
+    # calling the setting "URL hardening" is a contradiction.
+    ADMIN_PANEL_URL_PATH: str = "ops/"
     DJANGO_ADMIN_URL_PATH: str = "_django-admin-CHANGE-ME/"
     ADMIN_IP_ALLOWLIST: Annotated[list[str], NoDecode] = Field(default_factory=list)
 

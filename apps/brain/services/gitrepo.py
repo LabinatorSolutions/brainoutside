@@ -325,14 +325,58 @@ def bootstrap() -> dict[str, str]:
     return {"action": action, "head": sha, "dir": str(d)}
 
 
+def rebase_in_progress() -> bool:
+    """True when a rebase was started and never finished or aborted."""
+    g = repo_dir() / ".git"
+    return (g / "rebase-merge").exists() or (g / "rebase-apply").exists()
+
+
+def abort_rebase() -> bool:
+    """Undo a half-finished rebase. Returns True if there was one.
+
+    Nothing in this codebase ever ran `rebase --abort`, so a conflicting
+    pull wedged the clone permanently: `.git/rebase-merge` stayed put,
+    every later pull failed with "there is already a rebase-merge
+    directory", the working tree read dirty, and `replace_clone` — the
+    documented repair — refused for exactly that reason. The brain
+    served whatever it had at the time, forever.
+
+    Abort, not `reset --hard`: the pre-rebase state can hold local
+    commits that exist nowhere else (an approval that committed but
+    failed to push), and discarding those is the thing `replace_clone`
+    guards against. `--autostash` restores its own stash on abort.
+    """
+    if not rebase_in_progress():
+        return False
+    try:
+        _git("rebase", "--abort", cwd=repo_dir())
+        log.warning("brain: aborted an interrupted rebase in the clone")
+    except BrainRepoError:
+        log.exception("brain: `rebase --abort` failed; the clone needs manual repair")
+    return True
+
+
 def pull_rebase() -> dict[str, str]:
     """Fetch + rebase under the lock. Returns old/new HEAD for sync logging."""
     d = repo_dir()
     with repo_lock():
         if not is_valid_repo():
             raise BrainRepoError(f"No valid clone at {d} — run bootstrap first.")
+        # Clear a rebase an earlier run left behind, so an already-wedged
+        # install heals on the next sync rather than needing a human.
+        abort_rebase()
         old = head_sha()
-        _git("pull", "--rebase", "--autostash", cwd=d)
+        try:
+            _git("pull", "--rebase", "--autostash", cwd=d)
+        except BrainRepoError as exc:
+            if abort_rebase():
+                raise BrainRepoError(
+                    f"{exc} The rebase was aborted, so the clone is usable and "
+                    f"back at {old[:12]}. This usually means the clone holds "
+                    "commits that conflict with origin — check whether an "
+                    "approved feed committed here but never pushed."
+                ) from exc
+            raise
         new = head_sha()
         verify_contract()
     return {"old": old, "new": new, "changed": str(old != new).lower()}
@@ -345,6 +389,7 @@ def status_probe() -> dict[str, object]:
         info: dict[str, object] = {"valid": valid, "dir": str(repo_dir())}
         if valid:
             info["head"] = head_sha()
+            info["rebase_in_progress"] = rebase_in_progress()
             missing = [p for p in CONTRACT_PATHS if not (repo_dir() / p).exists()]
             info["contract_ok"] = not missing
             if missing:

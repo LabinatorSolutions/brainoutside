@@ -181,6 +181,20 @@ def check_clone() -> dict:
                       f"Nothing valid at {probe.get('dir')}. Build it from the "
                       "setup page, or replace the clone.",
                       action="replace_clone")
+    # Before the contract check on purpose: a clone stopped mid-rebase can
+    # read as contractless, and that diagnosis sends the operator to
+    # "Replace the clone", which then refuses because the tree is dirty —
+    # a dead end. This one names the actual problem and has a way out.
+    if probe.get("rebase_in_progress"):
+        return _check(
+            "clone", "danger", "The clone is stuck mid-rebase",
+            "A pull hit a conflict and left the rebase unfinished, so every "
+            "later sync fails and the brain being served is frozen. The next "
+            "sync aborts it automatically — run Pull from GitHub to trigger "
+            "one, then check whether an approved feed committed here but "
+            "never pushed.",
+            action="pull_now",
+        )
     if not probe.get("contract_ok"):
         return _check("clone", "danger", "The clone is missing contract files",
                       "Missing: " + ", ".join(probe.get("contract_missing", [])) +

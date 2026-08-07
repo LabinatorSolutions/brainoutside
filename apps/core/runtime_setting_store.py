@@ -8,10 +8,18 @@ The four operator-flippable flags (`maintenance_enabled`,
   2. Redis caches the read with a short TTL so the hot path stays
      sub-ms most of the time.
   3. A write commits the DB row, fires an audit row at the caller's
-     scope, then invalidates the cache so the next read repopulates.
+     scope, then writes the new value THROUGH the cache — see
+     `set_value` for why that is not the same as invalidating it.
   4. On Redis outage we fall through to a DB read; on DB outage we
      fall through to the caller-supplied default. The flag never
      "flips by itself" because the cache lost a key.
+
+The read path is read-then-populate with no interlock, so the TTL is
+the honest upper bound on how long a flip can take to be seen
+everywhere. That is a deliberate ceiling, not an oversight: the
+alternative is a version stamp or a lock on a read that happens on
+every request, and every surface that displays one of these flags
+already tells the operator the propagation window.
 
 Service modules use the thin API here and continue to expose their
 existing public surface (`billing_mode.current()`, `maintenance.is_enabled()`,
@@ -114,13 +122,35 @@ def set_value(
             key=key,
             defaults={"value": value, "updated_by": actor},
         )
+    # WRITE-THROUGH, not invalidate. Deleting the key left the next read
+    # to repopulate it, and `get_str` is read-then-populate with no
+    # interlock: a reader that had already fetched the OLD row could land
+    # its `cache.set` after this delete and pin the stale value for the
+    # whole TTL — five minutes of maintenance mode reading as "off" after
+    # the operator turned it on. Writing the new value here means the
+    # common case propagates immediately, and the losing interleaving is
+    # narrowed to a reader whose `set` lands after this one.
+    #
+    # The residual race is NOT closed, deliberately. Closing it needs a
+    # version stamp or a lock on a hot per-request read, and the window
+    # is already bounded by the same TTL the UI states out loud. This is
+    # the acknowledgement, not a claim of atomicity.
     try:
-        cache.delete(_CACHE_KEY_PREFIX + key)
+        cache.set(_CACHE_KEY_PREFIX + key, value, timeout=_CACHE_TTL_SECONDS)
     except Exception:
         log.warning(
-            "runtime_setting_store: cache invalidate failed for key=%s", key,
+            "runtime_setting_store: cache write-through failed for key=%s", key,
             exc_info=True,
         )
+        # Never leave the OLD value sitting there because the write-through
+        # failed — an unset key costs a DB read, a stale one is wrong.
+        try:
+            cache.delete(_CACHE_KEY_PREFIX + key)
+        except Exception:
+            log.warning(
+                "runtime_setting_store: cache invalidate failed for key=%s", key,
+                exc_info=True,
+            )
 
 
 def clear(key: str) -> None:

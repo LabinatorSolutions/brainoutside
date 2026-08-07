@@ -17,12 +17,13 @@ Design notes:
   it off") MUST survive a Redis incident. Redis-only would silently
   re-enable a buggy endpoint on a cache wipe.
 - Cache key namespace ``endpoint_gating:<slug>`` — one key per slug
-  so a single Redis GET answers the gate. Stale-while-correct: the
-  30s window means a flip can take up to 30s to propagate cluster-
-  wide. Operators who need instant takedowns should toggle, then
-  bump the cache-invalidate path in `set_disabled` (already does this
-  but clusters with cache replication may still serve a stale read
-  for a few hundred ms).
+  so a single Redis GET answers the gate. `set_disabled` writes the
+  new state THROUGH the cache rather than invalidating, so a toggle
+  normally takes effect on the next request rather than after the
+  next miss. The 30s TTL remains the honest upper bound: reads are
+  read-then-populate with no interlock, so a reader already holding
+  the previous row can still re-cache it after the write. Bounded,
+  acknowledged, and not worth a version stamp on a per-request read.
 - Cache failure direction: a Redis outage falls through to a DB
   read — slower but correct. Phase 8.6.1 contract.
 """
@@ -123,10 +124,22 @@ def set_disabled(
             "updated_by": actor if actor and getattr(actor, "pk", None) else None,
         },
     )
+    # WRITE-THROUGH, not invalidate — see `runtime_setting_store.set_value`
+    # for the full note. `is_disabled` is read-then-populate with no
+    # interlock, so deleting the key left a reader holding the OLD row
+    # free to re-cache it after this write and keep a "this is broken —
+    # keep it off" takedown from taking effect for the full 30s. Writing
+    # the new state propagates it now; the losing interleaving narrows to
+    # a reader whose `set` lands after this one, and stays TTL-bounded.
     try:
-        cache.delete(_cache_key(slug))
+        cache.set(_cache_key(slug), "1" if disabled else "0", timeout=_CACHE_TTL_S)
     except Exception:
-        pass
+        # An unset key costs a DB read; a stale one serves a disabled
+        # endpoint. Fall back to dropping it.
+        try:
+            cache.delete(_cache_key(slug))
+        except Exception:
+            pass
 
     changed = created or (before_disabled != disabled) or (before_reason != obj.reason)
     if changed:

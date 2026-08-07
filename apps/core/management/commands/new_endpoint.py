@@ -15,7 +15,7 @@ so the contributor doesn't forget step 3 of the recipe.
 The scaffold is intentionally minimal — it's a starting point, not a
 prescription. Authors edit Input / Output / run() to fit their case.
 The CLAUDE.md pattern library shows the canonical shapes for the three
-common patterns (sync no-credits / sync with credits / async).
+common patterns (sync / async).
 """
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ class Command(BaseCommand):
         self.stdout.write(
             f"  1. Add {dotted!r} to LOCAL_APPS in config/settings/base.py"
         )
-        self.stdout.write("  2. Edit endpoints.py — set credits_cost, write Input/Output/run()")
+        self.stdout.write("  2. Edit endpoints.py — write Input/Output/run()")
         self.stdout.write("  3. Edit tests.py — replace the stub assertion with a real one")
         self.stdout.write("  4. manage.py validate_endpoints")
         self.stdout.write("  5. pytest apps/app_endpoints/{slug}/".format(slug=slug.replace("-", "_")))
@@ -130,8 +130,6 @@ from apps.core.registry import Endpoint, endpoint
 @endpoint(
     slug="{slug}",
     description="TODO: one-line description that shows in /docs/ + MCP listing.",
-    # Set credits_cost > 0 to require an authenticated bearer + auto-charge.
-    credits_cost=0,
     # Tag groups the endpoint on the /docs/ catalog page. Use "examples"
     # for reference endpoints, or your own grouping ("billing", "search", ...).
     tags=(),
@@ -151,8 +149,8 @@ class {cls}(Endpoint):
 
     async def run(self, inp: Input, ctx: Ctx) -> Output:
         # TODO: implement. See CLAUDE.md for the 3 pattern shapes:
-        #   - sync no-credits (this scaffold's default)
-        #   - sync + credits + safe_request for outbound HTTP
+        #   - sync (this scaffold's default)
+        #   - sync + safe_request for outbound HTTP
         #   - async + ctx.aenqueue() returning a JobHandle (tell callers in
         #     the description to poll the `get-job-status` tool every 1-2s)
         return self.Output(greeting=f"Hello, {{inp.name}}")

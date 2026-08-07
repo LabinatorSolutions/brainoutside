@@ -75,7 +75,6 @@
                   {% if card.deprecated %}
                     <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:bg-amber-950 dark:text-amber-400">{% trans "deprecated" %}</span>
                   {% endif %}
-                  <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" title="{% trans 'Credits per call' %}">{% blocktrans with cost=card.credits_cost %}{{ cost }} cr{% endblocktrans %}</span>
                 </div>
               </div>
               {% if card.description %}

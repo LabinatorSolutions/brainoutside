@@ -80,8 +80,6 @@ from django.views.decorators.csrf import csrf_exempt
 
 from apps.core import endpoint_gating, error_hook, log_context
 from apps.core.bearer import resolve as resolve_bearer
-from apps.core.charging import charge as charge_credits
-from apps.core.charging import make_idempotency_key
 from apps.core.events import EndpointCalled, fire
 from apps.core.registry import registry
 from apps.core.security.client_ip import client_ip
@@ -361,62 +359,11 @@ async def _resolve_principal(request: HttpRequest) -> Principal | None:
     return await resolve_bearer(token)
 
 
-async def _finalize_charge(
-    charge_cm: object | None,
-    charge_handle: object | None,
-    *,
-    refund: bool,
-    refund_reason: str = "endpoint_error",
-) -> None:
-    """Commit (no-op) or refund the credit charge, then exit the CM.
-
-    `Charge.issue_refund()` is idempotent and sync. Calling it before
-    `__exit__(None, None, None)` lands a compensating ledger row
-    without re-raising. The CM exits normally because we pass no exc
-    info — `credit_charge` only refunds inside `__exit__` when an
-    exception is propagated through `yield`, which we don't do here.
-    """
-    if charge_cm is None:
-        return
-
-    if refund and charge_handle is not None and hasattr(charge_handle, "issue_refund"):
-        try:
-            await sync_to_async(
-                charge_handle.issue_refund,
-                thread_sensitive=True,  # type: ignore[attr-defined]
-            )(reason=refund_reason)
-        except Exception:
-            log.exception("mcp proxy: refund failed")
-
-    try:
-        await sync_to_async(
-            charge_cm.__exit__,
-            thread_sensitive=True,  # type: ignore[attr-defined]
-        )(None, None, None)
-    except Exception:
-        log.exception("mcp proxy: charge __exit__ failed")
-
-
-def _credit_error_response(request_id: str, *, required: int, available: int) -> JsonResponse:
-    """402 for an MCP `tools/call` that the user can't afford."""
-    body = {
-        "error": {
-            "code": "insufficient_credits",
-            "message": (
-                f"Need {required} credit(s); balance is {available}. Top up at /dashboard/billing/."
-            ),
-            "required": required,
-            "available": available,
-        }
-    }
-    resp = JsonResponse(body, status=402)
-    resp.headers["X-Request-ID"] = request_id
-    return resp
 
 
 def _active_spec_for_slug(slug: str):  # noqa: ANN202 — return type is EndpointSpec | None
     """Pick the active spec for an MCP tool-name. Mirrors the version-
-    pick rule used by the charging block below — highest registered
+    pick rule — highest registered
     version wins. Returns None when the slug is unknown to the registry
     (a tool-name from a stale client cache, for instance)."""
     specs = registry.by_slug(slug)
@@ -637,7 +584,7 @@ async def mcp_proxy_view(
         request._principal = principal  # type: ignore[attr-defined]
 
     # backfill `user_id` on the log contextvar so any log
-    # record emitted further down (charging, upstream forward, streamer
+    # record emitted further down (upstream forward, streamer
     # finalization) carries the user. The outer RequestIdMiddleware reset
     # restores this when the request completes.
     log_context.update_user_id(principal.user.pk)
@@ -685,10 +632,9 @@ async def mcp_proxy_view(
 
     # FinalPolish F3 — RFC 8594 deprecation + sunset gate on the MCP
     # path. Sunset short-circuits with a JSON-RPC tool error envelope
-    # BEFORE we charge credits or forward anything to the loopback
-    # subprocess (the call literally cannot be served, and the user
-    # shouldn't pay for it). Deprecation flags the slug so we can stamp
-    # advisory HTTP headers on the response once it's built.
+    # before we forward anything to the loopback subprocess — the call
+    # literally cannot be served. Deprecation flags the slug so we can
+    # stamp advisory HTTP headers on the response once it's built.
     deprecation_headers: dict[str, str] = {}
     if log_slug:
         active_for_gate = _active_spec_for_slug(log_slug)
@@ -703,63 +649,13 @@ async def mcp_proxy_view(
             if active_for_gate.is_deprecation_active_at(now):
                 deprecation_headers = active_for_gate.deprecation_response_headers()
 
-    # credit charge on the MCP path. tools/call requests
-    # that map to a paid @endpoint must charge credits BEFORE forwarding,
-    # and refund on upstream non-2xx. tools/list / initialize / pings
-    # don't trigger this branch (`log_slug is None`).
-    #
-    # We can't use `with charge_credits(...)` directly because the
-    # request flow (httpx.send → StreamingHttpResponse) spans the
-    # request handler AND the streamer coroutine. Instead we hold the
-    # CM + the yielded `Charge` handle, then exit explicitly in each
-    # finalization path. `Charge.issue_refund()` is idempotent, so the
-    # refund-on-error path can call it before exiting normally.
-    charge_cm: object | None = None
-    charge_handle: object | None = None
-    # Stays "" for unpaid endpoints; the APICallLog row's refund link is
-    # only meaningful when there's a consume row to potentially refund.
-    charge_idempotency_key: str = ""
-    if log_slug:
-        spec = registry.by_slug(log_slug)
-        # Pick the highest-version match (same convention as
-        # entitlements._spec_credits_cost). MCP tool name carries the
-        # version suffix on v2+ already, but for v1 the slug alone is fine.
-        active = max(spec, key=lambda s: s.version) if spec else None
-        if active is not None and active.credits_cost > 0:
-            charge_idempotency_key = make_idempotency_key(
-                credential_id=(
-                    principal.credential.pk if principal.credential is not None else None
-                ),
-                request_id=request_id,
-                endpoint_slug=active.slug,
-                amount=active.credits_cost,
-            )
-            try:
-                # The charge factory is sync (DB-bound). Run on a thread.
-                # `__enter__` performs the conditional UPDATE.
-                charge_cm = charge_credits(
-                    principal.user,
-                    n=active.credits_cost,
-                    idempotency_key=charge_idempotency_key,
-                    endpoint_slug=active.slug,
-                    request_id=request_id,
-                )
-                charge_handle = await sync_to_async(
-                    charge_cm.__enter__,
-                    thread_sensitive=True,  # type: ignore[attr-defined]
-                )()
-            except Exception as exc:
-                if (
-                    type(exc).__name__ == "InsufficientCreditsError"
-                    and hasattr(exc, "required")
-                    and hasattr(exc, "available")
-                ):
-                    return _credit_error_response(
-                        request_id,
-                        required=int(exc.required),
-                        available=int(exc.available),
-                    )
-                raise
+    # A credit charge used to sit here: resolve the tool's slug back to
+    # its spec, charge `credits_cost` before forwarding, map
+    # InsufficientCreditsError to 402, and refund on upstream non-2xx via
+    # a hand-managed context manager that had to straddle the streamer
+    # coroutine. No endpoint declares a cost and no billing backend was
+    # ever registered, so it charged nothing on every call. Removed with
+    # the rest of the billing apparatus.
 
     upstream_req = _client.build_request(
         method=request.method or "POST",
@@ -777,10 +673,6 @@ async def mcp_proxy_view(
             exc,
             extra={"request_id": request_id},
         )
-        # Subprocess unreachable → call never happened → refund any charge.
-        await _finalize_charge(
-            charge_cm, charge_handle, refund=True, refund_reason="mcp_unavailable"
-        )
         if log_slug:
             await _safe_record(
                 request_id=request_id,
@@ -791,10 +683,9 @@ async def mcp_proxy_view(
                 ip=ip,
                 user_agent=user_agent,
                 principal=principal,
-                consume_idempotency_key=charge_idempotency_key,
             )
-        # ErrorLog row so the admin Errors panel surfaces
-        # subprocess outages alongside view-layer crashes.
+        # Error event so `/ops/logs/` surfaces subprocess outages
+        # alongside view-layer crashes.
         await _safe_record_error(
             exc=exc,
             request_id=request_id,
@@ -820,9 +711,6 @@ async def mcp_proxy_view(
             "mcp proxy: upstream transport error",
             extra={"request_id": request_id, "error": str(exc)},
         )
-        await _finalize_charge(
-            charge_cm, charge_handle, refund=True, refund_reason="upstream_transport_error"
-        )
         if log_slug:
             await _safe_record(
                 request_id=request_id,
@@ -833,7 +721,6 @@ async def mcp_proxy_view(
                 ip=ip,
                 user_agent=user_agent,
                 principal=principal,
-                consume_idempotency_key=charge_idempotency_key,
             )
         await _safe_record_error(
             exc=exc,
@@ -861,8 +748,6 @@ async def mcp_proxy_view(
     # so we buffer it, drop the hidden tools, and return it non-streamed.
     # When nothing is disabled, and for every other JSON-RPC method, we
     # fall through to the pass-through streamer below untouched.
-    # tools/list carries no credit charge (log_slug is None), so there's
-    # no charge CM to finalize here.
     if is_tools_list and 200 <= upstream_status < 400:
         hidden_slugs = await sync_to_async(
             _hidden_tool_slugs, thread_sensitive=True
@@ -885,16 +770,8 @@ async def mcp_proxy_view(
             return resp
 
     async def finalize() -> None:
-        """Commit/refund the charge + write the APICallLog row. Shared by
-        the buffered path and the streamer's end-of-stream cleanup."""
-        # Refund only on non-2xx upstream — the call didn't deliver.
-        # 2xx commits the charge by exiting the CM normally.
-        await _finalize_charge(
-            charge_cm,
-            charge_handle,
-            refund=not (200 <= upstream_status < 400),
-            refund_reason="upstream_error",
-        )
+        """Write the call record. Shared by the buffered path and the
+        streamer's end-of-stream cleanup."""
         if log_slug:
             latency_ms = max(1, int((time.perf_counter() - start) * 1000))
             await _safe_record(
@@ -906,7 +783,6 @@ async def mcp_proxy_view(
                 ip=ip,
                 user_agent=user_agent,
                 principal=principal,
-                consume_idempotency_key=charge_idempotency_key,
             )
 
     def _stamp_common_headers(response: HttpResponse) -> HttpResponse:
@@ -1012,19 +888,7 @@ async def _safe_record(
     ip: str | None,
     user_agent: str,
     principal: Principal | None = None,
-    consume_idempotency_key: str = "",
 ) -> None:
-    # Resolve endpoint price so the APICallLog row reflects what the caller
-    # was charged. Skipped when the request never reached a charge (anonymous,
-    # free, or pre-charge failures). Matches the rule in observability
-    # middleware.
-    specs = registry.by_slug(slug)
-    active = max(specs, key=lambda s: s.version) if specs else None
-    credits_charged = (
-        active.credits_cost
-        if (active and active.credits_cost > 0 and principal is not None and status_code < 400)
-        else 0
-    )
     try:
         await _afire(
             EndpointCalled(
@@ -1043,8 +907,6 @@ async def _safe_record(
                 # api_keys subscriber stamps `last_used_*` on whichever
                 # APIKey happens to share the number with a URL token.
                 credential_kind=(principal.credential_kind if principal else ""),
-                credits_charged=credits_charged,
-                consume_idempotency_key=consume_idempotency_key or "",
                 ip=ip,
                 user_agent=user_agent,
                 error_class=error_class,

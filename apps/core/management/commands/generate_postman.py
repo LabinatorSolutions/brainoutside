@@ -108,10 +108,6 @@ def _request_item_for(spec: EndpointSpec) -> dict[str, Any]:
     description = spec.description or ""
     if spec.deprecated:
         description = f"⚠ DEPRECATED. {description}".strip()
-    if spec.credits_cost:
-        description = (
-            description + f"\n\nCharges {spec.credits_cost} credit(s) per call."
-        ).strip()
     return {
         "name": f"{spec.method} /{spec.version}/{spec.slug}",
         "request": {

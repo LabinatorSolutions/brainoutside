@@ -196,10 +196,6 @@ class Ctx:
         management commands, sync endpoints). Async `@endpoint.run()`
         bodies must `await ctx.aenqueue(...)` instead, since the
         underlying queue write hits the DB.
-
-        Phase 5.2.6 will wire credit charging on enqueue (charge here,
-        refund-on-terminal-failure via the dead-letter task) — for
-        Phase 6.4 we only deliver the queue surface.
         """
         return self._do_enqueue(task, kwargs)
 
@@ -223,15 +219,6 @@ class Ctx:
         from apps.core.jobs_hook import enqueue as _enqueue
 
         user_id = self.user.pk if (self.user is not None and self.user.is_authenticated) else None
-        # the REST view stashes the original consume's
-        # idempotency key + credits magnitude on `ctx.meta` when it
-        # charges before calling `run()`. Forward to the jobs backend so
-        # the TrackedTask carries the refund correlation; the dead-letter
-        # subscriber uses these to issue a compensating credit. Anonymous
-        # endpoints / free endpoints leave the meta keys absent → defaults
-        # of 0 / "" mean "nothing to refund".
-        consume_key = str(self.meta.get("consume_idempotency_key", "") or "")
-        consume_credits = int(self.meta.get("consume_credits", 0) or 0)
         # per-endpoint override of the Q2 task timeout
         # (in seconds). The REST view stashes spec.async_timeout_seconds
         # on ctx.meta when the spec set a non-zero value; we forward it
@@ -244,8 +231,6 @@ class Ctx:
             payload=kwargs or None,
             request_id=self.request_id,
             endpoint_slug=self.meta.get("endpoint_slug", ""),
-            credits_charged=consume_credits,
-            idempotency_key=consume_key,
             async_timeout_seconds=async_timeout,
         )
         # Duck-typed pass-through — apps.jobs returns a JobHandle dataclass

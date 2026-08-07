@@ -184,14 +184,3 @@ class EndpointCalled(Event):
     error_class: str = ""
     ip: str | None = None
     user_agent: str = ""
-    # Gross credits the endpoint cost — populated by the fire site when the
-    # caller is authenticated and the request succeeded. Zero for anonymous
-    # callers, free endpoints, and pre-charge failures (401, 402). Logged
-    # for refund-on-error paths (422, 5xx) at the gross amount; refunds
-    # land in the CreditTransaction ledger for the precise net.
-    credits_charged: int = 0
-    # Hash key the matching `consume` ledger row was booked under. The
-    # `CreditsRefunded` subscriber stamps `refunded=True` on the
-    # APICallLog row that carries the same value when an async-job
-    # dead-letter refund lands. Empty for anonymous + free endpoints.
-    consume_idempotency_key: str = ""

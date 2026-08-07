@@ -6,10 +6,12 @@ apps.observability (import-linter Contract 1: core has no reverse deps on
 feature apps). This module is the bridge: apps.observability registers a
 recorder at boot, apps.core dispatches without knowing the implementation.
 
-Same shape as `apps.core.bearer` and `apps.core.charging`
-. When the observability app is not installed (rare — only
-in narrow unit tests of apps.core itself), `record_error()` is a silent
-no-op so request handling is never broken by an unwired recorder.
+Same shape as `apps.core.bearer`. When no recorder is registered,
+`record_error()` is a silent no-op so request handling is never broken
+by an unwired recorder.
+
+In this fork the recorder is `apps.events.sinks.record_error`, installed
+by `EventsConfig.ready()`; rows land in the `Event` log.
 
 The recorder contract:
 

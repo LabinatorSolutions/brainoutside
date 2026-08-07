@@ -4,24 +4,24 @@
 
 1. Verifies the HTTP method.
 2. Parses the JSON body into `spec.input_model` (pydantic v2).
-3. Resolves a `Principal` from `Authorization: Bearer mcpsk_...` if present
-  . Anonymous calls remain allowed at this phase
-   wires plan/credit gating that requires auth.
+3. Resolves a `Principal` from `Authorization: Bearer mcpsk_...`. This
+   server fronts a private knowledge base, so a bearer is mandatory —
+   there is no anonymous tier at any layer (PLAN.md §5).
 4. Builds a `Ctx` carrying request_id + user + credential.
 5. Awaits `spec.cls().run(inp, ctx)`.
 6. Serializes the output via `spec.output_model.model_dump_json()`.
 7. Echoes `X-Request-ID` on the response.
 
-Error contract — kept simple in Phase 2; Phase 7 introduces the ErrorLog model
-and a global exception handler:
+Error contract:
 
 - 400 `invalid_json`           — body is not valid JSON
-- 401 `auth_required`          — endpoint charges credits but no bearer
+- 401 `auth_required`          — no bearer
 - 401 `invalid_credential`     — Authorization header present but bad
-- 402 `insufficient_credits`   — balance < endpoint's per-call cost
 - 405 `method_not_allowed`     — wrong HTTP method
 - 422 `input_validation_error` — pydantic input validation failed
+- 429 `rate_limit_exceeded`    — throttle, or auth-failure lockout
 - 500 `internal_error`         — anything else; safe message; no stacktrace leak
+- 503 `endpoint_disabled`      — an operator took this endpoint offline
 """
 from __future__ import annotations
 
@@ -38,8 +38,6 @@ from pydantic import ValidationError
 
 from apps.core import endpoint_gating, error_hook, idempotency, log_context
 from apps.core.bearer import resolve as resolve_bearer
-from apps.core.charging import charge as charge_credits
-from apps.core.charging import make_idempotency_key
 from apps.core.ctx import build_ctx
 from apps.core.registry import EndpointSpec
 from apps.core.security.client_ip import client_ip
@@ -71,10 +69,10 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         # runtime endpoint disable. The
         # registry is import-time only; this row gives operators a
         # knob to take a buggy endpoint offline without a redeploy.
-        # Sits before auth/charge so a disabled endpoint never burns
-        # cycles on credentials or credits. 503 (not 4xx) tells well-
-        # behaved clients + status-page monitors this is a server-side
-        # decision, not a client error.
+        # Sits before auth so a disabled endpoint never burns cycles on
+        # credential resolution. 503 (not 4xx) tells well-behaved clients
+        # + status-page monitors this is a server-side decision, not a
+        # client error.
         gated = await sync_to_async(
             endpoint_gating.is_disabled, thread_sensitive=True
         )(spec.slug)
@@ -148,9 +146,9 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         # (above) is the surviving runtime knob.
 
         # BRAIN-SERVER FORK DIVERGENCE: every endpoint requires an
-        # authenticated caller, credits or not. The upstream template
-        # allows anonymous calls when credits_cost == 0; this server
-        # fronts a private knowledge base, so there is no anonymous tier
+        # authenticated caller. The upstream template allowed anonymous
+        # calls to any endpoint it wasn't billing for; this server fronts
+        # a private knowledge base, so there is no anonymous tier
         # (PLAN.md §5 "No anonymous access, any layer").
         if principal is None:
             return _err(
@@ -197,9 +195,9 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
             response.headers["X-RateLimit-Remaining"] = "0"
             return response
 
-        # Idempotency-Key dispatch. Runs BEFORE charge +
-        # execute so a replay never re-charges credits. Anonymous
-        # callers SKIP processing (no user scope = collision risk).
+        # Idempotency-Key dispatch. Runs BEFORE execute so a replay
+        # never re-runs the endpoint. Anonymous callers SKIP processing
+        # (no user scope = collision risk).
         # Body bytes are read here once (we'll re-use them for json.loads
         # below). Cache hits short-circuit with the previously-stored
         # response verbatim; mismatch → 422; in-flight → 409.
@@ -310,74 +308,13 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         if spec.async_timeout_seconds > 0:
             ctx.meta["async_timeout_seconds"] = spec.async_timeout_seconds
 
-        # credit charge wraps run(). For credits_cost==0 the
-        # registered factory hands back a no-op CM, so the unauthenticated
-        # / free-endpoint path is unchanged.
-        idempotency_key = make_idempotency_key(
-            credential_id=(
-                principal.credential.pk
-                if principal and principal.credential is not None
-                else None
-            ),
-            request_id=request_id,
-            endpoint_slug=spec.slug,
-            amount=spec.credits_cost,
-        )
-        # stash consume metadata on the Ctx so that any
-        # `ctx.aenqueue(...)` inside `run()` records (credits, key) onto
-        # the TrackedTask. When the Q2 task dead-letters, the subscriber
-        # rebuilds the refund key from these and issues a compensating
-        # credit. Anonymous / free endpoints leave these absent.
-        if spec.credits_cost > 0 and principal is not None:
-            ctx.meta["consume_idempotency_key"] = idempotency_key
-            ctx.meta["consume_credits"] = spec.credits_cost
-            # Stash on the request so RequestLogMiddleware can stamp the
-            # APICallLog row with the consume key — the CreditsRefunded
-            # subscriber uses that key to find the row to flip.
-            request._consume_idempotency_key = idempotency_key  # type: ignore[attr-defined]
-
-        # credit-charge orchestration. The factory is sync
-        # (DB-bound). We can't use a `with` block here because `await
-        # ep.run(...)` straddles enter/exit. Manage the CM by hand:
-        # enter via sync_to_async, refund-on-failure via the duck-typed
-        # `Charge.issue_refund()`, exit via sync_to_async.
-        charge_cm: Any = None
-        charge_handle: Any = None
-        if spec.credits_cost > 0 and ctx.user is not None:
-            charge_cm = charge_credits(
-                ctx.user,
-                n=spec.credits_cost,
-                idempotency_key=idempotency_key,
-                endpoint_slug=spec.slug,
-                request_id=request_id,
-            )
-            try:
-                charge_handle = await sync_to_async(
-                    charge_cm.__enter__, thread_sensitive=True
-                )()
-            except Exception as exc:
-                if (
-                    type(exc).__name__ == "InsufficientCreditsError"
-                    and hasattr(exc, "required")
-                    and hasattr(exc, "available")
-                ):
-                    return await _finalize_idem(
-                        idem_record,
-                        _err(
-                            request_id,
-                            status=402,
-                            code="insufficient_credits",
-                            message=(
-                                f"Need {exc.required} credit(s); balance is "
-                                f"{exc.available}. Top up at /dashboard/billing/."
-                            ),
-                            extra={
-                                "required": int(exc.required),
-                                "available": int(exc.available),
-                            },
-                        ),
-                    )
-                raise
+        # A credit charge used to wrap `run()` here: build an idempotency
+        # key, enter a charge context manager, map InsufficientCreditsError
+        # to 402, refund on 422/500. None of it could fire — no endpoint in
+        # this product declares a `credits_cost`, and no backend was ever
+        # registered, so `charge()` handed back a no-op context manager on
+        # every request. Removed with the rest of the billing apparatus;
+        # this server is not a metered API.
 
         try:
             instance = spec.cls()
@@ -392,39 +329,12 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
             # IP. These are 422s, NOT 500s — the input was bad even
             # though it parsed.
             #
-            # Why not write an ErrorLog row: the Pydantic-422 path
-            # above (line ~271) doesn't either. Logging every SSRF
-            # probe + every bad-upstream response would flood the
-            # admin Errors panel with rows operators have to learn
-            # to ignore. The ledger of failed calls is still visible
-            # via APICallLog (status_code=422); ErrorLog is reserved
-            # for actual server-side bugs.
+            # Why not record an error event: the Pydantic-422 path
+            # above doesn't either. Logging every SSRF probe + every
+            # bad-upstream response would flood `/ops/logs/` with rows
+            # operators have to learn to ignore. An error row is
+            # reserved for actual server-side bugs.
             #
-            # Refund: same as the 500 path — the user was charged at
-            # CM-enter (line ~336) before `run()` saw the input.
-            # Returning 422 without refunding would let buyers scan
-            # the SSRF guard at the cost of the operator's plan
-            # credits.
-            if charge_handle is not None and hasattr(charge_handle, "issue_refund"):
-                try:
-                    await sync_to_async(
-                        charge_handle.issue_refund, thread_sensitive=True
-                    )(reason="input_validation_error")
-                except Exception:
-                    log.exception(
-                        "rest: refund failed",
-                        extra={"request_id": request_id, "slug": spec.slug},
-                    )
-            if charge_cm is not None:
-                try:
-                    await sync_to_async(
-                        charge_cm.__exit__, thread_sensitive=True
-                    )(None, None, None)
-                except Exception:
-                    log.exception(
-                        "rest: charge __exit__ failed",
-                        extra={"request_id": request_id, "slug": spec.slug},
-                    )
             # Message cap: surface the endpoint author's message
             # verbatim (the contract is that ValueError messages are
             # user-safe), but cap at 500 chars so a runaway exception
@@ -440,32 +350,8 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                 ),
             )
         except Exception as exc:
-            # Refund the credit charge before returning 500. `issue_refund`
-            # is idempotent and lives on the duck-typed `Charge` handle.
-            if charge_handle is not None and hasattr(charge_handle, "issue_refund"):
-                try:
-                    await sync_to_async(
-                        charge_handle.issue_refund, thread_sensitive=True
-                    )(reason="endpoint_error")
-                except Exception:
-                    log.exception(
-                        "rest: refund failed",
-                        extra={"request_id": request_id, "slug": spec.slug},
-                    )
-            if charge_cm is not None:
-                try:
-                    await sync_to_async(
-                        charge_cm.__exit__, thread_sensitive=True
-                    )(None, None, None)
-                except Exception:
-                    log.exception(
-                        "rest: charge __exit__ failed",
-                        extra={"request_id": request_id, "slug": spec.slug},
-                    )
-            # persist a structured ErrorLog row + mirror to Sentry
-            # via the apps.core.error_hook bridge (registered by
-            # `ObservabilityConfig.ready()`). No-op when observability isn't
-            # installed (rare; only narrow apps.core unit tests).
+            # Persist a structured error row via the `apps.core.error_hook`
+            # bridge, which `EventsConfig.ready()` registers.
             try:
                 await sync_to_async(
                     error_hook.record_error, thread_sensitive=True
@@ -484,7 +370,7 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                 )
             except Exception:
                 log.exception(
-                    "rest: ErrorLog write failed",
+                    "rest: error event write failed",
                     extra={"request_id": request_id, "slug": spec.slug},
                 )
             log.exception(
@@ -502,18 +388,6 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                     message="The endpoint failed unexpectedly.",
                 ),
             )
-
-        # Success path — commit the charge by exiting the CM with no exc.
-        if charge_cm is not None:
-            try:
-                await sync_to_async(
-                    charge_cm.__exit__, thread_sensitive=True
-                )(None, None, None)
-            except Exception:
-                log.exception(
-                    "rest: charge __exit__ failed",
-                    extra={"request_id": request_id, "slug": spec.slug},
-                )
 
         if not isinstance(result, spec.output_model):
             log.error(
@@ -553,8 +427,8 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
     async def view(request: HttpRequest) -> HttpResponse:
         # FinalPolish F3 — RFC 8594 deprecation + sunset gate. Sits at the
         # very top of dispatch so a sunset endpoint never burns cycles on
-        # auth resolution or charge attempts. Deprecation only stamps
-        # advisory headers; sunset short-circuits with 410 Gone.
+        # auth resolution. Deprecation only stamps advisory headers;
+        # sunset short-circuits with 410 Gone.
         now = timezone.now()
         request_id = getattr(request, "request_id", None) or uuid.uuid4().hex
 

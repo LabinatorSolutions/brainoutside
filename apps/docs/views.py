@@ -40,7 +40,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
 def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
     """Per-endpoint detail page (10.4.3 / 10.4.4 / 10.4.5).
 
-    Header (verb / path / credits / version / deprecated pill) +
+    Header (verb / path / version / deprecated pill) +
     description + 4 tabs (REST / MCP / Python SDK / JS SDK) +
     Pydantic-rendered Input + Output schema tables with collapsible
     nested sub-schemas + try-it placeholder for G4.

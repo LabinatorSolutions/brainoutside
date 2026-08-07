@@ -29,7 +29,6 @@ class EndpointCard:
     method: str
     path: str
     description: str
-    credits_cost: int
     deprecated: bool
     tags: list[str] = field(default_factory=list)
 
@@ -83,7 +82,6 @@ def get_catalog() -> CatalogBundle:
             method=spec.method,
             path=f"/api/{spec.version}/{spec.path}",
             description=spec.description or "",
-            credits_cost=spec.credits_cost,
             # FinalPolish F3 — `is_deprecated` fires for BOTH the legacy
             # bool flag AND any spec that carries a `deprecated_at` date.
             # Keeps the catalog chip honest for both deprecation styles

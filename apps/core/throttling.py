@@ -2,7 +2,7 @@
 
 apps.core can't import apps.rate_limit (Contract 1: core has no reverse
 deps on feature apps). Same pattern as `apps.core.bearer` and
-`apps.core.charging` — the feature app calls `register(...)` from its
+`apps.core.bearer` — the feature app calls `register(...)` from its
 `AppConfig.ready()`, apps.core dispatches without knowing the impl.
 
 When the rate_limit app isn't installed (or it failed to register a

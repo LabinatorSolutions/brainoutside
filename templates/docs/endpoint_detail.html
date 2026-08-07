@@ -4,7 +4,7 @@
   Phase 10.4.2-5 — per-endpoint detail page.
 
   Layout (top → bottom):
-    1. Header — method pill / slug / version / credits / deprecated.
+    1. Header — method pill / slug / version / deprecated.
     2. Description + path callout.
     3. Tabs: REST | MCP | Python SDK | JS SDK (Alpine, no HTMX).
     4. Schema sections — Input + Output tables with collapsible
@@ -18,7 +18,6 @@
   <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
     <span class="inline-flex items-center rounded bg-brand-100 px-2 py-0.5 font-mono text-xs font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-400">{{ spec.method }}</span>
     <code class="font-mono text-zinc-700 dark:text-zinc-300">/api/{{ spec.version }}/{{ spec.slug }}</code>
-    <span class="inline-flex items-center rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium tabular-nums text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" title="{% trans 'Credits charged per call' %}">{% blocktrans with cost=spec.credits_cost %}{{ cost }} credits/call{% endblocktrans %}</span>
     {% if spec.is_deprecated %}
       <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-700 dark:bg-amber-950 dark:text-amber-400">{% trans "deprecated" %}</span>
     {% endif %}

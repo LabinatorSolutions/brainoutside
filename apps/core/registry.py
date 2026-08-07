@@ -74,7 +74,6 @@ class EndpointSpec:
     method: str = "POST"
     description: str = ""
     deprecated: bool = False
-    credits_cost: int = 0  # Phase 5 reads this when charging credits.
     tags: tuple[str, ...] = ()
     # per-endpoint override for the Q2 task timeout
     # (seconds). Default `0` means "use the cluster default" (currently
@@ -166,7 +165,6 @@ class EndpointSpec:
             ),
             "sunset_at": self.sunset_at.isoformat() if self.sunset_at else None,
             "deprecation_message": self.deprecation_message,
-            "credits_cost": self.credits_cost,
             "tags": list(self.tags),
         }
 
@@ -215,7 +213,6 @@ def endpoint(
     method: str = "POST",
     description: str = "",
     deprecated: bool = False,
-    credits_cost: int = 0,
     tags: tuple[str, ...] = (),
     async_timeout_seconds: int = 0,
     deprecated_at: datetime | None = None,
@@ -246,8 +243,6 @@ def endpoint(
         # If GET ever earns its keep, relax this check. (Phase 11.3 example endpoints
         # may revisit; for now, POST-only keeps the surface predictable.)
         raise RegistryError(f"Unsupported HTTP method {method!r}. Only POST for now.")
-    if credits_cost < 0:
-        raise RegistryError(f"credits_cost must be >= 0, got {credits_cost}.")
     if async_timeout_seconds < 0:
         raise RegistryError(
             f"async_timeout_seconds must be >= 0 (0 = use cluster default), "
@@ -290,7 +285,6 @@ def endpoint(
             method=method,
             description=resolved_description,
             deprecated=deprecated,
-            credits_cost=credits_cost,
             tags=tuple(tags),
             async_timeout_seconds=async_timeout_seconds,
             deprecated_at=deprecated_at,

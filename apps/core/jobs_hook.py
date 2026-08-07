@@ -1,8 +1,8 @@
 """Background-jobs hook registry.
 
 apps.core can't import apps.jobs (Contract 1: core has no reverse deps
-on feature apps). Same pattern as `apps.core.bearer` / `apps.core.charging`
-/ `apps.core.throttling` — feature app calls `register_enqueue(...)`
+on feature apps). Same pattern as `apps.core.bearer` /
+`apps.core.throttling` — feature app calls `register_enqueue(...)`
 from its `AppConfig.ready()`, apps.core.ctx dispatches without knowing
 the impl.
 
@@ -30,8 +30,6 @@ class EnqueueFn(Protocol):
         payload: dict[str, Any] | None = None,
         request_id: str = "",
         endpoint_slug: str = "",
-        credits_charged: int = 0,
-        idempotency_key: str = "",
         async_timeout_seconds: int = 0,
     ) -> object: ...
 
@@ -85,17 +83,11 @@ def enqueue(
     payload: dict[str, Any] | None = None,
     request_id: str = "",
     endpoint_slug: str = "",
-    credits_charged: int = 0,
-    idempotency_key: str = "",
     async_timeout_seconds: int = 0,
 ) -> object:
     """Hand a task to the registered backend. Raises when no backend
     is registered — a missing queue is a deployment problem, not
     something to swallow.
-
-    `credits_charged` + `idempotency_key` propagate
-    the original endpoint consume's metadata onto the TrackedTask row
-    so the dead-letter refund subscriber can rebuild the refund key.
 
     `async_timeout_seconds` overrides the cluster's
     default per-task timeout. `0` means "use the cluster default".
@@ -111,8 +103,6 @@ def enqueue(
         payload=payload,
         request_id=request_id,
         endpoint_slug=endpoint_slug,
-        credits_charged=credits_charged,
-        idempotency_key=idempotency_key,
         async_timeout_seconds=async_timeout_seconds,
     )
 

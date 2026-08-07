@@ -94,8 +94,6 @@ def _operation(spec: EndpointSpec, *, prefix: str) -> dict[str, Any]:
             "500": {"$ref": "#/components/responses/InternalError"},
         },
     }
-    if spec.credits_cost:
-        op["x-credits-cost"] = spec.credits_cost
     return op
 
 

@@ -10,8 +10,8 @@ converge here:
 
 Endpoints don't care which auth method got them here — they read
 `ctx.user` for ownership decisions and `ctx.credential` for
-plan/credits/rate-limit attribution. Phase 5's credit charge keys off
-`credential.id` so refunds attribute to the same key/token.
+rate-limit and tier attribution — `apps.mind.tiers.tier_for_credential`
+reads the visibility ceiling off the credential, not off the user.
 """
 from __future__ import annotations
 

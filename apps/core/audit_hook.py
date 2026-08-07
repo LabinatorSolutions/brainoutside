@@ -7,10 +7,12 @@ deps on feature apps). This module is the bridge: `AuditConfig.ready()`
 registers a recorder at boot, apps.core dispatches without knowing
 the implementation.
 
-Same shape as `apps.core.bearer` / `apps.core.charging` /
-`apps.core.error_hook`. When apps.audit isn't installed (rare — only
-narrow unit tests of apps.core itself), `record(...)` is a silent
-no-op so request handling never breaks on an unwired recorder.
+Same shape as `apps.core.bearer` / `apps.core.error_hook`. When no
+recorder is registered, `record(...)` is a silent no-op so request
+handling never breaks on an unwired recorder.
+
+In this fork the recorder is `apps.events.sinks.record_audit`, installed
+by `EventsConfig.ready()`; rows land in the `Event` log.
 
 Recorder contract:
 

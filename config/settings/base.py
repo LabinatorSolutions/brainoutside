@@ -75,7 +75,10 @@ MIDDLEWARE = [
     "apps.core.security.SecurityHeadersMiddleware",
     # Admin-login brute-force lockout (per-IP, pre-auth).
     "apps.core.security.auth_signals.AdminLoginThrottleMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",
+    # whitenoise via our async-capable adapter: upstream's middleware is
+    # sync-only, and one sync middleware here forces Django to run the
+    # entire inner chain through async_to_sync (see the adapter docstring).
+    "apps.core.middleware.AsyncWhiteNoiseMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "django.middleware.http.ConditionalGetMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

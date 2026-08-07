@@ -21,8 +21,9 @@ from __future__ import annotations
 import uuid
 from typing import Awaitable, Callable
 
-from asgiref.sync import iscoroutinefunction, markcoroutinefunction
+from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.http import HttpRequest, HttpResponse
+from whitenoise.middleware import WhiteNoiseMiddleware
 
 from apps.core import log_context
 
@@ -59,3 +60,48 @@ class RequestIdMiddleware:
         # client always sees the canonical id we recorded.
         response.headers["X-Request-ID"] = request_id
         return response
+
+
+class AsyncWhiteNoiseMiddleware(WhiteNoiseMiddleware):
+    """whitenoise's middleware, made async-capable.
+
+    Upstream `WhiteNoiseMiddleware` declares no `async_capable`, so in
+    this stack — where every other middleware is async-only — Django
+    adapted it and the ENTIRE chain inside it back to sync: four
+    sync/async boundary crossings and two pinned threadpool threads on
+    every request. `assemble-context` at 5–30 s plus the 4 s
+    `activity.json` poll saturates that pool silently — exactly the
+    pathology `log_scrub` documents and designs around at the outer
+    edge, reintroduced mid-chain by a static-file helper.
+
+    The hit-path work is safe inline: with `autorefresh` off (any real
+    deployment) the lookup is a dict get over an in-memory manifest,
+    and `serve` opens one local file for Django's FileResponse — the
+    same synchronous `open()` every FileResponse does; the ASGI handler
+    streams it without holding a thread. `autorefresh` (a DEBUG mode)
+    re-scans the filesystem per request, so that path keeps a thread
+    hop.
+    """
+
+    sync_capable = False
+    async_capable = True
+
+    def __init__(self, get_response) -> None:
+        super().__init__(get_response)
+        markcoroutinefunction(self)
+        if not iscoroutinefunction(get_response):
+            raise RuntimeError(
+                "AsyncWhiteNoiseMiddleware requires the async ASGI stack."
+            )
+
+    async def __call__(self, request: HttpRequest) -> HttpResponse:  # type: ignore[override]
+        # Mirrors upstream __call__ line for line; only the waiting is new.
+        if self.autorefresh:
+            static_file = await sync_to_async(self.find_file, thread_sensitive=False)(
+                request.path_info
+            )
+        else:
+            static_file = self.files.get(request.path_info)
+        if static_file is not None:
+            return self.serve(static_file, request)
+        return await self.get_response(request)

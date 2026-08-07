@@ -166,7 +166,28 @@ self-hosting, security, saas, build-in-public, content-creation, youtube,
 seo, teaching, engineering-thinking, open-source, tools, entrepreneurship,
 audience-growth`
 
-## 8. Consumers
+## 8. Blocked scripts (optional)
+
+Validator rule 6. If your brain is meant to hold one language and you
+want the server to reject anything written in another script, list the
+scripts here. **Leave this out and nothing is blocked** — that is the
+default, and it is the right one for most brains.
+
+The server recognises: `arabic`, `hebrew`, `cyrillic`, `greek`,
+`devanagari`, `thai`, `han`, `hiragana`, `katakana`, `hangul`. A name it
+doesn't recognise is reported as a warning on the approval screen rather
+than silently ignored, because a typo here would quietly switch the rule
+off.
+
+This is coarse on purpose: it asks "does this file contain that script
+at all", not "what language is this". A note that quotes one Arabic
+phrase is rejected the same as one written entirely in Arabic.
+
+To use it, uncomment and edit:
+
+<!-- Scripts: `arabic` -->
+
+## 9. Consumers
 
 Anything can read this mind through `mind-reader` + a lens: reply agents,
 newsletter/blog/video pipelines, remix tasks (an external proven
@@ -174,7 +195,7 @@ title/hook + your substance), niche-platform agents, and — via an MCP/API
 door with server-side visibility filtering — audience-facing chatbots. The
 repo structure never changes per consumer; only the lens does.
 
-## 9. Contract version
+## 10. Contract version
 
 The frontmatter at the top of this file carries `contract-version`.
 Your brain is a copy of the template and never auto-updates, so this

@@ -6,8 +6,12 @@ gate before the M2.5 commit. Note rules apply to `knowledge/` only
 (grill B8); other paths get their own per-kind checks.
 
 Pure core: `validate(proposal, ctx)` touches no DB and no filesystem —
-the caller builds a `ValidationContext` (taxonomy from the clone's
-CLAUDE.md, the entity index, private file texts) via `context_from_repo()`.
+the caller builds a `ValidationContext` (taxonomy and blocked scripts
+from the clone's CLAUDE.md, the entity index, private file texts) via
+`context_from_repo()`.
+
+Rule 6 is **owner policy, not engine policy**: it blocks nothing until
+the brain's own CLAUDE.md asks for it. See `BLOCKABLE_SCRIPTS`.
 """
 from __future__ import annotations
 
@@ -26,10 +30,33 @@ NOTE_STATUSES = {"current", "superseded"}
 ALLOWED_PREFIXES = ("knowledge/", "projects/", "content-catalog/", "raw/")
 
 _FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
-# Arabic, Arabic Supplement, Arabic Extended-A, presentation forms A+B.
-_ARABIC_RE = re.compile(
-    "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]"
-)
+
+#: Rule 6's vocabulary: scripts a brain may ask the validator to reject,
+#: by name. **Empty by default** — this used to be a hardcoded Arabic
+#: ban, which is a fact about one owner's corpus, not about the engine,
+#: and it silently rejected a stranger's notes on a rule they could not
+#: see or change. (The template's contract text was generalised for
+#: exactly this reason; the server never followed.) A brain opts in via
+#: its own CLAUDE.md — see `blocked_scripts_from_claude_md`.
+#:
+#: Ranges are deliberately coarse. The question is "does this file
+#: contain text in that script at all", not "what language is this".
+BLOCKABLE_SCRIPTS: dict[str, str] = {
+    # Arabic, Arabic Supplement, Arabic Extended-A, presentation forms A+B
+    # — byte-for-byte the ranges the hardcoded rule used.
+    "arabic": "[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]",
+    "hebrew": "[֐-׿יִ-ﭏ]",
+    "cyrillic": "[Ѐ-ԯ]",
+    "greek": "[Ͱ-Ͽἀ-῿]",
+    "devanagari": "[ऀ-ॿ]",
+    "thai": "[฀-๿]",
+    "han": "[㐀-䶿一-鿿]",
+    "hiragana": "[぀-ゟ]",
+    "katakana": "[゠-ヿ]",
+    "hangul": "[ᄀ-ᇿ가-힯]",
+}
+_SCRIPT_RES = {name: re.compile(pattern) for name, pattern in BLOCKABLE_SCRIPTS.items()}
+
 _DATE_RE = re.compile(r"^\d{4}-\d{2}$")
 _WS_RE = re.compile(r"\s+")
 # Minimum normalized-line length considered "quoting" for rule 8 — short
@@ -69,6 +96,13 @@ class ValidationContext:
     # The feed's source kind — rule 2 allows a null source_url for
     # "thought" (contract §5 rule 2 amendment, 2026-07-30).
     source_kind: str = ""
+    # Rule 6, opted into by the brain's CLAUDE.md. Empty = nothing blocked.
+    blocked_scripts: tuple[str, ...] = ()
+    # Names the brain asked for that this server does not know. Carried so
+    # the approval UI can say so — a typo here silently disarms the rule,
+    # and a silently disarmed rule is the failure this whole change is
+    # about.
+    unknown_scripts: tuple[str, ...] = ()
 
 
 # ---- context builder (the only impure part, kept at the edge) ------------
@@ -93,15 +127,66 @@ def taxonomy_from_claude_md(text: str) -> set[str]:
     return tags
 
 
+#: Only a line that opens with this carries the list. See the docstring.
+_SCRIPTS_LINE_RE = re.compile(r"^[ \t]*Scripts:[ \t]*(.+)$", re.MULTILINE | re.IGNORECASE)
+
+
+def blocked_scripts_from_claude_md(text: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Parse a `## Blocked scripts` section. Returns (known, unknown).
+
+    Anchored to its own heading like the taxonomy parser above, but the
+    list must sit on a line that STARTS with `Scripts:`:
+
+        ## Blocked scripts
+
+        Scripts: `arabic, hebrew`
+
+    Not "any backticks in the section", which is how this was first
+    written and which the template immediately broke: that section has
+    to name every script the server knows in order to document them, and
+    it shows a commented-out example. Harvesting backticks from prose
+    would have turned a page of documentation into a blocklist of
+    everything, and left `<!-- Scripts: `arabic` -->` switched ON. A
+    commented-out line does not start with `Scripts:`, so it stays off.
+
+    Absent section, absent file, or an empty list all mean *block
+    nothing* — the right default for a server somebody else is about to
+    install. Names this server does not recognise come back separately
+    rather than being dropped, so a typo surfaces instead of quietly
+    turning the rule off.
+    """
+    m = re.search(r"^##.*Blocked scripts.*$", text, re.MULTILINE)
+    if not m:
+        return (), ()
+    section = text[m.end():]
+    nxt = re.search(r"^## ", section, re.MULTILINE)
+    if nxt:
+        section = section[: nxt.start()]
+    known: list[str] = []
+    unknown: list[str] = []
+    for line in _SCRIPTS_LINE_RE.findall(section):
+        for span in re.findall(r"`([^`]+)`", line):
+            for tok in span.split(","):
+                tok = tok.strip().lower()
+                if not tok:
+                    continue
+                bucket = known if tok in _SCRIPT_RES else unknown
+                if tok not in bucket:
+                    bucket.append(tok)
+    return tuple(known), tuple(unknown)
+
+
 def context_from_repo() -> ValidationContext:
     from apps.brain.models import Entity
     from apps.brain.services import gitrepo
 
     repo = gitrepo.repo_dir()
     claude_md = repo / "CLAUDE.md"
-    taxonomy = taxonomy_from_claude_md(
+    claude_text = (
         claude_md.read_text(encoding="utf-8", errors="replace") if claude_md.is_file() else ""
     )
+    taxonomy = taxonomy_from_claude_md(claude_text)
+    blocked, unknown = blocked_scripts_from_claude_md(claude_text)
     entities: dict[str, dict] = {}
     private_texts: list[str] = []
     for e in Entity.objects.all():
@@ -110,7 +195,13 @@ def context_from_repo() -> ValidationContext:
             p = repo / e.path
             if p.is_file():
                 private_texts.append(p.read_text(encoding="utf-8", errors="replace"))
-    return ValidationContext(taxonomy=taxonomy, entities=entities, private_texts=private_texts)
+    return ValidationContext(
+        taxonomy=taxonomy,
+        entities=entities,
+        private_texts=private_texts,
+        blocked_scripts=blocked,
+        unknown_scripts=unknown,
+    )
 
 
 # ---- helpers -------------------------------------------------------------
@@ -184,6 +275,15 @@ def validate(proposal: dict, ctx: ValidationContext) -> ValidationResult:
             "proposes NEW taxonomy tags (contract §7 — extend deliberately): "
             + ", ".join(taxonomy_additions)
         )
+    if ctx.unknown_scripts:
+        # Said out loud where the operator already is. A misspelled name
+        # under "Blocked scripts" disarms rule 6 for that script, and a
+        # silently disarmed rule is worse than no rule.
+        res.warnings.append(
+            "CLAUDE.md lists scripts this server does not know, so they are "
+            f"NOT blocked: {', '.join(ctx.unknown_scripts)}. Known names: "
+            + ", ".join(sorted(BLOCKABLE_SCRIPTS))
+        )
 
     for f in files:
         path = str(f.get("path", ""))
@@ -210,11 +310,16 @@ def validate(proposal: dict, ctx: ValidationContext) -> ValidationResult:
         if action == "create" and any(e["path"] == path for e in ctx.entities.values()):
             res.violations.append(Violation(5, path, "create targets a file that already exists — use update"))
 
-        # -- rule 6: no Arabic-script content --
-        if _ARABIC_RE.search(content):
-            res.violations.append(
-                Violation(6, path, "Arabic-script content — the corpus never enters the mind (contract §2)")
-            )
+        # -- rule 6: no content in a script this brain blocks --
+        for script in ctx.blocked_scripts:
+            if _SCRIPT_RES[script].search(content):
+                res.violations.append(
+                    Violation(
+                        6, path,
+                        f"{script}-script content — your CLAUDE.md lists "
+                        f"{script} under Blocked scripts",
+                    )
+                )
 
         # -- per-kind frontmatter (rules 1-4) --
         if path.startswith("knowledge/"):

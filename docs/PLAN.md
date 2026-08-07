@@ -161,7 +161,10 @@ Scoped: note rules apply to `knowledge/` only (grill B8).
 3. `topics` ⊆ taxonomy parsed from CLAUDE.md in the clone.
 4. Takes/stories contain `> VERBATIM:`.
 5. No file deletions.
-6. No Arabic-script content.
+6. No content in a script the brain's own CLAUDE.md lists under
+   **Blocked scripts**. Empty by default — owner policy, not engine
+   policy. (Was a hardcoded Arabic ban, which is a fact about one
+   owner's corpus and rejected a stranger's notes on an invisible rule.)
 7. INDEX.md **consistency**: every new/changed entity's index line exists
    AND agrees with frontmatter on status and visibility (the old rule 7
    would have passed today's real voice.md mismatch — grill B5/B7/B14).

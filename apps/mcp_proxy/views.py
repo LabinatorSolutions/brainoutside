@@ -58,6 +58,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -215,6 +216,16 @@ def _is_tools_list(body: bytes) -> bool:
     return isinstance(msg, dict) and msg.get("method") == "tools/list"
 
 
+def _is_jsonrpc_batch(body: bytes) -> bool:
+    """True iff `body` is a JSON-RPC batch (a top-level array)."""
+    if not body:
+        return False
+    try:
+        return isinstance(json.loads(body), list)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+
+
 def _hidden_tool_slugs() -> set[str]:
     """Slugs to drop from a `tools/list` response.
 
@@ -361,13 +372,22 @@ async def _resolve_principal(request: HttpRequest) -> Principal | None:
 
 
 
-def _active_spec_for_slug(slug: str):  # noqa: ANN202 — return type is EndpointSpec | None
-    """Pick the active spec for an MCP tool-name. Mirrors the version-
-    pick rule — highest registered
-    version wins. Returns None when the slug is unknown to the registry
-    (a tool-name from a stale client cache, for instance)."""
-    specs = registry.by_slug(slug)
-    return max(specs, key=lambda s: s.version) if specs else None
+#: `EndpointSpec.mcp_tool_name`'s versioned form, inverted.
+_TOOL_NAME_VERSION_RE = re.compile(r"^(?P<slug>.+?)__(?P<version>v[0-9]+)$")
+
+
+def _spec_for_tool_name(name: str):  # noqa: ANN202 — return type is EndpointSpec | None
+    """Resolve an MCP tool name to the exact spec the bridge registered
+    it from: a bare name is v1, `slug__v2` is that version — the inverse
+    of `EndpointSpec.mcp_tool_name`. The old helper fed the raw name to
+    `registry.by_slug`, which matches on bare slug, so every v2+ tool
+    name resolved to nothing and the sunset/deprecation gate silently
+    skipped it. Returns None when the name is unknown to the registry
+    (a stale client cache); the bridge answers tool_not_found there."""
+    m = _TOOL_NAME_VERSION_RE.match(name)
+    if m:
+        return registry.get(m.group("version"), m.group("slug"))
+    return registry.get("v1", name)
 
 
 def _sunset_tool_error_response(
@@ -589,6 +609,29 @@ async def mcp_proxy_view(
     # restores this when the request completes.
     log_context.update_user_id(principal.user.pk)
 
+    # Refuse JSON-RPC batches. Every gate below — throttle, the sunset
+    # check, the APICallLog write — hangs off the single-object
+    # `tools/call` slug, so a top-level array sailed past all of them and
+    # was forwarded upstream: N tool calls, none metered, gated or
+    # recorded. Current MCP (2025-06-18) removed JSON-RPC batching, so no
+    # compliant client sends one; refusing whole is honest where
+    # partially honouring (some entries throttled, some not) would not be.
+    if _is_jsonrpc_batch(body):
+        resp = JsonResponse(
+            {
+                "error": {
+                    "code": "batch_not_supported",
+                    "message": (
+                        "JSON-RPC batch requests are not supported. "
+                        "Send one request per HTTP call."
+                    ),
+                }
+            },
+            status=400,
+        )
+        resp.headers["X-Request-ID"] = request_id
+        return resp
+
     # An `admin_only` gate used to sit here, mirroring REST's: a non-staff
     # caller of an admin-only tool got "tool not found". It read
     # `principal.user.is_staff`, which is True for every credential this
@@ -637,7 +680,7 @@ async def mcp_proxy_view(
     # stamp advisory HTTP headers on the response once it's built.
     deprecation_headers: dict[str, str] = {}
     if log_slug:
-        active_for_gate = _active_spec_for_slug(log_slug)
+        active_for_gate = _spec_for_tool_name(log_slug)
         if active_for_gate is not None:
             now = timezone.now()
             if active_for_gate.is_sunset_at(now):

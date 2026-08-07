@@ -253,6 +253,17 @@ async def _drain(prompt: str, options) -> RunResult:
     )
 
 
+async def _aclose(stream) -> None:
+    """Close an SDK stream, tolerating one that does not support it."""
+    closer = getattr(stream, "aclose", None)
+    if closer is None:
+        return
+    try:
+        await closer()
+    except Exception:  # pragma: no cover - teardown must not mask the run
+        log.debug("sdk runner: closing the stream failed", exc_info=True)
+
+
 async def _run_ledgered(
     *,
     kind: str,
@@ -387,8 +398,9 @@ async def stream_agent(
     """Tier-locked STREAMING run (M3.1/M3.3): an async generator that
     yields `("delta", text)` as tokens arrive and finally `("result",
     RunResult)` exactly once. Same gates, lockdown, and row-before-run
-    ledger as `run_agent_async`; the wall-clock timeout is enforced
-    between events (the SDK cleans its subprocess up on generator close).
+    ledger as `run_agent_async`; the wall-clock timeout bounds the WAIT
+    for each event, not just the gap between events, and the stream is
+    closed explicitly so the SDK reaps its subprocess.
     Observed `Read` tool calls land in RunResult.read_paths — the honest
     source list, not agent self-report."""
     import time as _time
@@ -430,9 +442,28 @@ async def stream_agent(
     read_paths: list[str] = []
     model = ""
     started = _time.monotonic()
+    stream = query(prompt=prompt, options=options)
+    client_gone = False
     try:
-        async for message in query(prompt=prompt, options=options):
-            if _time.monotonic() - started > timeout_s:
+        # Manual iteration with a per-event deadline, not `async for`.
+        # The timeout used to be checked only AFTER a message arrived, so
+        # the `await` on the next one was unbounded: a CLI that wedged
+        # before producing anything — or between two events — hung the SSE
+        # response forever. The Send button stayed disabled, the ledger row
+        # stayed `ok=None`, and the subprocess kept spending where the
+        # daily-cap breaker could not see it. The non-streaming path uses
+        # `asyncio.wait_for` and was never exposed to this.
+        events = stream.__aiter__()
+        while True:
+            remaining = timeout_s - (_time.monotonic() - started)
+            if remaining <= 0:
+                run = RunResult(ok=False, text="".join(chunks), error_class="Timeout")
+                break
+            try:
+                message = await asyncio.wait_for(events.__anext__(), timeout=remaining)
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
                 run = RunResult(ok=False, text="".join(chunks), error_class="Timeout")
                 break
             if isinstance(message, StreamEvent):
@@ -468,6 +499,7 @@ async def stream_agent(
     except GeneratorExit:
         # Client disconnected mid-stream: finalize the ledger row in the
         # finally below, re-raise, and NEVER yield again.
+        client_gone = True
         run = RunResult(ok=False, text="".join(chunks), error_class="ClientDisconnected")
         raise
     except Exception as exc:  # SDK/transport errors → degraded, never raise raw
@@ -477,6 +509,14 @@ async def stream_agent(
             label = f"CliError: {str(exc)[:100]}"
         run = RunResult(ok=False, text="".join(chunks), error_class=label)
     finally:
+        # Close the stream so the SDK reaps its subprocess. Abandoning the
+        # iterator only closes it whenever the generator is collected,
+        # which for a wedged CLI means the process outlives the request.
+        # Skipped while unwinding from GeneratorExit: awaiting there is
+        # what turns a disconnect into "async generator ignored
+        # GeneratorExit", and that teardown closes the stream anyway.
+        if not client_gone:
+            await _aclose(stream)
         run.read_paths = read_paths
         op.finished_at = timezone.now()
         op.ok = run.ok

@@ -1,286 +1,160 @@
-"""Rotate the FIELD_ENCRYPTION_KEY across every django-cryptography column.
+"""Re-encrypt every stored secret under a new FIELD_ENCRYPTION_KEY.
 
-Phase P3 / PLAN2. Operator workflow:
+This command used to walk `django_cryptography` columns. This project has
+none — the only encrypted data is `AppSetting.value_encrypted`, a plain
+TextField holding Fernet tokens produced by `apps.brainconfig.crypto`,
+which uses FIELD_ENCRYPTION_KEY directly as a Fernet key with no PBKDF2
+derivation. So the command found nothing, printed "No encrypted fields
+discovered. Nothing to do." and exited 0.
+
+That exit code was the dangerous part: an operator following the workflow
+in this docstring would then swap the key and redeploy, and every
+AppSetting read would raise InvalidToken — which `AppSetting.value`
+deliberately swallows, returning "". The Anthropic key, the webhook
+secret and the write PAT would all silently read as unset, with no error
+anywhere, recoverable only by restoring the old key.
+
+Operator workflow:
 
     # 1. Generate a NEW Fernet key.
     python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-    # 2. Run the rotation. The OLD value is whatever's currently in env;
-    #    the NEW value is what you'll deploy next.
-    python manage.py rotate_field_encryption_key \\
-        --old="<current FIELD_ENCRYPTION_KEY>" \\
-        --new="<the key you just generated>" \\
-        --batch-size=100
+    # 2. Re-encrypt, passing the keys through the environment so they do
+    #    not land in shell history or the process list.
+    OLD_FIELD_ENCRYPTION_KEY=<current> NEW_FIELD_ENCRYPTION_KEY=<new> \\
+        python manage.py rotate_field_encryption_key
 
-    # 3. Once the rotation completes (process exits 0), update env to the
-    #    NEW key and redeploy. Subsequent reads now find ciphertext that
-    #    was rewritten with the NEW key during step 2.
+    # 3. Deploy the NEW key as FIELD_ENCRYPTION_KEY and restart.
 
-The command walks every model in INSTALLED_APPS, finds fields wrapped by
-`django_cryptography.fields.encrypt(...)`, and re-encrypts each row's
-ciphertext in batches:
+Run it with the app stopped, or at least with nobody editing settings:
+a value written between this command's read and its write would be
+re-encrypted from the stale plaintext and the operator's edit lost. Rows
+are locked FOR UPDATE to keep that window as small as the DB allows.
 
-  - Reads the RAW ciphertext via the DB cursor (bypassing
-    `from_db_value`'s decrypt-on-read).
-  - Decrypts with the OLD key.
-  - Re-encrypts with the NEW key.
-  - Writes back via raw UPDATE (bypassing `get_db_prep_value`'s
-    encrypt-on-write).
-
-Idempotent. If a row's ciphertext is already encrypted with the NEW
-key (e.g. a previous interrupted run already migrated it), the OLD
-key fails to decrypt → we try the NEW key → success → skip the row.
-This makes `--resume-from` semantically unnecessary; just re-run the
-command.
+Idempotent. A row already readable with the NEW key is left alone, so an
+interrupted run is safe to repeat.
 
 `--dry-run` reports what would change without writing.
-`--batch-size N` controls the row-fetch + UPDATE batch (default 100).
-
-The underlying `django-cryptography-django5` envelope is AES-CBC with
-HMAC-SHA256 signing. Keys are run through PBKDF2-SHA256 (30000
-iterations, salt `b"django-cryptography"`) to derive the 32-byte AES
-key — the same derivation `CryptographyConf.configure()` does at boot
-when the setting `CRYPTOGRAPHY_KEY` is set. Re-implementing the
-derivation here keeps the command independent of Django's settings
-state (we don't need to override-settings + reload models mid-process).
 """
 from __future__ import annotations
 
 import logging
-import pickle
-import sys
+import os
 from typing import Any
 
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from django.apps import apps as django_apps
+from cryptography.fernet import Fernet, InvalidToken
 from django.core.management.base import BaseCommand, CommandError
-from django.db import connection, transaction
-from django.utils.encoding import force_bytes
-from django_cryptography.fields import EncryptedMixin
-from django_cryptography.utils.crypto import FernetBytes, InvalidToken
+from django.db import transaction
 
 log = logging.getLogger(__name__)
 
-# Mirrors `django_cryptography.conf.CryptographyConf` defaults so the
-# derivation here matches what the library uses at boot. If a forker
-# customizes either (via `CRYPTOGRAPHY_DIGEST` / `CRYPTOGRAPHY_SALT`),
-# they'll need to mirror the change here — at v1.0 we don't override
-# either, so the constants are safe to hard-code.
-_KDF_SALT = b"django-cryptography"
-_KDF_ITERATIONS = 30000
-
-
-def _derive_aes_key(input_key: str | bytes) -> bytes:
-    """Replicate `CryptographyConf.configure`'s KDF for the AES key bytes.
-
-    The library digest is SHA-256 with a 32-byte output, so we derive
-    32 bytes from the input key + salt + iteration count. The result
-    is what `FernetBytes` will use as its AES key.
-    """
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=hashes.SHA256().digest_size,
-        salt=_KDF_SALT,
-        iterations=_KDF_ITERATIONS,
-    )
-    return kdf.derive(force_bytes(input_key))
-
-
-def _encrypted_fields() -> list[tuple[type, Any]]:
-    """Discover every concrete `(model, field)` pair where `field` is an
-    EncryptedMixin subclass. Skips abstract + proxy models — they have
-    no DB table to rewrite."""
-    pairs: list[tuple[type, Any]] = []
-    for model in django_apps.get_models():
-        if model._meta.abstract or model._meta.proxy:
-            continue
-        for field in model._meta.get_fields():
-            if isinstance(field, EncryptedMixin):
-                pairs.append((model, field))
-    return pairs
-
 
 class Command(BaseCommand):
-    help = (
-        "Rotate FIELD_ENCRYPTION_KEY across every django-cryptography-encrypted "
-        "column. Reads each row with the OLD key, re-encrypts with the NEW key, "
-        "writes back. Idempotent — a second run is a no-op (rows already on the "
-        "NEW key fail OLD-key decrypt, get skipped via NEW-key probe)."
-    )
+    help = "Re-encrypt AppSetting secrets from the old FIELD_ENCRYPTION_KEY to a new one."
 
     def add_arguments(self, parser: Any) -> None:
         parser.add_argument(
             "--old",
-            required=True,
-            help="The current FIELD_ENCRYPTION_KEY (Fernet base64 string).",
+            default="",
+            help=(
+                "Current Fernet key. Prefer OLD_FIELD_ENCRYPTION_KEY in the "
+                "environment — an argument is visible in the process list."
+            ),
         )
         parser.add_argument(
             "--new",
-            required=True,
-            help="The new FIELD_ENCRYPTION_KEY to migrate every encrypted row to.",
+            default="",
+            help="Replacement Fernet key. Prefer NEW_FIELD_ENCRYPTION_KEY in the environment.",
         )
-        parser.add_argument(
-            "--batch-size",
-            type=int,
-            default=100,
-            help="Rows per fetch + UPDATE batch (default 100).",
-        )
-        parser.add_argument(
-            "--dry-run",
-            action="store_true",
-            help="Report what would change without writing.",
-        )
+        parser.add_argument("--dry-run", action="store_true", help="Report without writing.")
 
-    def handle(self, *args: Any, **opts: Any) -> None:
-        old_key = opts["old"]
-        new_key = opts["new"]
-        batch_size: int = int(opts["batch_size"])
-        dry_run: bool = bool(opts["dry_run"])
+    def handle(self, *args: Any, old: str, new: str, dry_run: bool, **options: Any) -> None:
+        from apps.brainconfig.models import AppSetting
 
+        old_key = (os.environ.get("OLD_FIELD_ENCRYPTION_KEY") or old).strip()
+        new_key = (os.environ.get("NEW_FIELD_ENCRYPTION_KEY") or new).strip()
         if not old_key or not new_key:
-            raise CommandError("--old and --new are both required.")
+            raise CommandError(
+                "Both keys are required. Set OLD_FIELD_ENCRYPTION_KEY and "
+                "NEW_FIELD_ENCRYPTION_KEY in the environment (preferred), or "
+                "pass --old/--new."
+            )
         if old_key == new_key:
-            raise CommandError("--old and --new must differ.")
+            raise CommandError("--old and --new are the same key; nothing to rotate.")
 
-        old_fernet = FernetBytes(_derive_aes_key(old_key))
-        new_fernet = FernetBytes(_derive_aes_key(new_key))
+        try:
+            old_fernet, new_fernet = Fernet(old_key.encode()), Fernet(new_key.encode())
+        except (ValueError, TypeError) as exc:
+            raise CommandError(
+                f"Not a valid Fernet key ({exc}). Generate one with: "
+                'python -c "from cryptography.fernet import Fernet; '
+                'print(Fernet.generate_key().decode())"'
+            ) from None
 
-        pairs = _encrypted_fields()
-        if not pairs:
-            self.stdout.write("No encrypted fields discovered. Nothing to do.")
+        rotated: list[str] = []
+        already: list[str] = []
+        unreadable: list[str] = []
+
+        # One transaction, rows locked: a settings write landing between the
+        # read and the write would otherwise be silently reverted to its
+        # pre-rotation plaintext.
+        with transaction.atomic():
+            rows = AppSetting.objects.select_for_update().exclude(value_encrypted="").order_by("key")
+            for row in rows:
+                token = row.value_encrypted.encode("ascii")
+                try:
+                    plaintext = old_fernet.decrypt(token)
+                except InvalidToken:
+                    try:
+                        new_fernet.decrypt(token)
+                    except InvalidToken:
+                        # Readable by neither key: rotated from a third key,
+                        # or corrupt. Never overwrite it — that would
+                        # destroy the only copy.
+                        unreadable.append(row.key)
+                    else:
+                        already.append(row.key)
+                    continue
+
+                rotated.append(row.key)
+                if not dry_run:
+                    row.value_encrypted = new_fernet.encrypt(plaintext).decode("ascii")
+                    row.save(update_fields=["value_encrypted"])
+
+            if dry_run:
+                transaction.set_rollback(True)
+
+        verb = "Would re-encrypt" if dry_run else "Re-encrypted"
+        self.stdout.write(f"{verb}: {len(rotated)} setting(s)")
+        for k in rotated:
+            self.stdout.write(f"  ~ {k}")
+        if already:
+            self.stdout.write(f"Already on the new key: {len(already)} setting(s)")
+            for k in already:
+                self.stdout.write(f"  = {k}")
+        if unreadable:
+            self.stdout.write(
+                self.style.ERROR(
+                    f"Unreadable with either key: {len(unreadable)} setting(s) — LEFT UNTOUCHED"
+                )
+            )
+            for k in unreadable:
+                self.stdout.write(f"  ! {k}")
+
+        if dry_run:
+            self.stdout.write(self.style.WARNING("DRY RUN — no DB writes."))
             return
 
-        total_re_encrypted = 0
-        total_already_new = 0
-        total_corrupt = 0
-
-        for model, field in pairs:
-            label = f"{model._meta.label}.{field.name}"
-            self.stdout.write(f"== {label} ==")
-            re_encrypted, already_new, corrupt = self._rotate_field(
-                model,
-                field,
-                old_fernet=old_fernet,
-                new_fernet=new_fernet,
-                batch_size=batch_size,
-                dry_run=dry_run,
+        if unreadable:
+            raise CommandError(
+                "Some settings could not be decrypted with either key. They were "
+                "left as-is. Do NOT deploy the new key yet — re-set those values "
+                "in /ops/settings/ first, or restore the key they were written "
+                "with."
             )
-            self.stdout.write(
-                f"   re-encrypted: {re_encrypted}  already-new: {already_new}  corrupt: {corrupt}"
-            )
-            total_re_encrypted += re_encrypted
-            total_already_new += already_new
-            total_corrupt += corrupt
-
-        self.stdout.write(self.style.SUCCESS("Rotation complete."))
+        log.info("rotate_field_encryption_key: rotated=%s already=%s", len(rotated), len(already))
         self.stdout.write(
-            f"Totals: re-encrypted={total_re_encrypted} "
-            f"already-new={total_already_new} corrupt={total_corrupt}"
-        )
-        if dry_run:
-            self.stdout.write(self.style.WARNING("(dry-run — no writes were issued)"))
-        if total_corrupt:
-            # Non-fatal — surface to the operator so they can investigate.
-            self.stdout.write(
-                self.style.WARNING(
-                    f"WARNING: {total_corrupt} row(s) failed BOTH old-key and new-key "
-                    "decrypt. Investigate before swapping env to the new key."
-                )
+            self.style.SUCCESS(
+                "Rotation complete. Deploy FIELD_ENCRYPTION_KEY=<new key> and restart."
             )
-            sys.exit(2)
-
-    def _rotate_field(
-        self,
-        model: type,
-        field: Any,
-        *,
-        old_fernet: FernetBytes,
-        new_fernet: FernetBytes,
-        batch_size: int,
-        dry_run: bool,
-    ) -> tuple[int, int, int]:
-        """Walk one (model, field) pair. Returns (re_encrypted, already_new, corrupt)."""
-        table = model._meta.db_table
-        pk_column = model._meta.pk.column
-        col = field.column
-
-        re_encrypted = 0
-        already_new = 0
-        corrupt = 0
-
-        # Cursor over PKs only first — keeps the working set small.
-        with connection.cursor() as cursor:
-            cursor.execute(f'SELECT "{pk_column}" FROM "{table}" ORDER BY "{pk_column}"')
-            all_pks = [row[0] for row in cursor.fetchall()]
-
-        for start in range(0, len(all_pks), batch_size):
-            batch_pks = all_pks[start : start + batch_size]
-            placeholders = ",".join(["%s"] * len(batch_pks))
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    f'SELECT "{pk_column}", "{col}" FROM "{table}" '
-                    f'WHERE "{pk_column}" IN ({placeholders})',
-                    batch_pks,
-                )
-                rows = cursor.fetchall()
-
-            updates: list[tuple[bytes, Any]] = []
-            for pk, ciphertext in rows:
-                if ciphertext is None:
-                    continue
-                raw = bytes(ciphertext) if not isinstance(ciphertext, (bytes, bytearray)) else bytes(ciphertext)
-                # Attempt OLD-key decrypt first.
-                try:
-                    plaintext = old_fernet.decrypt(raw)
-                except (InvalidToken, Exception):
-                    # Fall back to NEW-key probe — this catches the "already
-                    # migrated" case so reruns become no-ops.
-                    try:
-                        new_fernet.decrypt(raw)
-                        already_new += 1
-                    except Exception:
-                        corrupt += 1
-                        log.warning(
-                            "rotate_field_encryption_key: row %s.%s pk=%s ciphertext "
-                            "failed BOTH old-key and new-key decrypt",
-                            model._meta.label,
-                            field.name,
-                            pk,
-                        )
-                    continue
-
-                # Successfully decrypted with OLD. Re-encrypt with NEW.
-                # `plaintext` is bytes (it's the inner pickle stream that
-                # EncryptedMixin handed to FernetBytes.encrypt at write time).
-                # We DON'T need to unpickle / repickle — preserving the
-                # exact bytes round-trips through any base_class.
-                # Cross-check: confirm the pickle stream is well-formed
-                # so we don't silently propagate a corrupt row.
-                try:
-                    pickle.loads(plaintext)
-                except Exception:
-                    log.warning(
-                        "rotate_field_encryption_key: row %s.%s pk=%s decrypted "
-                        "successfully but pickle.loads failed — skipping to avoid corruption",
-                        model._meta.label,
-                        field.name,
-                        pk,
-                    )
-                    corrupt += 1
-                    continue
-
-                new_ciphertext = new_fernet.encrypt(plaintext)
-                updates.append((new_ciphertext, pk))
-
-            if updates and not dry_run:
-                with transaction.atomic():
-                    with connection.cursor() as cursor:
-                        for new_ct, pk in updates:
-                            cursor.execute(
-                                f'UPDATE "{table}" SET "{col}" = %s WHERE "{pk_column}" = %s',
-                                [connection.Database.Binary(new_ct), pk],
-                            )
-            re_encrypted += len(updates)
-
-        return re_encrypted, already_new, corrupt
+        )

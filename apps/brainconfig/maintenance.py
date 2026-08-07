@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 
-from apps.brainconfig.jobs import JobSpec, run
+from apps.brainconfig.jobs import JobSpec, run, update
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +75,21 @@ RUNNABLE = {j.name: j for j in (VERIFY_READ, PULL_NOW, REBUILD_INDEX, REPLACE_CL
 
 
 def job_verify_read() -> None:
+    """Clone into a scratch directory and report what git said.
+
+    The setup wizard's Verify button runs this too. It used to call
+    `verify_read_access` inline in the web request — a 180s git timeout
+    under a 60s gunicorn worker timeout, on the one path where the remote
+    is least likely to answer promptly, because the operator is usually
+    still installing the deploy key when they press it. The worker killed
+    the request mid-clone, the page never came back, and nothing recorded
+    whether the clone had in fact succeeded.
+
+    The structured half of the outcome is stashed on the job record.
+    `run()` carries a label and an error string, and the wizard renders
+    more than that: git's own stderr verbatim, and the contract files a
+    reachable-but-not-a-brain repository is missing.
+    """
     def body(progress):
         from apps.brain.services import gitrepo
         from apps.brainconfig import setup_services, setup_state
@@ -82,6 +97,13 @@ def job_verify_read() -> None:
         url = gitrepo.configured_url()
         progress(0, 1, f"Cloning {url} into a scratch directory")
         outcome = setup_services.verify_read_access(url)
+        update(
+            VERIFY_READ.name,
+            message=outcome.message,
+            git_error=outcome.git_error,
+            missing=list(outcome.missing_contract),
+            head=outcome.head[:12],
+        )
         if outcome.ok:
             setup_state.mark_read_verified()
             return f"Read access confirmed at {outcome.head[:12]}."

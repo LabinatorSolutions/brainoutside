@@ -31,6 +31,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.brain.services import gitcreds, gitrepo
+from apps.brainconfig import jobs, maintenance
 from apps.brainconfig import services as cfg
 from apps.brainconfig import setup_services, setup_state
 
@@ -169,17 +170,41 @@ def _step_repo(request):
 # ---- 3. read (deploy key) ------------------------------------------------
 
 
+def _verify_result(record: dict) -> dict | None:
+    """The Verify job's record in the shape `read.html` renders.
+
+    None while it is queued, running, or has never run. `message`,
+    `git_error`, `missing` and `head` are stashed by the job body
+    (`maintenance.job_verify_read`) because `run()` itself only carries a
+    label and an error string, and this page shows git's stderr verbatim
+    and the missing contract files.
+    """
+    state = record.get("state")
+    if state not in ("done", "failed"):
+        return None
+    return {
+        "ok": state == "done",
+        "message": record.get("message") or record.get("label") or "",
+        "git_error": record.get("git_error") or "",
+        "head": record.get("head") or "",
+        "missing": record.get("missing") or [],
+    }
+
+
 def _step_read(request):
     url = gitrepo.configured_url()
     if not url:
         return redirect("setup:step", slug="repo")
 
-    result = request.session.pop("verify_result", None)
     if request.method == "POST":
         action = request.POST.get("action", "")
         if action == "regenerate":
             gitcreds.generate_keypair(actor=request.user)
             setup_state.clear_read_verified()
+            # The last verdict was about the key that just stopped
+            # existing. Leaving it on screen beside the new key would
+            # read as a result for that key.
+            jobs.clear(maintenance.VERIFY_READ.name)
             messages.warning(
                 request,
                 "New key generated. The old one no longer works — remove it "
@@ -187,18 +212,15 @@ def _step_read(request):
             )
             return redirect(request.path)
         if action == "verify":
-            outcome = setup_services.verify_read_access(url)
-            if outcome.ok:
-                setup_state.mark_read_verified()
-            request.session["verify_result"] = {
-                "ok": outcome.ok,
-                "message": outcome.message,
-                "git_error": outcome.git_error,
-                "head": outcome.head[:12],
-                "missing": outcome.missing_contract,
-            }
+            # On the worker, like the health page's identical button and
+            # for the same reason: a clone is a 180s timeout inside a 60s
+            # request. The page below watches the job record.
+            started, message = jobs.enqueue(maintenance.VERIFY_READ)
+            if not started:
+                messages.info(request, message)
             return redirect(request.path)
 
+    record = jobs.get(maintenance.VERIFY_READ.name)
     status = gitcreds.status()["read"]
     public_key = gitcreds.ensure_keypair(actor=request.user) if status["source"] != "file" else ""
     web = setup_services.repo_web_url(url)
@@ -210,7 +232,8 @@ def _step_read(request):
         public_key=public_key,
         key_source=status["source"],
         verified=setup_state.read_verified(),
-        result=result,
+        verifying=record.get("state") == "running",
+        result=_verify_result(record),
     ))
 
 
@@ -362,6 +385,23 @@ def _step_build(request):
         built=setup_state.brain_built(),
         ops_url=_ops_home(),
     ))
+
+
+def verify_progress(request):
+    """Polled by the Read step while the clone runs on the worker.
+
+    State only. The verdict is rendered server-side from the same job
+    record, so the page reloads once this stops saying "running" rather
+    than reproducing the whole result block in JavaScript.
+    """
+    guard = _require_staff(request)
+    if guard is not None:
+        return JsonResponse({"error": "auth"}, status=403)
+    record = jobs.get(maintenance.VERIFY_READ.name)
+    return JsonResponse({
+        "state": record.get("state", ""),
+        "label": record.get("label", ""),
+    })
 
 
 def build_progress(request):

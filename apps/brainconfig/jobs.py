@@ -71,8 +71,19 @@ def mark_queued(name: str, label: str) -> None:
 
     If the worker is slow to pick up (or down), the UI still shows the
     job as started rather than appearing to have ignored the click.
+
+    Replaces the record rather than merging into it. A job body may stash
+    its own fields (the read check stores git's stderr and the missing
+    contract files, which `run()`'s label/error pair cannot carry), and
+    merging would leave the previous run's verdict sitting on this run's
+    record — visible for as long as the new one takes.
     """
-    update(name, state="running", step=0, total=1, label=label, error="", result="")
+    cache.set(
+        _key(name),
+        {"state": "running", "step": 0, "total": 1, "label": label,
+         "error": "", "result": ""},
+        TTL_SECONDS,
+    )
 
 
 def enqueue(spec: JobSpec) -> tuple[bool, str]:

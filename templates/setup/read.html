@@ -45,7 +45,17 @@
     </div>
   {% endif %}
 
-  {% if result %}
+  {% if verifying %}
+    <div class="notice mt-5">
+      <div class="font-semibold">Checking…</div>
+      <p class="mt-1 text-sm text-muted">
+        Cloning your repository into a scratch directory. This runs on the
+        worker, so a cold or unreachable remote can take a couple of
+        minutes without costing you this page — it also appears under
+        Tasks in the ops UI. Safe to close; the result will be here.
+      </p>
+    </div>
+  {% elif result %}
     <div class="notice mt-5 {% if result.ok %}notice-ok{% else %}notice-danger{% endif %}">
       <div class="font-semibold {% if result.ok %}text-signal-ink{% else %}text-danger-ink{% endif %}">
         {{ result.message }}
@@ -82,8 +92,11 @@
     name/value, and the view sees no `action` at all. Costs nothing, and
     the button still greys out for the life of the request.
   {% endcomment %}
+  {# `busy` starts true when a check is already in flight — the job may #}
+  {# have been started from here, from another tab, or from /ops/health/. #}
   <form method="post" class="mt-5 flex flex-wrap items-center gap-2"
-        x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+        x-data="{busy: {{ verifying|yesno:'true,false' }}}"
+        @submit="setTimeout(() => busy = true)">
     {% csrf_token %}
     <button type="submit" name="action" value="verify"
             :disabled="busy"
@@ -103,4 +116,26 @@
          class="btn-ink btn-lg">Continue</a>
     {% endif %}
   </form>
+
+  {% if verifying %}
+    <script nonce="{{ csp_nonce }}">
+      // Watch, then reload. The verdict is rendered server-side from the
+      // same job record, so there is nothing to rebuild here — and a
+      // reload is what picks up `verified`, which unhides Continue.
+      (function () {
+        const timer = setInterval(async () => {
+          if (document.visibilityState === 'hidden') return;
+          try {
+            const r = await fetch('{% url "setup:verify-progress" %}');
+            if (!r.ok) return;
+            const next = await r.json();
+            if (next.state !== 'running') {
+              clearInterval(timer);
+              window.location.reload();
+            }
+          } catch (e) { /* transient — the next tick retries */ }
+        }, 2000);
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

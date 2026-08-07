@@ -240,13 +240,39 @@ def _apply_taxonomy(repo: Path, proposal: dict) -> None:
 # ---- the locked sequence -------------------------------------------------
 
 
-def _rollback(branch: str) -> None:
-    """Return the clone to pristine origin state. Never raises."""
+def _rollback(branch: str) -> str:
+    """Return the clone to pristine origin state. Never raises.
+
+    Returns "" when the tree came back clean, else `git status --porcelain`
+    naming what survived. A rollback that quietly failed is how content
+    nobody approved reaches the public API: `indexer.rebuild()` walks the
+    WORKING TREE, not the commit, so a leftover file is indexed, copied
+    into a tier snapshot, and served.
+    """
     for args in (("rebase", "--abort"), ("reset", "--hard", f"origin/{branch}"), ("clean", "-fd")):
         try:
             gitrepo.run(*args)
         except gitrepo.BrainRepoError:
             pass
+    try:
+        return gitrepo.run("status", "--porcelain")
+    except gitrepo.BrainRepoError as exc:  # pragma: no cover - defensive
+        return f"could not verify the rollback: {exc}"
+
+
+def _dirty_note(leftover: str) -> str:
+    """Failure-message suffix when the clone did not come back clean."""
+    if not leftover:
+        return ""
+    lines = leftover.splitlines()
+    shown = "; ".join(lines[:5])
+    if len(lines) > 5:
+        shown += f"; +{len(lines) - 5} more"
+    return (
+        f" [ROLLBACK INCOMPLETE — the clone still holds: {shown}. "
+        "Nothing here was committed, but the next sync indexes the working "
+        "tree and will serve it. Clean the clone before re-approving.]"
+    )
 
 
 def _push(branch: str) -> None:
@@ -300,18 +326,41 @@ def apply_feed(feed_id: int) -> str:
                     _push(branch)
                     commit = gitrepo.run("rev-parse", "HEAD")
                     break
-                except ApplyFailure:
-                    _rollback(branch)
-                    raise
+                except ApplyFailure as exc:
+                    raise ApplyFailure(f"{exc}{_dirty_note(_rollback(branch))}") from exc
                 except gitrepo.BrainRepoError as exc:
                     # Push/transport trouble — routine race territory.
-                    _rollback(branch)
-                    if attempts >= MAX_PUSH_ATTEMPTS:
+                    leftover = _rollback(branch)
+                    # A retry re-applies onto whatever is in the tree, so a
+                    # rollback that did not fully take ends the attempt loop.
+                    if leftover or attempts >= MAX_PUSH_ATTEMPTS:
                         raise ApplyFailure(
-                            f"push failed after {attempts} attempts: {exc}"
+                            f"push failed after {attempts} attempt(s): {exc}"
+                            f"{_dirty_note(leftover)}"
                         ) from exc
                     log.warning("feed %s: attempt %s failed (%s), retrying", feed.pk, attempts, exc)
-    except (ApplyFailure, gitrepo.BrainRepoError) as exc:
+                except Exception as exc:
+                    # ANYTHING else: an OSError from mkdir over an existing
+                    # file, a UnicodeDecodeError from one of the strict
+                    # read_text calls, a DB blip inside the validator. These
+                    # used to escape past the rollback with the proposal's
+                    # files already written — and `pull --rebase --autostash`
+                    # then preserved them, so the next sync indexed and
+                    # served content no one ever approved into a commit.
+                    log.exception("feed %s: unexpected failure during apply", feed.pk)
+                    raise ApplyFailure(
+                        f"unexpected {type(exc).__name__} while applying: {exc}"
+                        f"{_dirty_note(_rollback(branch))}"
+                    ) from exc
+                except BaseException:
+                    # Worker shutdown or cancellation mid-apply. Not ours to
+                    # convert into a Feed failure — but the tree still must
+                    # not be left holding half a proposal.
+                    _rollback(branch)
+                    raise
+    except Exception as exc:
+        # Deliberately broad: the alternative to marking the Feed failed is
+        # leaving it wedged in `approving`, where no UI action can reach it.
         _finalize_failed(feed, str(exc), attempts)
         return f"failed: {exc}"
 

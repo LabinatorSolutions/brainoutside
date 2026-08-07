@@ -9,11 +9,15 @@ visibility + staleness resolved at serve time — never self-reported.
 from __future__ import annotations
 
 import datetime
+import decimal
 import logging
 
 from asgiref.sync import sync_to_async
+from django.core.cache import cache
+from django.db.models import F
 from django.utils import timezone
 
+from apps.core.cache import make_key
 from apps.reader.models import ChatMessage, ChatSession
 from apps.reader.services import reader, sdk_runner
 
@@ -22,6 +26,14 @@ log = logging.getLogger(__name__)
 HISTORY_TURNS = 12  # most recent messages replayed into the prompt
 MESSAGE_MAX_CHARS = 8000
 STALE_AFTER_DAYS = 45  # reader rule 3 (contract §6)
+
+#: Added to the SDK timeout to bound a lock whose holder was killed
+#: outright — every ordinary exit releases it in a `finally`.
+TURN_LOCK_GRACE_SECONDS = 60
+
+
+def turn_lock_key(session_id: int) -> str:
+    return make_key("chat", "turn", session_id)
 
 
 def compose_chat_append() -> str:
@@ -102,7 +114,21 @@ def _sources_from_paths(tier: str, abs_paths: list[str]) -> list[dict]:
 
 async def run_turn(session: ChatSession, user_text: str):
     """Async generator of SSE-ready events:
-    ("delta", text)… then ("done", {...}) or ("error", {...})."""
+    ("delta", text)… then ("done", {...}) or ("error", {...}).
+
+    **One turn at a time per session.** Two tabs on the same session used
+    to interleave: each inserted its user message and then read "every
+    message except the newest" as history, so whichever went second stole
+    the other's exclusion and replayed a slice containing its own new
+    message and missing the other's. The token totals were a
+    read-modify-write off a session object loaded at request start, so
+    one of the two updates was simply lost.
+
+    A second turn is REFUSED, not queued. A turn is a 5-30s streamed
+    agent run; holding the second request open behind the first turns a
+    stray second tab into a hang, and the SSE client has an `error` event
+    it already renders.
+    """
     user_text = (user_text or "").strip()
     if not user_text:
         yield ("error", {"message": "empty message"})
@@ -111,12 +137,53 @@ async def run_turn(session: ChatSession, user_text: str):
         yield ("error", {"message": f"message too long (cap {MESSAGE_MAX_CHARS} chars)"})
         return
 
+    # `add` is the atomic claim — set-if-absent in one backend round trip,
+    # on LocMem and Redis alike. Called synchronously rather than through
+    # `sync_to_async`: the release below runs in a `finally` that may be
+    # unwinding from GeneratorExit, where awaiting anything raises
+    # "async generator ignored GeneratorExit" (see `stream_agent`), and a
+    # single cache op either side of a 5-30s run is not worth two idioms.
+    lock = turn_lock_key(session.pk)
+    ttl = await sync_to_async(_lock_ttl)()
+    if not cache.add(lock, "1", ttl):
+        yield ("error", {
+            "message": "This session already has a turn running — wait for it "
+                       "to finish, or open a new session.",
+        })
+        return
+
+    try:
+        async for event in _run_turn_locked(session, user_text):
+            yield event
+    finally:
+        cache.delete(lock)
+
+
+def _lock_ttl() -> int:
+    from apps.brainconfig import services as config
+
+    return config.sdk_timeout_seconds() + TURN_LOCK_GRACE_SECONDS
+
+
+async def _run_turn_locked(session: ChatSession, user_text: str):
+    """The turn itself. Split out so the lock's `finally` wraps every
+    exit path of the generator, including a client disconnect."""
+
     def _prep():
-        ChatMessage.objects.create(session=session, role="user", content=user_text)
+        mine = ChatMessage.objects.create(session=session, role="user", content=user_text)
         if not session.title:
             session.title = user_text[:200]
         session.save(update_fields=["title", "updated_at"])
-        return list(session.messages.order_by("-created_at", "-id")[1 : HISTORY_TURNS + 1])[::-1]
+        # Excluded BY PRIMARY KEY, not by "drop the newest row". The
+        # slice version was only correct while nothing else was writing
+        # to this session, which is the assumption the lock now enforces
+        # — but the lock lives in the cache, and a cache that is down
+        # must not silently restore a corrupt prompt.
+        recent = (
+            session.messages.exclude(pk=mine.pk)
+            .order_by("-created_at", "-id")[:HISTORY_TURNS]
+        )
+        return list(recent)[::-1]
 
     history = await sync_to_async(_prep)()
     append = await sync_to_async(compose_chat_append)()
@@ -155,16 +222,16 @@ async def run_turn(session: ChatSession, user_text: str):
             error=run.error_class if not run.ok else "",
             sdk_operation_id=run.operation_id,
         )
-        session.total_input_tokens += run.usage.get("input_tokens") or 0
-        session.total_output_tokens += run.usage.get("output_tokens") or 0
-        session.total_cost_usd = float(session.total_cost_usd) + (run.cost_usd or 0)
-        session.save(
-            update_fields=[
-                "total_input_tokens",
-                "total_output_tokens",
-                "total_cost_usd",
-                "updated_at",
-            ]
+        # Incremented in the DATABASE, not read-modify-written off this
+        # instance: `session` was loaded when the request began, and the
+        # old version wrote back a total computed from a snapshot that
+        # could already be several turns stale. `update()` skips
+        # `auto_now`, so `updated_at` is set by hand.
+        ChatSession.objects.filter(pk=session.pk).update(
+            total_input_tokens=F("total_input_tokens") + (run.usage.get("input_tokens") or 0),
+            total_output_tokens=F("total_output_tokens") + (run.usage.get("output_tokens") or 0),
+            total_cost_usd=F("total_cost_usd") + decimal.Decimal(str(run.cost_usd or 0)),
+            updated_at=timezone.now(),
         )
         from apps.events.models import emit
 

@@ -34,7 +34,14 @@ def tier_for_credential(credential: object) -> str:
         profile = Consumer.objects.filter(api_key=credential).first()
     except (TypeError, ValueError):  # not an APIKey (e.g. OAuth token)
         return "public"
-    return profile.max_visibility if profile else "public"
+    if profile is None:
+        return "public"
+    # Same clamp as `url_mcp_tokens.api.tier_for`, same reason: an
+    # unrecognised stored value answers public instead of passing itself
+    # through. The model's `choices` only guard forms — a hand-edited row
+    # can hold anything, and unclamped it reached `TIER_ORDER[tier]` rank
+    # lookups that 500 on every call that credential makes.
+    return profile.max_visibility if profile.max_visibility in TIER_ORDER else "public"
 
 
 def allows(tier: str, visibility: str) -> bool:

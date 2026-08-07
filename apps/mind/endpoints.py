@@ -34,7 +34,9 @@ def _cred(ctx: Ctx):
 
 
 def _visible_entities(tier: str):
-    rank = tiers.TIER_ORDER[tier]
+    # `.get(tier, 0)` like every sibling rank check: an unknown tier reads
+    # as public — fail closed, never a KeyError that 500s the endpoint.
+    rank = tiers.TIER_ORDER.get(tier, 0)
     return [e for e in Entity.objects.all() if tiers.TIER_ORDER.get(e.visibility, 2) <= rank]
 
 

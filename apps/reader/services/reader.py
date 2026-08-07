@@ -128,7 +128,9 @@ def _verify_entities(tier: str, ids: list[str]) -> tuple[list[str], list[str]]:
     from apps.brain.models import Entity
     from apps.mind import tiers
 
-    rank = tiers.TIER_ORDER[tier]
+    # `.get(tier, 0)`: an unknown tier verifies at public rank — rejecting
+    # everything above it — instead of raising out of the verify step.
+    rank = tiers.TIER_ORDER.get(tier, 0)
     vis = {e.entity_id: e.visibility for e in Entity.objects.filter(entity_id__in=ids)}
     verified, rejected = [], []
     for i in ids:

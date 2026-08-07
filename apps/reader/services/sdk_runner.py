@@ -106,26 +106,39 @@ def today_unpriced() -> dict[str, int]:
     Reporting the gap is the honest alternative to inventing a number
     for it: pricing is per-model and changes, and a made-up dollar
     figure inside a spend breaker is worse than an admitted blind spot.
+
+    **All four token columns count.** This used to sum `input_tokens` and
+    `output_tokens` only, which on this workload is a rounding error:
+    every run replays a system prompt and a snapshot through the prompt
+    cache, so a real cut-off run measured here recorded `in=2, out=2,
+    cache_read=11689, cache_write=2212` — reported as 4 tokens out of
+    13,905. A blind-spot figure that understates by three orders of
+    magnitude is not an admission, it is the same silence in smaller
+    type. The two cache columns are also in the `> 0` filter, since a
+    run can be entirely cache reads and would otherwise not be counted
+    as a gap at all.
     """
     from django.db.models import Count, Q, Sum
+
+    columns = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens")
+    burned = Q()
+    for column in columns:
+        burned |= Q(**{f"{column}__gt": 0})
 
     start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
     agg = (
         SdkOperation.objects.filter(
             created_at__gte=start, cost_usd__isnull=True, finished_at__isnull=False
         )
-        .filter(Q(input_tokens__gt=0) | Q(output_tokens__gt=0))
-        .aggregate(
-            runs=Count("id"),
-            input_tokens=Sum("input_tokens"),
-            output_tokens=Sum("output_tokens"),
-        )
+        .filter(burned)
+        .aggregate(runs=Count("id"), **{c: Sum(c) for c in columns})
     )
-    return {
-        "runs": agg["runs"] or 0,
-        "input_tokens": agg["input_tokens"] or 0,
-        "output_tokens": agg["output_tokens"] or 0,
-    }
+    out = {c: agg[c] or 0 for c in columns}
+    out["runs"] = agg["runs"] or 0
+    # Precomputed because the template cannot add four numbers, and the
+    # gate's warning needs the same figure.
+    out["total_tokens"] = sum(out[c] for c in columns)
+    return out
 
 
 #: Input-side counters the Anthropic `message_start` payload carries.
@@ -211,7 +224,7 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
                 "be priced (no ResultMessage) — the daily cap is being checked "
                 "against incomplete spend",
                 unpriced["runs"],
-                unpriced["input_tokens"] + unpriced["output_tokens"],
+                unpriced["total_tokens"],
             )
         if today_cost_usd() >= float(cap):
             raise DailyCapExceeded(

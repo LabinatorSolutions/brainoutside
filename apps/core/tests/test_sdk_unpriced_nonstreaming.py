@@ -121,9 +121,11 @@ class TestATimedOutNonStreamingRunRecordsItsTokens:
 
         _run(_agent)
 
-        assert sdk_runner.today_unpriced() == {
-            "runs": 1, "input_tokens": 100, "output_tokens": 60
-        }
+        gap = sdk_runner.today_unpriced()
+        assert gap["runs"] == 1
+        assert gap["input_tokens"] == 100 and gap["output_tokens"] == 60
+        assert gap["cache_read_tokens"] == 20 and gap["cache_write_tokens"] == 5
+        assert gap["total_tokens"] == 185
 
     def test_the_cost_stays_null_rather_than_invented(self, stub_sdk):
         stream = _Stream([_start(), _mdelta(60)], stall_after=2)

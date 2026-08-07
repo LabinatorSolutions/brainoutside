@@ -58,11 +58,16 @@
         figure above cannot see it, so the gap is stated rather than
         priced: per-model pricing changes, and a made-up dollar amount
         inside a circuit breaker is worse than an admitted blind spot.
+
+        `total_tokens`, not input+output. Every run replays a system
+        prompt and a snapshot through the prompt cache, so the cache
+        columns ARE the volume — a measured cut-off run was 4 tokens by
+        the old sum and 13,905 by this one.
       {% endcomment %}
       {% if unpriced.runs %}
         <div class="mt-1 text-xs text-warn-ink">
           Not counted above: {{ unpriced.runs }} run{{ unpriced.runs|pluralize }} used
-          {{ unpriced.input_tokens|add:unpriced.output_tokens }} tokens the CLI never priced
+          {{ unpriced.total_tokens }} tokens the CLI never priced
           (timed out or disconnected).
         </div>
       {% endif %}

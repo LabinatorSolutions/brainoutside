@@ -160,7 +160,12 @@ class TestTheGapIsReported:
         self._finished(ok=False, error_class="ClientDisconnected", input_tokens=40, output_tokens=10)
 
         assert sdk_runner.today_unpriced() == {
-            "runs": 2, "input_tokens": 140, "output_tokens": 70
+            "runs": 2,
+            "input_tokens": 140,
+            "output_tokens": 70,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
+            "total_tokens": 210,
         }
 
     def test_priced_runs_are_not_counted(self):

@@ -13,6 +13,7 @@ import math
 import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import Callable, Optional
 
 from django.conf import settings as dj_settings
 
@@ -44,6 +45,49 @@ class SettingSpec:
     #: free-text keys that land somewhere with a layout to break — the
     #: value column is a TextField, so nothing else stops a 5 KB paste.
     max_len: int = 0
+    #: Normalise/validate a pasted value before it stores: takes the
+    #: stripped input, returns the canonical form, raises ValueError with
+    #: an operator-facing message. The Settings page enforces it; where
+    #: the wizard validates the same key, the spec points at the SAME
+    #: function (the repo URL uses `setup_services.normalise_repo_input`)
+    #: so the two surfaces cannot drift. None = store as typed.
+    clean: Optional[Callable[[str], str]] = None
+
+
+def _clean_repo_url(raw: str) -> str:
+    """The wizard's own normaliser — one definition, two surfaces.
+
+    Before this, /ops/settings/ stored `myname/brain` verbatim: the
+    clone check went red and the offered repair failed against a URL
+    git cannot parse, while the wizard would have normalised the same
+    paste to `git@github.com:myname/brain.git`.
+    """
+    from apps.brainconfig import setup_services
+
+    try:
+        return setup_services.normalise_repo_input(raw)
+    except setup_services.SetupError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _clean_decimal(raw: str) -> str:
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        raise ValueError("must be a number, like 10.00") from None
+    if not value.is_finite():
+        raise ValueError("must be a finite number — nan/inf is not a threshold")
+    return str(value)
+
+
+def _clean_positive_int(raw: str) -> str:
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError("must be a whole number") from None
+    if value < 1:
+        raise ValueError("must be at least 1")
+    return str(value)
 
 
 REGISTRY: tuple[SettingSpec, ...] = (
@@ -87,30 +131,35 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "Reader budget (USD/run)",
         "Soft per-run cap, checked between turns by the SDK.",
         default="0.50",
+        clean=_clean_decimal,
     ),
     SettingSpec(
         "MAX_BUDGET_USD_FEEDER",
         "Feeder budget (USD/run)",
         "Soft per-run cap for feed extraction.",
         default="1.00",
+        clean=_clean_decimal,
     ),
     SettingSpec(
         "MAX_TURNS_READER",
         "Reader max turns",
         "Hard cap on agentic turns per reader run.",
         default="15",
+        clean=_clean_positive_int,
     ),
     SettingSpec(
         "MAX_TURNS_FEEDER",
         "Feeder max turns",
         "Hard cap on agentic turns per feeder run.",
         default="25",
+        clean=_clean_positive_int,
     ),
     SettingSpec(
         "SDK_TIMEOUT_SECONDS",
         "Run timeout (seconds)",
         "Wall-clock ceiling per SDK run; the subprocess is killed past it.",
         default="300",
+        clean=_clean_positive_int,
     ),
     SettingSpec(
         "DAILY_COST_CAP",
@@ -121,6 +170,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "are synthetic CLI estimates, not billed spend. Clearing restores "
         "the default.",
         default="10.00",
+        clean=_clean_decimal,
     ),
     SettingSpec(
         "BRAIN_REPO_URL",
@@ -129,6 +179,7 @@ REGISTRY: tuple[SettingSpec, ...] = (
         "this does NOT move the clone on disk — the server refuses to boot "
         "on a mismatch until the clone is replaced.",
         env_wins=True,
+        clean=_clean_repo_url,
     ),
     SettingSpec(
         "GITHUB_WEBHOOK_SECRET",

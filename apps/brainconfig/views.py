@@ -262,11 +262,22 @@ def _save(request) -> None:
             # looks like the save worked.
             rejected.append(f"{spec.key} (max {spec.max_len} characters)")
             continue
+        if spec.clean is not None:
+            # The same normalisation the wizard applies — `myname/brain`
+            # pasted here used to store verbatim, turn the clone check
+            # red, and break the offered repair. Reject with the
+            # cleaner's own message rather than store a value some later
+            # surface will choke on less legibly.
+            try:
+                raw = spec.clean(raw)
+            except ValueError as exc:
+                rejected.append(f"{spec.key} ({exc})")
+                continue
         if raw != services.get(spec.key) or not services.is_db_set(spec.key):
             services.set_value(spec.key, raw, actor=request.user)
             changed.append(spec.key)
     if rejected:
-        messages.error(request, f"Too long, not saved: {', '.join(rejected)}")
+        messages.error(request, f"Not saved: {', '.join(rejected)}")
     if changed:
         messages.success(request, f"Saved: {', '.join(changed)}")
     elif not rejected:

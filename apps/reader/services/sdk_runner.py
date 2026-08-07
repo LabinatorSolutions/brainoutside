@@ -2,11 +2,14 @@
 
 Responsibilities (PLAN.md §7):
 - **Lockdown**: deny-by-default tool policy scoped to one tier snapshot.
-  `Read` is allowed only inside the caller-tier's snapshot dir, `Grep`/
-  `Glob` likewise via cwd; everything else (Bash, Write, Edit, WebFetch,
-  WebSearch, Task…) is disallowed BY NAME so the tools leave context
-  entirely. `setting_sources=[]` + `strict_mcp_config=True` mean nothing
-  auto-loads from ~/.claude or any repo .claude/ (grill C4, C12a).
+  `Read` is allowed only inside the caller-tier's snapshot dir; `Grep`/
+  `Glob` are confined by a PreToolUse hook, NOT by cwd — cwd does not
+  constrain an absolute `path` argument, and an `allowed_tools` entry
+  with no `(...)` specifier allows the whole tool outright. Everything
+  else (Bash, Write, Edit, WebFetch, WebSearch, Task…) is disallowed BY
+  NAME so the tools leave context entirely. `setting_sources=[]` +
+  `strict_mcp_config=True` mean nothing auto-loads from ~/.claude or any
+  repo .claude/ (grill C4, C12a).
 - **Ledger**: an SdkOperation row is written BEFORE the run (`ok=None`)
   and finalized after, so killed runs are never invisible (grill C6).
 - **Budgets**: per-kind `max_budget_usd` (soft, SDK-enforced between
@@ -22,6 +25,7 @@ import concurrent.futures
 import hashlib
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Awaitable
 
 from asgiref.sync import sync_to_async
@@ -118,11 +122,71 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
     return api_key
 
 
+# Tool inputs that name a filesystem location. `Read` uses `file_path`;
+# `Grep` and `Glob` use `path`. Anything else here is belt-and-braces for
+# tools that are denied by name today but might be allowed later.
+_PATH_TOOL_INPUT_KEYS = ("file_path", "path", "notebook_path")
+
+
+def _deny(reason: str) -> dict:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
+def tier_path_guard(tier_path: Path):
+    """PreToolUse hook: refuse any file tool call resolving outside `tier_path`.
+
+    This is what actually confines `Grep`/`Glob`, and it is not optional.
+    `cwd` does not constrain an absolute `path=` argument, and the SDK
+    documents that an `allowed_tools` entry with no `(...)` specifier
+    ("Grep") allows the whole tool outright — so neither mechanism can stop
+    an agent reading a sibling tier. All three tier snapshots live on one
+    mounted volume, so an unconfined Grep with `output_mode="content"` is a
+    cross-tier read of note bodies. A PreToolUse hook is the SDK's
+    documented way to gate every call (see `CanUseToolShadowedWarning`).
+
+    Symlinks resolve before the check, so a symlink inside the snapshot
+    pointing out of it is refused too.
+    """
+    root = tier_path.resolve()
+
+    async def guard(input_data, tool_use_id, context):
+        tool_name = input_data.get("tool_name", "tool")
+        tool_input = input_data.get("tool_input") or {}
+        for key in _PATH_TOOL_INPUT_KEYS:
+            raw = tool_input.get(key)
+            if not raw or not isinstance(raw, str):
+                continue
+            candidate = Path(raw)
+            if not candidate.is_absolute():
+                candidate = root / candidate
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                return _deny(f"{tool_name}: {key} could not be resolved.")
+            if resolved != root and root not in resolved.parents:
+                log.warning(
+                    "tier guard refused %s %s=%r (outside %s)", tool_name, key, raw, root
+                )
+                return _deny(
+                    f"{tool_name} may only touch the caller's tier snapshot. "
+                    f"{key} resolves outside it."
+                )
+        return {}
+
+    return guard
+
+
 def _snapshot_options(
     tier: str, api_key: str, kind: str, append_prompt: str, output_format=None, streaming: bool = False
 ):
     """ClaudeAgentOptions locked to one tier snapshot (§7 'the real config')."""
-    from claude_agent_sdk import ClaudeAgentOptions
+    from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
 
     from apps.brain.services import snapshots
 
@@ -131,6 +195,15 @@ def _snapshot_options(
         cwd=str(tier_path),
         permission_mode="dontAsk",  # deny anything not pre-approved
         allowed_tools=[f"Read({tier_path.as_posix()}/**)", "Grep", "Glob"],
+        # The hook — not cwd, not allowed_tools — is what confines Grep/Glob.
+        hooks={
+            "PreToolUse": [
+                HookMatcher(
+                    matcher="Read|Grep|Glob",
+                    hooks=[tier_path_guard(tier_path)],
+                )
+            ]
+        },
         disallowed_tools=DENIED_TOOLS,
         setting_sources=[],
         strict_mcp_config=True,

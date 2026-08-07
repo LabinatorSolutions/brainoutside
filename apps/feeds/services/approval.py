@@ -140,22 +140,25 @@ def _apply_files(repo: Path, proposal: dict) -> None:
         target.write_text(content, encoding="utf-8", newline="\n")
 
 
-def _entity_paths(proposal: dict) -> dict[str, str]:
-    """entity_id -> path for the files this proposal carries."""
-    out: dict[str, str] = {}
-    for f in proposal.get("files") or []:
-        m = re.search(r"^id:\s*(\S+)", str(f.get("content", "")), re.MULTILINE)
-        if m:
-            out[m.group(1)] = str(f.get("path", ""))
-    return out
-
-
 def _apply_index_lines(repo: Path, proposal: dict) -> None:
     index = repo / "INDEX.md"
     lines = index.read_text(encoding="utf-8").splitlines()
+    # An index line may only describe a file this proposal carries. The
+    # validator enforces the same rule, but this loop OVERWRITES the first
+    # existing line ending with the extracted path, and INDEX.md is not in
+    # the approval diff — so an unchecked entry rewrites an unrelated
+    # entity's line with nobody seeing it. The empty-path case (a line
+    # ending in `|`) is the sharp one: `endswith("")` matches every line,
+    # so it clobbers whichever entity is listed first.
+    targets = set(validator.proposed_entity_paths(proposal).values())
     for entry in proposal.get("index_lines") or []:
         new_line = str(entry.get("line", "")).rstrip()
-        path = new_line.rsplit("|", 1)[-1].strip()
+        path = validator.index_line_path(new_line)
+        if path not in targets:
+            raise ApplyFailure(
+                f"index line points at {path!r}, which is not a file this "
+                f"proposal carries: {new_line!r}"
+            )
         replaced = False
         for i, line in enumerate(lines):
             if line.startswith("- ") and line.rstrip().endswith(path):

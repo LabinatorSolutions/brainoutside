@@ -44,8 +44,11 @@ SEED_INDEX_MD = """# INDEX
 
 
 def _run(*args: str, cwd: Path) -> str:
+    # encoding is explicit: `text=True` alone decodes with the host locale,
+    # which on Windows is cp1252 and turns every em dash in an INDEX line
+    # into mojibake — an assertion failure that looks like a logic bug.
     proc = subprocess.run(
-        ["git", *args], cwd=str(cwd), capture_output=True, text=True
+        ["git", *args], cwd=str(cwd), capture_output=True, text=True, encoding="utf-8"
     )
     if proc.returncode != 0:
         raise AssertionError(

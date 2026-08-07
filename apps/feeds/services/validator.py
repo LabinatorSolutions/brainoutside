@@ -131,6 +131,33 @@ def _norm(s: str) -> str:
     return _WS_RE.sub(" ", s).strip().lower()
 
 
+def index_line_path(line: str) -> str:
+    """The path an INDEX line points at — its last `|`-separated segment.
+
+    `approval._apply_index_lines` reads the line exactly this way to pick
+    which existing INDEX.md line to overwrite, so the validator has to
+    read it identically or the two disagree about what a proposal does.
+    A line with no `|` at all yields the whole line, which matches no
+    real path and is therefore rejected — which is the point.
+    """
+    return str(line).rstrip().rsplit("|", 1)[-1].strip()
+
+
+def proposed_entity_paths(proposal: dict) -> dict[str, str]:
+    """entity_id -> path for every proposal file carrying frontmatter.
+
+    One definition because three callers need the same answer: the
+    feeder's index-line normaliser, rule 7 below, and the apply-time
+    guard in `approval._apply_index_lines`.
+    """
+    out: dict[str, str] = {}
+    for f in proposal.get("files") or []:
+        fm, _ = _split_frontmatter(str(f.get("content", "")))
+        if fm and str(fm.get("id") or "").strip():
+            out[str(fm["id"]).strip()] = str(f.get("path", ""))
+    return out
+
+
 def _as_list(v: object) -> list[str]:
     if isinstance(v, list):
         return [str(x) for x in v]
@@ -199,6 +226,47 @@ def validate(proposal: dict, ctx: ValidationContext) -> ValidationResult:
         # -- rule 7: index line exists + agrees (all entity files) --
         if path.startswith(("knowledge/", "projects/")):
             _validate_index_agreement(path, content, index_by_entity, res)
+
+    # -- rule 7, the other direction --
+    #
+    # Rule 7 above asks "does every proposed FILE have an index line".
+    # Nothing asked the reverse, and the reverse is where the damage is:
+    # `diffview.build` renders one diff per proposed FILE and never shows
+    # INDEX.md at all, so an index line naming some unrelated entity is
+    # invisible to the operator approving the feed — and
+    # `_apply_index_lines` overwrites the first existing line whose text
+    # ends with that path. The degenerate case is worse still: a line
+    # ending in `|` extracts an EMPTY path, and `endswith("")` is true for
+    # every line, so it silently clobbers whichever entity happens to be
+    # listed first. `feeder.normalize_index_lines` already declines to
+    # recompose an entry with no proposed file, deferring to "the
+    # validator judges it" — this is that judgement.
+    proposed_paths = proposed_entity_paths(proposal)
+    for entry in index_lines:
+        entity_id = str(entry.get("entity_id", "")).strip()
+        line = str(entry.get("line", ""))
+        target = proposed_paths.get(entity_id)
+        if target is None:
+            res.violations.append(
+                Violation(
+                    7,
+                    entity_id or "?",
+                    "index line names no file in this proposal — INDEX.md is "
+                    "not rendered in the approval diff, so this would be "
+                    "committed unreviewed",
+                )
+            )
+            continue
+        found = index_line_path(line)
+        if found != target:
+            res.violations.append(
+                Violation(
+                    7,
+                    target,
+                    f"index line must end with `| {target}`; it points at "
+                    f"{found!r}, which is the line the commit would overwrite",
+                )
+            )
 
     # -- supersedes are declarative; check both ends --
     for s in supersedes:

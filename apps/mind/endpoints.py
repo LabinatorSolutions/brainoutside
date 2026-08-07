@@ -263,7 +263,9 @@ class GetRaw(Endpoint):
         if not inp.path.startswith("raw/"):
             raise ValueError("get-raw serves only raw/ paths.")
         try:
-            content = files.read(tier, inp.path)
+            # subdir= is the guard that holds. The prefix test above only
+            # produces the friendlier message: `raw/../INDEX.md` passes it.
+            content = files.read(tier, inp.path, subdir="raw")
         except files.SnapshotMiss:
             emit("auth_denied", consumer=_cred(ctx), entity_ids=[], surface="get-raw", tier=tier, path=inp.path)
             raise ValueError(f"unknown path: {inp.path}") from None

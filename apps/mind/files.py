@@ -17,20 +17,31 @@ class SnapshotMiss(ValueError):
     """Requested path absent from the caller's tier snapshot."""
 
 
-def read(tier: str, relpath: str) -> str:
+def read(tier: str, relpath: str, *, subdir: str | None = None) -> str:
+    """Read `relpath` from the caller's tier snapshot.
+
+    `subdir` additionally confines the read to one directory inside the
+    snapshot. Callers that restrict by prefix (`get-raw` serves only
+    `raw/`) must pass it: a `startswith("raw/")` test is satisfied by
+    `raw/../INDEX.md`, which resolves back out of `raw/` and used to be
+    served — skipping the per-entity `tiers.allows` check that `get-note`
+    applies, since nothing about a raw read consults the DB.
+    """
     base = snapshots.tier_dir(tier).resolve()
+    root = (base / subdir).resolve() if subdir else base
     target = (base / relpath).resolve()
-    # Traversal guard: the resolved target must stay inside the snapshot.
-    if base not in target.parents and target != base:
+    # Traversal guard: the resolved target must stay inside the snapshot,
+    # and inside `subdir` when the caller named one.
+    if root not in target.parents and target != root:
         raise SnapshotMiss(f"unknown path: {relpath}")
     if not target.is_file():
         raise SnapshotMiss(f"unknown path: {relpath}")
     return target.read_text(encoding="utf-8", errors="replace")
 
 
-def exists(tier: str, relpath: str) -> bool:
+def exists(tier: str, relpath: str, *, subdir: str | None = None) -> bool:
     try:
-        read(tier, relpath)
+        read(tier, relpath, subdir=subdir)
         return True
     except SnapshotMiss:
         return False

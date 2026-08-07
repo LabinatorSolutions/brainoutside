@@ -27,6 +27,7 @@ server-side from the canonical clone, tier-appropriately (M3).
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -36,6 +37,8 @@ from django.utils import timezone
 
 from apps.brain.models import Entity
 from apps.brain.services import gitrepo
+
+log = logging.getLogger(__name__)
 
 TIERS = ("public", "agents-only", "private")
 TIER_ORDER = {"public": 0, "agents-only": 1, "private": 2}
@@ -58,6 +61,25 @@ def _visible(tier: str):
     return [e for e in Entity.objects.all() if TIER_ORDER.get(e.visibility, 2) <= max_rank]
 
 
+def _inside_raw(repo: Path, rel: str) -> bool:
+    """True when `rel` names a real file that is genuinely under `repo/raw/`.
+
+    A prefix test is not enough. `_RAW_REF_RE` accepts `.` and `/`, so a
+    reference like `raw/../identity/core.md` matches it and `is_file()`
+    succeeds — which used to copy that file into whatever tier was being
+    built, including public. Resolving first is what makes the `raw/`
+    restriction mean anything, and it closes symlinks out of the repo too.
+    """
+    raw_root = (repo / "raw").resolve()
+    try:
+        target = (repo / rel).resolve()
+    except OSError:
+        return False
+    if raw_root not in target.parents:
+        return False
+    return target.is_file()
+
+
 def _linked_raw_paths(repo: Path, entities: list[Entity]) -> set[str]:
     """raw/ files referenced by the given entities (source field or body)."""
     found: set[str] = set()
@@ -69,8 +91,10 @@ def _linked_raw_paths(repo: Path, entities: list[Entity]) -> set[str]:
         if p.exists():
             candidates.update(_RAW_REF_RE.findall(p.read_text(encoding="utf-8", errors="replace")))
         for c in candidates:
-            if (repo / c).is_file():
+            if _inside_raw(repo, c):
                 found.add(c)
+            else:
+                log.warning("ignoring raw ref %r in %s (outside raw/)", c, e.path)
     return found
 
 
@@ -157,11 +181,22 @@ def build_tier(tier: str) -> dict[str, object]:
 
 
 def _all_raw(repo: Path) -> set[str]:
+    """Every markdown file under raw/, at any depth.
+
+    Was `glob("*.md")` — top level only — while `_RAW_REF_RE` explicitly
+    matches nested paths. A note linking `raw/interviews/2024-06.md` put
+    that file in the agents-only snapshot (via `_linked_raw_paths`) but not
+    in the private one, so private-tier `get-raw` 404'd where agents-only
+    succeeded, contradicting this module's own "private includes all of
+    raw/" contract.
+    """
+    if not (repo / "raw").is_dir():
+        return set()
     return {
         p.relative_to(repo).as_posix()
-        for p in (repo / "raw").glob("*.md")
-        if p.name != "README.md"
-    } if (repo / "raw").is_dir() else set()
+        for p in (repo / "raw").rglob("*.md")
+        if p.name != "README.md" and _inside_raw(repo, p.relative_to(repo).as_posix())
+    }
 
 
 def build_all() -> dict[str, dict[str, object]]:

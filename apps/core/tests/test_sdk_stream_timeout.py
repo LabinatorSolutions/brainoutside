@@ -59,6 +59,10 @@ class ResultMessage:
         self.num_turns = 1
         self.total_cost_usd = 0.01
         self.subtype = None
+        # Only the non-streaming path reads this, but the stub stands in
+        # for the real message everywhere — leaving it off made `_drain`
+        # raise AttributeError and report a transport failure.
+        self.structured_output = None
 
 
 def _delta(text):

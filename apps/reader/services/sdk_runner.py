@@ -282,9 +282,25 @@ def tier_path_guard(tier_path: Path):
 
 
 def _snapshot_options(
-    tier: str, api_key: str, kind: str, append_prompt: str, output_format=None, streaming: bool = False
+    tier: str,
+    api_key: str,
+    kind: str,
+    append_prompt: str,
+    output_format=None,
+    partial_messages: bool = True,
 ):
-    """ClaudeAgentOptions locked to one tier snapshot (§7 'the real config')."""
+    """ClaudeAgentOptions locked to one tier snapshot (§7 'the real config').
+
+    `partial_messages` used to be `streaming`, on only for `stream_agent`,
+    because raw stream events are what the chat SSE response is made of.
+    But they are also the only place usage appears *before* the
+    `ResultMessage` — and a run that times out never gets a
+    `ResultMessage`. With it off, a timed-out `assemble-context` recorded
+    no cost (expected: nothing can price it) and no tokens either, so it
+    was invisible even to `today_unpriced()`, the figure whose whole job
+    is to admit what the breaker cannot see. The extra events cost some
+    IPC volume on a pipe that is already carrying the same content.
+    """
     from claude_agent_sdk import ClaudeAgentOptions, HookMatcher
 
     from apps.brain.services import snapshots
@@ -311,20 +327,35 @@ def _snapshot_options(
         max_turns=config.max_turns(kind),
         max_budget_usd=config.max_budget_usd(kind),
         env=_auth_env(api_key),
-        include_partial_messages=streaming,
+        include_partial_messages=partial_messages,
         output_format=output_format,
     )
 
 
-async def _drain(prompt: str, options) -> RunResult:
-    """Run one query() to completion and fold it into a RunResult."""
-    from claude_agent_sdk import AssistantMessage, ResultMessage, TextBlock, query
+async def _drain(prompt: str, options, partial: "_PartialUsage | None" = None) -> RunResult:
+    """Run one query() to completion and fold it into a RunResult.
+
+    `partial` is filled as raw stream events arrive. It is the caller's
+    object, not a return value, because the way this coroutine ends when
+    it matters is `asyncio.wait_for` cancelling it — at which point
+    nothing it returns is ever seen. `_run_ledgered` reads it afterwards.
+    """
+    from claude_agent_sdk import (
+        AssistantMessage,
+        ResultMessage,
+        StreamEvent,
+        TextBlock,
+        query,
+    )
 
     chunks: list[str] = []
     model = ""
     result: ResultMessage | None = None
     async for message in query(prompt=prompt, options=options):
-        if isinstance(message, AssistantMessage):
+        if isinstance(message, StreamEvent):
+            if partial is not None:
+                partial.observe(message.event or {})
+        elif isinstance(message, AssistantMessage):
             model = message.model or model
             for block in message.content:
                 if isinstance(block, TextBlock):
@@ -393,8 +424,9 @@ async def _run_ledgered(
 
     op = await sync_to_async(_create_op)()
     run = RunResult(ok=False, text="", error_class="Unknown")
+    partial = _PartialUsage()
     try:
-        run = await asyncio.wait_for(_drain(prompt, options), timeout=timeout_s)
+        run = await asyncio.wait_for(_drain(prompt, options, partial), timeout=timeout_s)
     except asyncio.TimeoutError:
         run = RunResult(ok=False, text="", error_class="Timeout")
     except Exception as exc:  # SDK/transport errors → degraded, never raise raw
@@ -404,6 +436,14 @@ async def _run_ledgered(
             label = f"CliError: {str(exc)[:100]}"
         run = RunResult(ok=False, text="", error_class=label)
     finally:
+        # Same rule as the streaming path: a completed ResultMessage is
+        # authoritative and must never be overwritten by the partials
+        # that led up to it. Cost is still left NULL — pricing is
+        # per-model and changes, and an invented dollar figure inside a
+        # spend breaker is worse than an admitted blind spot. What this
+        # buys is that the blind spot is now *countable*.
+        if not run.usage:
+            run.usage = partial.as_usage()
         op.finished_at = timezone.now()
         op.ok = run.ok
         op.error_class = run.error_class
@@ -458,6 +498,9 @@ async def test_connection_async(
         system_prompt="You are a connectivity probe. Reply with exactly: OK",
         model=model,
         max_turns=1,
+        # Raw stream events carry usage before any ResultMessage does, so
+        # a ping that times out still records what it burned.
+        include_partial_messages=True,
         env={
             **_auth_env(api_key),
             # A ping must fail fast: one retry, short per-request timeout —
@@ -527,7 +570,7 @@ async def stream_agent(
 
     api_key = await sync_to_async(_check_gates)(exempt_daily_cap=False)
     options = await sync_to_async(_snapshot_options)(
-        tier, api_key, kind, append_system, None, True
+        tier, api_key, kind, append_system, None, partial_messages=True
     )
     timeout_s = await sync_to_async(config.sdk_timeout_seconds)()
     ledger_kind = "chat" if kind == "reader" else "feed_extraction"
@@ -674,7 +717,7 @@ async def run_agent_async(
     """
     api_key = await sync_to_async(_check_gates)(exempt_daily_cap=False)
     options = await sync_to_async(_snapshot_options)(
-        tier, api_key, kind, append_system, output_format
+        tier, api_key, kind, append_system, output_format, partial_messages=True
     )
     ledger_kind = "assemble_context" if kind == "reader" else "feed_extraction"
     timeout_s = await sync_to_async(config.sdk_timeout_seconds)()

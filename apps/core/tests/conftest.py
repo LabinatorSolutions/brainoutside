@@ -125,7 +125,12 @@ def brain(tmp_path, settings, monkeypatch) -> Brain:
     _run("remote", "add", "origin", origin.as_posix(), cwd=clone)
     _run("push", "-u", "origin", "main", cwd=clone)
 
-    _run("clone", origin.as_posix(), str(upstream), cwd=tmp_path)
+    # `-c core.autocrlf=false` on the CLONE, not just afterwards: this host
+    # may have autocrlf=true globally, in which case the checkout writes
+    # CRLF and the next `add -A` (with autocrlf since turned off) commits
+    # those CRLFs back — rewriting every line of every seeded file and
+    # making an unrelated upstream commit look like it touched INDEX.md.
+    _run("-c", "core.autocrlf=false", "clone", origin.as_posix(), str(upstream), cwd=tmp_path)
     _identity(upstream)
 
     settings.BRAIN_REPO_DIR = clone

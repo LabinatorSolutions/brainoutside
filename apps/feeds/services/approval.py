@@ -151,14 +151,22 @@ def _safe_target(repo: Path, relpath: str) -> Path:
     return target
 
 
+def _file_bytes(f: dict) -> str:
+    """Exactly what `_apply_files` will write for this entry.
+
+    Shared with the staleness check so the two cannot drift: "would
+    applying this change anything?" has to be asked about the same text
+    that would actually land.
+    """
+    content = str(f.get("content", ""))
+    return content if content.endswith("\n") else content + "\n"
+
+
 def _apply_files(repo: Path, proposal: dict) -> None:
     for f in proposal.get("files") or []:
         target = _safe_target(repo, str(f.get("path", "")))
         target.parent.mkdir(parents=True, exist_ok=True)
-        content = str(f.get("content", ""))
-        if not content.endswith("\n"):
-            content += "\n"
-        target.write_text(content, encoding="utf-8", newline="\n")
+        target.write_text(_file_bytes(f), encoding="utf-8", newline="\n")
 
 
 def _apply_index_lines(repo: Path, proposal: dict) -> None:
@@ -303,13 +311,52 @@ def _push(branch: str) -> None:
     gitrepo.run("push", *_push_target(branch), timeout=120)
 
 
+def landed_commit(feed_pk: int, branch: str) -> str:
+    """SHA of the commit on origin carrying this Feed's trailer, or "".
+
+    Every approval commits `Feed-Id: <pk>` as a trailer, and until now
+    nothing ever read it back. That trailer is the only durable link
+    between a Feed row and the brain's history, and it is what makes
+    "did my push actually land?" answerable at all.
+
+    It has to be answerable, because a push can succeed on the server and
+    still report failure to the client — a dropped connection after the
+    ref moved. The retry then replays onto a tree that already contains
+    the proposal, `git commit` says "nothing to commit", that reads as a
+    push failure, and after MAX_PUSH_ATTEMPTS the Feed is marked `failed`
+    with an empty `commit_hash` while its content is live in the brain.
+
+    `--grep` is an unanchored coarse filter (so `Feed-Id: 12` also
+    matches feed 123); the exact per-line comparison below is what
+    decides. Being generous in the filter and strict in the check is the
+    right way round — a missed match here would resurrect the bug.
+    """
+    try:
+        out = gitrepo.run(
+            "log",
+            f"origin/{branch}",
+            "--fixed-strings",
+            f"--grep=Feed-Id: {feed_pk}",
+            "--format=%H%x00%B%x1e",
+        )
+    except gitrepo.BrainRepoError:  # no such ref yet, or an unreadable log
+        return ""
+    for record in out.split("\x1e"):
+        sha, _, body = record.strip("\n").partition("\x00")
+        if not sha.strip():
+            continue
+        if any(line.strip() == f"Feed-Id: {feed_pk}" for line in body.splitlines()):
+            return sha.strip()
+    return ""
+
+
 def _changed_between(old: str, new: str) -> set[str]:
     """Repo-relative paths whose content differs between two commits."""
     out = gitrepo.run("diff", "--name-only", old, new)
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
-def _assert_review_still_holds(reviewed_at: str, touched: set[str]) -> None:
+def _assert_review_still_holds(repo: Path, reviewed_at: str, touched: dict[str, str]) -> None:
     """Refuse to apply a reviewed diff onto a brain that has moved under it.
 
     Every attempt starts with `reset --hard origin/<branch>` and then
@@ -326,12 +373,30 @@ def _assert_review_still_holds(reviewed_at: str, touched: set[str]) -> None:
     Only `files` paths are checked. INDEX.md and CLAUDE.md are edited by
     `_apply_index_lines` / `_apply_taxonomy`, which re-read whatever is
     there now and merge into it, so an upstream change to those survives.
+
+    A path that moved to EXACTLY the bytes this proposal would write is
+    not a conflict — applying it changes nothing, and there is nothing
+    for the operator to re-review. That case is real: it is what a
+    replay after a lost push looks like, and what happens when the same
+    content is committed by hand.
+
+    Reading `repo / path` needs no containment guard: `path` is in the
+    intersection of the proposal's paths with git's own changed-file
+    list, so it is a real repo-relative path by construction.
     """
     if not touched:
         return
-    overlap = touched & _changed_between(reviewed_at, "HEAD")
-    if overlap:
-        raise StaleReview(sorted(overlap))
+    conflicts = []
+    for path in sorted(touched.keys() & _changed_between(reviewed_at, "HEAD")):
+        target = repo / path
+        try:
+            current = target.read_text(encoding="utf-8") if target.is_file() else None
+        except (OSError, UnicodeDecodeError):
+            current = None
+        if current != touched[path]:
+            conflicts.append(path)
+    if conflicts:
+        raise StaleReview(conflicts)
 
 
 def apply_feed(feed_id: int) -> str:
@@ -346,10 +411,14 @@ def apply_feed(feed_id: int) -> str:
         return "no proposal"
 
     proposal = feed.proposal
+    # path -> the exact text this proposal would write there.
     touched = {
-        str(f.get("path", "")) for f in (proposal.get("files") or []) if f.get("path")
+        str(f.get("path", "")): _file_bytes(f)
+        for f in (proposal.get("files") or [])
+        if f.get("path")
     }
     attempts = 0
+    outcome = "committed"
     try:
         with gitrepo.repo_lock():
             branch = gitrepo.run("rev-parse", "--abbrev-ref", "HEAD")
@@ -362,7 +431,22 @@ def apply_feed(feed_id: int) -> str:
                 gitrepo.run("fetch", *_fetch_args(branch), timeout=120)
                 gitrepo.run("reset", "--hard", f"origin/{branch}")
                 gitrepo.run("clean", "-fd")
-                _assert_review_still_holds(reviewed_at, touched)
+                # Is this feed already in the brain? A push can succeed on
+                # the server and still report failure to the client, and
+                # the replay that follows finds nothing to commit — which
+                # used to burn all three attempts and then mark the Feed
+                # `failed` with an empty commit_hash while its content was
+                # live. The trailer says otherwise, so ask it first.
+                landed = landed_commit(feed.pk, branch)
+                if landed:
+                    commit, outcome = landed, "already-landed"
+                    log.warning(
+                        "feed %s: already committed as %s — recording it "
+                        "instead of replaying",
+                        feed.pk, landed[:12],
+                    )
+                    break
+                _assert_review_still_holds(repo, reviewed_at, touched)
                 try:
                     ctx = validator.context_from_repo()
                     ctx.source_kind = str((feed.raw_payload or {}).get("source_kind") or "")
@@ -385,6 +469,21 @@ def apply_feed(feed_id: int) -> str:
                     _apply_supersedes(repo, proposal, ctx.entities)
                     _apply_taxonomy(repo, proposal)
                     gitrepo.run("add", "-A")
+                    if not gitrepo.run("status", "--porcelain"):
+                        # The proposal is already present verbatim, but
+                        # under no commit of ours (the trailer check above
+                        # came back empty) — somebody committed the same
+                        # bytes by hand. `git commit` would exit non-zero
+                        # with "nothing to commit", which reads as a push
+                        # failure and ends as a bogus `failed`. What the
+                        # approval asked for is true, so say so, and point
+                        # at the commit that made it true.
+                        commit, outcome = gitrepo.run("rev-parse", "HEAD"), "already-present"
+                        log.warning(
+                            "feed %s: proposal already present at %s — nothing to commit",
+                            feed.pk, commit[:12],
+                        )
+                        break
                     gitrepo.run(
                         "-c", f"user.name={dj_settings.BRAIN_COMMIT_NAME}",
                         "-c", f"user.email={dj_settings.BRAIN_COMMIT_EMAIL}",
@@ -450,6 +549,9 @@ def apply_feed(feed_id: int) -> str:
         commit=commit,
         retries=attempts - 1,
         edited=feed.proposal_edited,
+        # "committed" | "already-landed" | "already-present" — the last two
+        # mean this run recorded a commit it did not create.
+        outcome=outcome,
     )
 
     # Post-push (lock released): reindex + rebuild snapshots so the new
@@ -462,7 +564,7 @@ def apply_feed(feed_id: int) -> str:
     except Exception:
         log.exception("feed %s: post-approval reindex failed (sync beat will repair)", feed.pk)
 
-    return f"approved as {commit[:12]} after {attempts} attempt(s)"
+    return f"approved as {commit[:12]} after {attempts} attempt(s) [{outcome}]"
 
 
 def _finalize_stale(feed: Feed, exc: StaleReview) -> None:

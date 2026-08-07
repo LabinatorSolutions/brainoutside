@@ -45,6 +45,27 @@ class ApplyFailure(RuntimeError):
     """Terminal apply problem — rolls back and marks the Feed failed."""
 
 
+class StaleReview(RuntimeError):
+    """The brain moved under the diff the operator approved.
+
+    Not a failure of the proposal — the review is simply out of date, so
+    this sends the Feed back to `pending` rather than `failed`.
+    """
+
+    def __init__(self, paths: list[str]) -> None:
+        self.paths = sorted(paths)
+        shown = ", ".join(self.paths[:5])
+        if len(self.paths) > 5:
+            shown += f", +{len(self.paths) - 5} more"
+        super().__init__(
+            f"the brain changed {shown} while this approval was in flight. "
+            "Applying now would overwrite that change with the version you "
+            "reviewed, so the commit would not match the diff you approved. "
+            "The diff below is recomputed against the brain as it stands — "
+            "check it and approve again."
+        )
+
+
 # ---- write credential (worker-only, grill C13) ---------------------------
 
 
@@ -282,6 +303,37 @@ def _push(branch: str) -> None:
     gitrepo.run("push", *_push_target(branch), timeout=120)
 
 
+def _changed_between(old: str, new: str) -> set[str]:
+    """Repo-relative paths whose content differs between two commits."""
+    out = gitrepo.run("diff", "--name-only", old, new)
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
+def _assert_review_still_holds(reviewed_at: str, touched: set[str]) -> None:
+    """Refuse to apply a reviewed diff onto a brain that has moved under it.
+
+    Every attempt starts with `reset --hard origin/<branch>` and then
+    re-applies FULL file contents. That is what makes push-race replay
+    safe for the proposal — and what silently reverted anything upstream
+    had done to the same file in the meantime. The operator approved a
+    diff `diffview.build` computed against the clone at review time; the
+    commit that landed was a different one, and nothing said so.
+
+    The same window exists without any push race: the clone advances on
+    every sync, so a brain edit pushed between the review and the
+    worker's run is reverted by the very first attempt.
+
+    Only `files` paths are checked. INDEX.md and CLAUDE.md are edited by
+    `_apply_index_lines` / `_apply_taxonomy`, which re-read whatever is
+    there now and merge into it, so an upstream change to those survives.
+    """
+    if not touched:
+        return
+    overlap = touched & _changed_between(reviewed_at, "HEAD")
+    if overlap:
+        raise StaleReview(sorted(overlap))
+
+
 def apply_feed(feed_id: int) -> str:
     """Q2 task entry: perform the approval for a claimed (`approving`) Feed."""
     feed = Feed.objects.filter(pk=feed_id).first()
@@ -294,17 +346,23 @@ def apply_feed(feed_id: int) -> str:
         return "no proposal"
 
     proposal = feed.proposal
+    touched = {
+        str(f.get("path", "")) for f in (proposal.get("files") or []) if f.get("path")
+    }
     attempts = 0
     try:
         with gitrepo.repo_lock():
             branch = gitrepo.run("rev-parse", "--abbrev-ref", "HEAD")
             repo = gitrepo.repo_dir()
+            # The clone as the operator's diff was rendered against it.
+            reviewed_at = gitrepo.run("rev-parse", "HEAD")
             while True:
                 attempts += 1
                 # Start every attempt from exact origin state — replay-safe.
                 gitrepo.run("fetch", *_fetch_args(branch), timeout=120)
                 gitrepo.run("reset", "--hard", f"origin/{branch}")
                 gitrepo.run("clean", "-fd")
+                _assert_review_still_holds(reviewed_at, touched)
                 try:
                     ctx = validator.context_from_repo()
                     ctx.source_kind = str((feed.raw_payload or {}).get("source_kind") or "")
@@ -369,6 +427,9 @@ def apply_feed(feed_id: int) -> str:
                     # not be left holding half a proposal.
                     _rollback(branch)
                     raise
+    except StaleReview as exc:
+        _finalize_stale(feed, exc)
+        return f"stale: {exc}"
     except Exception as exc:
         # Deliberately broad: the alternative to marking the Feed failed is
         # leaving it wedged in `approving`, where no UI action can reach it.
@@ -402,6 +463,29 @@ def apply_feed(feed_id: int) -> str:
         log.exception("feed %s: post-approval reindex failed (sync beat will repair)", feed.pk)
 
     return f"approved as {commit[:12]} after {attempts} attempt(s)"
+
+
+def _finalize_stale(feed: Feed, exc: StaleReview) -> None:
+    """Back to `pending`, not `failed`.
+
+    Nothing is wrong with the proposal; the review is out of date.
+    `pending` is the only status the ops UI can act on, and re-opening
+    the feed re-renders the diff against the clone as it now stands and
+    re-validates against the current entity index — which is exactly what
+    the operator has to see before approving again. `failed` would strand
+    a perfectly good proposal with no way back.
+    """
+    feed.status = "pending"
+    feed.error = str(exc)[:2000]
+    feed.decided_at = None
+    feed.save(update_fields=["status", "error", "decided_at"])
+    emit(
+        "feed",
+        action="stale_review",
+        feed_id=feed.pk,
+        source_id=feed.source_id,
+        paths=exc.paths[:20],
+    )
 
 
 def _finalize_failed(feed: Feed, error: str, attempts: int = 0) -> None:

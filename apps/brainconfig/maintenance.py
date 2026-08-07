@@ -107,12 +107,14 @@ def job_pull_now() -> None:
 
 def job_rebuild_index() -> None:
     def body(progress):
-        from apps.brain.services import indexer, snapshots
+        from apps.brain.services import indexer, sync
 
         progress(0, 2, "Reading frontmatter")
         result = indexer.rebuild(trigger="manual")
         progress(1, 2, "Materialising snapshots")
-        snapshots.build_all()
+        # Via sync so a snapshot failure marks the SyncRun not-ok — the
+        # index alone being consistent is not the brain being published.
+        sync.publish_snapshots(result)
         return f"+{result.added} ~{result.changed} -{result.removed} at {result.commit_sha[:12]}"
 
     run(REBUILD_INDEX.name, REBUILD_INDEX.label, body)
@@ -120,13 +122,12 @@ def job_rebuild_index() -> None:
 
 def job_replace_clone() -> None:
     def body(progress):
-        from apps.brain.services import gitrepo, indexer, snapshots
+        from apps.brain.services import gitrepo, indexer, sync
 
         progress(0, 2, "Re-cloning from the configured URL")
         result = gitrepo.replace_clone()
         progress(1, 2, "Re-indexing")
-        indexer.rebuild(trigger="replace-clone")
-        snapshots.build_all()
+        sync.publish_snapshots(indexer.rebuild(trigger="replace-clone"))
         return f"Re-cloned at {result['head'][:12]}."
 
     run(REPLACE_CLONE.name, REPLACE_CLONE.label, body)

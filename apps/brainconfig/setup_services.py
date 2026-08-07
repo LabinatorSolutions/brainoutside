@@ -280,7 +280,7 @@ def run_build() -> None:
     spinning forever, which is worse than a visible failure.
     """
     from apps.brain.models import Entity
-    from apps.brain.services import gitrepo, indexer, snapshots
+    from apps.brain.services import gitrepo, indexer, sync
     from apps.brainconfig import setup_state as state
     from apps.events.models import emit
 
@@ -296,7 +296,7 @@ def run_build() -> None:
         run = indexer.rebuild(trigger="setup")
 
         step(3, "Building the per-tier snapshots")
-        snapshots.build_all()
+        sync.publish_snapshots(run)
 
         state.set_progress(
             state="done",

@@ -129,15 +129,22 @@ def _generated_index(tier: str, entities: list[Entity], head: str) -> str:
     return "\n".join(lines)
 
 
-def build_tier(tier: str) -> dict[str, object]:
-    """Build one tier's snapshot into a temp dir, then atomically swap it in."""
+def _tmp_dir(tier: str) -> Path:
+    return views_dir() / f".tmp-{tier}"
+
+
+def _old_dir(tier: str) -> Path:
+    return views_dir() / f".old-{tier}"
+
+
+def stage_tier(tier: str) -> dict[str, object]:
+    """Build one tier's snapshot into its temp dir. Nothing is swapped."""
     repo = gitrepo.repo_dir()
     head = gitrepo.head_sha()
     entities = _visible(tier)
     strip = tier == "public"
 
-    tmp = views_dir() / f".tmp-{tier}"
-    final = views_dir() / tier
+    tmp = _tmp_dir(tier)
     if tmp.exists():
         shutil.rmtree(tmp)
     tmp.mkdir(parents=True)
@@ -173,11 +180,46 @@ def build_tier(tier: str) -> dict[str, object]:
         "files": sorted(files),
     }
     emit("_MANIFEST.json", json.dumps(manifest, indent=2))
-
-    if final.exists():
-        shutil.rmtree(final)
-    tmp.rename(final)
     return manifest
+
+
+def swap_in(tier: str) -> None:
+    """Move a staged tier into place, keeping the old one until it is.
+
+    The swap used to be `rmtree(final)` then `rename(tmp, final)`. During
+    the rmtree — a whole tier of files — every read at that tier returned
+    422 "unknown path", and a process killed between the two calls left
+    NO directory for the tier at all, until whenever the next successful
+    sync happened. That is realistic: the GitHub webhook runs `sync()`
+    synchronously inside a gunicorn request under a 60s timeout.
+
+    Renaming the live directory aside instead makes the visible window
+    two renames wide instead of a full delete, and leaves the previous
+    snapshot on disk so `recover_interrupted_swaps()` can put it back.
+    """
+    tmp, final, old = _tmp_dir(tier), tier_dir(tier), _old_dir(tier)
+    if old.exists():
+        shutil.rmtree(old)
+    if final.exists():
+        final.rename(old)
+    tmp.rename(final)
+    if old.exists():
+        # Slow, and nothing reads it any more — a failure here (the
+        # documented Windows bind-mount PermissionError) costs disk, not
+        # correctness, and the next build clears it.
+        try:
+            shutil.rmtree(old)
+        except OSError:
+            log.warning("snapshots: could not remove %s yet", old, exc_info=True)
+
+
+def recover_interrupted_swaps() -> None:
+    """Put back a tier whose swap was interrupted mid-rename."""
+    for tier in TIERS:
+        final, old = tier_dir(tier), _old_dir(tier)
+        if not final.exists() and old.is_dir():
+            log.warning("snapshots: restoring %s from an interrupted swap", tier)
+            old.rename(final)
 
 
 def _all_raw(repo: Path) -> set[str]:
@@ -200,9 +242,24 @@ def _all_raw(repo: Path) -> set[str]:
 
 
 def build_all() -> dict[str, dict[str, object]]:
-    """Build every tier under the repo lock (consistent read of the clone)."""
+    """Build every tier under the repo lock, then swap them in together.
+
+    Build-and-swap per tier meant a failure on tier 2 left `public` at
+    the new HEAD while `agents-only` and `private` sat at the old one,
+    indefinitely — tiers disagreeing is the one thing snapshots exist to
+    prevent, and `get-raw` serves out of them. Worse, the caller had
+    already recorded `SyncRun.ok = True`, so the health tile stayed
+    green over it.
+
+    Staging every tier first makes the failure mode "nothing changed"
+    rather than "some tiers changed". The swap phase is renames only.
+    """
     with gitrepo.repo_lock():
-        return {tier: build_tier(tier) for tier in TIERS}
+        recover_interrupted_swaps()
+        manifests = {tier: stage_tier(tier) for tier in TIERS}
+        for tier in TIERS:
+            swap_in(tier)
+        return manifests
 
 
 def tier_dir(tier: str) -> Path:

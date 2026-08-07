@@ -31,6 +31,27 @@ def last_indexed_sha() -> str:
     return run.commit_sha if run else ""
 
 
+def publish_snapshots(run: SyncRun) -> None:
+    """Materialise every tier, and make a failure visible on the run.
+
+    `indexer.rebuild()` records `ok = True` the moment the DB index is
+    consistent, which is before any tier has been written. A snapshot
+    build that then failed propagated to the caller but left that row
+    green — so the dashboard health tile, and `last_indexed_sha()`,
+    reported a brain that was published when it was not. Every path that
+    reindexes goes through here so the row and the disk agree.
+    """
+    try:
+        snapshots.build_all()
+    except Exception as exc:
+        run.ok = False
+        run.error = (f"{run.error}; " if run.error else "") + f"snapshot build failed: {exc}"
+        run.save(update_fields=["ok", "error"])
+        emit("degraded", surface="snapshots", head=run.commit_sha, reason=str(exc)[:500])
+        log.exception("brain: snapshot build failed at %s", (run.commit_sha or "")[:12])
+        raise
+
+
 def sync(trigger: str = "manual", *, pull: bool = True) -> SyncRun:
     """Full pipeline. Returns the SyncRun row (drift flag set when detected).
 
@@ -68,7 +89,7 @@ def sync(trigger: str = "manual", *, pull: bool = True) -> SyncRun:
         emit("drift", entity_ids=[], stage="post-rebuild", head=run.commit_sha)
         raise SyncError(run.error)
 
-    snapshots.build_all()
+    publish_snapshots(run)
 
     if drift:
         run.drift_detected = True

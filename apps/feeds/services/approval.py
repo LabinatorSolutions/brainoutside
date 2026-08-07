@@ -562,10 +562,9 @@ def apply_feed(feed_id: int) -> str:
     # Post-push (lock released): reindex + rebuild snapshots so the new
     # notes serve immediately; the webhook echo will no-op on the SHA.
     try:
-        from apps.brain.services import indexer, snapshots
+        from apps.brain.services import indexer, sync
 
-        indexer.rebuild(trigger="feed-approval")
-        snapshots.build_all()
+        sync.publish_snapshots(indexer.rebuild(trigger="feed-approval"))
     except Exception:
         log.exception("feed %s: post-approval reindex failed (sync beat will repair)", feed.pk)
 

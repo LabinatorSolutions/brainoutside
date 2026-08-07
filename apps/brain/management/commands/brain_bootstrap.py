@@ -28,12 +28,12 @@ class Command(BaseCommand):
         # reindexes — index it here instead. Non-empty index: the sync
         # pipeline owns freshness, not bootstrap.
         from apps.brain.models import Entity
-        from apps.brain.services import indexer, snapshots
+        from apps.brain.services import indexer, sync
 
         if not Entity.objects.exists():
             try:
                 run = indexer.rebuild(trigger="bootstrap")
-                snapshots.build_all()
+                sync.publish_snapshots(run)
             except gitrepo.BrainRepoError as exc:
                 raise CommandError(str(exc)) from exc
             self.stdout.write(

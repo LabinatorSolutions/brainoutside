@@ -124,10 +124,27 @@ def claude_configured() -> bool:
 
 
 def brain_built() -> bool:
-    from apps.brain.models import Entity
+    """A clone we can read, and at least one successful index run over it.
+
+    This used to require `Entity.objects.exists()`, which trapped anyone
+    whose repo indexed to zero entities: the build job reported done, the
+    step stayed incomplete forever, and `SetupRequiredMiddleware` bounced
+    every /ops/ request back to a wizard that had just cleared its own
+    progress. There was no way out and nothing said what was wrong.
+
+    Zero entities is a legitimate state — a repo whose notes are all
+    drafts, or a brand-new brain someone hasn't written into yet. The
+    honest signal that the build worked is that the indexer ran and
+    succeeded, so that is what we check. `/setup/build/` still tells the
+    operator when the count is zero, because it usually means the
+    frontmatter isn't what they think.
+    """
+    from apps.brain.models import Entity, SyncRun
     from apps.brain.services import gitrepo
 
-    return gitrepo.is_valid_repo() and Entity.objects.exists()
+    if not gitrepo.is_valid_repo():
+        return False
+    return SyncRun.objects.filter(ok=True).exists() or Entity.objects.exists()
 
 
 _PREDICATES = {

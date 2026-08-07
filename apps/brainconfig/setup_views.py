@@ -325,11 +325,14 @@ def _step_build(request):
             )
         return redirect(request.path)
 
-    # JSON, not the dict: the template seeds Alpine's state with this and a
-    # Python repr is not JavaScript (`True`, `None`, single quotes).
+    # Passed as a dict and rendered with |json_script, NOT interpolated as
+    # a JSON string: `label` and `error` carry text from build and git
+    # failures, and a `</script>` in there would end the block early and
+    # kill the whole page's JS.
     return render(request, "setup/build.html", _context(
         request, "build",
-        progress_json=json.dumps(setup_state.get_progress()),
+        progress=setup_state.get_progress(),
+        built=setup_state.brain_built(),
         ops_url=_ops_home(),
     ))
 

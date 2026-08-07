@@ -31,7 +31,6 @@ class EndpointCard:
     description: str
     credits_cost: int
     deprecated: bool
-    admin_only: bool = False
     tags: list[str] = field(default_factory=list)
 
     @property
@@ -55,16 +54,16 @@ class CatalogBundle:
     total_endpoints: int = 0
 
 
-def get_catalog(*, is_staff: bool = False) -> CatalogBundle:
+def get_catalog() -> CatalogBundle:
     """Build the catalog from `apps.core.registry`. Each spec lands in
     each of its tags' groups (and once in `Uncategorized` when
     tag-less). Groups are alphabetical with `Uncategorized` last so
     the eye lands on real categories first.
 
-    `is_staff` gates admin-only endpoints: non-staff visitors never see
-    a card for an endpoint whose `EndpointFlag.admin_only` is set (the
-    runtime hide toggle). Staff see every endpoint, with an admin-only
-    badge rendered by the template."""
+    Every registered endpoint appears. This used to take an `is_staff`
+    argument and drop cards for endpoints flagged `EndpointFlag.admin_only`;
+    that flag never fired in a single-operator product and was removed
+    before launch. `/docs/` is staff-only in its entirety anyway."""
     bundle = CatalogBundle()
 
     try:
@@ -73,20 +72,6 @@ def get_catalog(*, is_staff: bool = False) -> CatalogBundle:
         return bundle
 
     specs = registry.all()
-
-    # Admin-only set (runtime hide toggle). One bulk DB query — this is a
-    # page render, not a hot path. Non-staff: drop the cards entirely.
-    # Staff: keep them but stamp `admin_only` so the template can badge
-    # them as still-hidden-from-the-public.
-    try:
-        from apps.core import endpoint_gating
-
-        hidden = endpoint_gating.admin_only_slugs()
-    except Exception:
-        hidden = set()
-    if hidden and not is_staff:
-        specs = [s for s in specs if s.slug not in hidden]
-
     bundle.total_endpoints = len(specs)
 
     # Tag → cards
@@ -104,7 +89,6 @@ def get_catalog(*, is_staff: bool = False) -> CatalogBundle:
             # Keeps the catalog chip honest for both deprecation styles
             # without making the template do the OR-logic itself.
             deprecated=spec.is_deprecated,
-            admin_only=spec.slug in hidden,
             tags=list(spec.tags),
         )
         if not spec.tags:

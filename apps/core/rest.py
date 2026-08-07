@@ -139,28 +139,13 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         if principal is not None:
             log_context.update_user_id(principal.user.pk)
 
-        # admin-only gate. An endpoint flagged `admin_only` (runtime
-        # toggle on the EndpointFlag row) is hidden from non-staff: it
-        # behaves as if it doesn't exist. We return 404 (not 403) so the
-        # surface stays invisible — a non-staff caller can't even tell
-        # the endpoint is registered. Anonymous callers (principal is
-        # None) are by definition non-staff; staff (is_staff=True) fall
-        # through and use the endpoint normally. The read goes through
-        # the same Redis-cached path as the disable gate above.
-        is_staff = principal is not None and bool(
-            getattr(principal.user, "is_staff", False)
-        )
-        if not is_staff:
-            admin_only = await sync_to_async(
-                endpoint_gating.is_admin_only, thread_sensitive=True
-            )(spec.slug)
-            if admin_only:
-                return _err(
-                    request_id,
-                    status=404,
-                    code="not_found",
-                    message="No endpoint matches this path.",
-                )
+        # There was a second gate here — `admin_only`, "hide this
+        # endpoint from non-staff callers". It gated on
+        # `principal.user.is_staff`, and setup sets `is_staff=True` on
+        # the single account every credential in this product resolves
+        # to, so the branch was unreachable by construction. Removed
+        # before launch rather than left looking live. `disabled`
+        # (above) is the surviving runtime knob.
 
         # BRAIN-SERVER FORK DIVERGENCE: every endpoint requires an
         # authenticated caller, credits or not. The upstream template

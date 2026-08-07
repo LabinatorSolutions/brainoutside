@@ -40,7 +40,6 @@ from apps.core import audit_hook
 log = logging.getLogger(__name__)
 
 _CACHE_PREFIX = "endpoint_gating:"
-_ADMIN_CACHE_PREFIX = "endpoint_admin_only:"
 _CACHE_TTL_S = 30
 
 
@@ -50,7 +49,6 @@ class FlagRow:
 
     slug: str
     disabled: bool
-    admin_only: bool
     reason: str
     updated_at: object  # datetime; typed loosely so dataclass stays slim
     updated_by_email: str
@@ -58,10 +56,6 @@ class FlagRow:
 
 def _cache_key(slug: str) -> str:
     return f"{_CACHE_PREFIX}{slug}"
-
-
-def _admin_cache_key(slug: str) -> str:
-    return f"{_ADMIN_CACHE_PREFIX}{slug}"
 
 
 def is_disabled(slug: str) -> bool:
@@ -151,91 +145,6 @@ def set_disabled(
     return changed
 
 
-def is_admin_only(slug: str) -> bool:
-    """Hot-path read. True iff the slug has a row with admin_only=True.
-
-    Mirrors :func:`is_disabled` exactly — 30s Redis cache, DB read on
-    miss, DB read on Redis outage. Fails *open* (returns False) when both
-    Redis and the DB are unreachable: the right direction for a *hide*
-    gate, since an infra blip must never 404 a public endpoint. The flip
-    side — an admin-only endpoint momentarily becoming visible during a
-    total DB+cache outage — is acceptable; the call-path still requires
-    staff auth for the endpoint to actually run.
-    """
-    if not slug:
-        return False
-    key = _admin_cache_key(slug)
-    try:
-        cached = cache.get(key)
-        if cached is not None:
-            return cached == "1"
-    except Exception:
-        log.warning("endpoint_gating: admin cache read failed slug=%s", slug, exc_info=True)
-    from apps.core.models import EndpointFlag
-
-    try:
-        admin_only = EndpointFlag.objects.filter(slug=slug, admin_only=True).exists()
-    except Exception:
-        log.warning("endpoint_gating: admin DB read failed slug=%s", slug, exc_info=True)
-        return False  # Stay open if the DB is unreachable too.
-    try:
-        cache.set(key, "1" if admin_only else "0", timeout=_CACHE_TTL_S)
-    except Exception:
-        pass
-    return admin_only
-
-
-def set_admin_only(
-    slug: str,
-    admin_only: bool,
-    *,
-    actor=None,
-    actor_label: str = "",
-    request_id: str = "",
-    ip: Optional[str] = None,
-) -> bool:
-    """Flip the admin-only flag for `slug` and emit an audit row. Returns
-    True iff the persisted state actually changed.
-
-    Writes to the same `EndpointFlag` row as `set_disabled` (one row per
-    slug), preserving any existing `disabled` / `reason` state — the two
-    gates are independent.
-    """
-    if not slug:
-        return False
-    from apps.core.models import EndpointFlag
-
-    before_admin_only = is_admin_only(slug)
-
-    _obj, created = EndpointFlag.objects.update_or_create(
-        slug=slug,
-        defaults={
-            "admin_only": bool(admin_only),
-            "updated_by": actor if actor and getattr(actor, "pk", None) else None,
-        },
-    )
-    try:
-        cache.delete(_admin_cache_key(slug))
-    except Exception:
-        pass
-
-    changed = created or (before_admin_only != bool(admin_only))
-    if changed:
-        audit_hook.record(
-            action="settings.endpoint.admin_mode_toggled",
-            actor=actor,
-            actor_label=actor_label or ("system" if actor is None else ""),
-            target_type="endpoint",
-            target_id=slug,
-            before={"admin_only": before_admin_only},
-            after={"admin_only": bool(admin_only)},
-            ip=ip,
-            request_id=request_id,
-            is_compliance=False,
-        )
-    return changed
-
-
 def list_flags() -> list[FlagRow]:
     """Return every persisted flag, newest-first. Drives the Settings page."""
     from apps.core.models import EndpointFlag
@@ -247,7 +156,6 @@ def list_flags() -> list[FlagRow]:
             FlagRow(
                 slug=row.slug,
                 disabled=row.disabled,
-                admin_only=row.admin_only,
                 reason=row.reason,
                 updated_at=row.updated_at,
                 updated_by_email=email,
@@ -270,45 +178,25 @@ def disabled_slugs() -> set[str]:
         return set()
 
 
-def admin_only_slugs() -> set[str]:
-    """Bulk lookup of every admin-only slug. Used by the listing surfaces
-    (docs catalog, playground list, _catalog, _openapi.json) so a page
-    render does one DB query instead of one cache.get per endpoint."""
-    from apps.core.models import EndpointFlag
-
-    try:
-        return set(
-            EndpointFlag.objects.filter(admin_only=True).values_list("slug", flat=True)
-        )
-    except Exception:
-        log.warning("endpoint_gating: admin_only_slugs DB read failed", exc_info=True)
-        return set()
-
-
 def clear_cache(slug: str = "") -> None:
-    """Test helper. Without `slug` clears every flag cache (both the
-    disable and admin-only namespaces); with one, just that slug's keys."""
+    """Test helper. Without `slug` clears every flag cache key; with one,
+    just that slug's."""
     try:
         if slug:
             cache.delete(_cache_key(slug))
-            cache.delete(_admin_cache_key(slug))
         elif hasattr(cache, "keys"):
-            for prefix in (_CACHE_PREFIX, _ADMIN_CACHE_PREFIX):
-                for k in list(cache.keys(f"{prefix}*")):
-                    cache.delete(k)
+            for k in list(cache.keys(f"{_CACHE_PREFIX}*")):
+                cache.delete(k)
     except Exception:
         pass
 
 
 __all__ = [
     "FlagRow",
-    "admin_only_slugs",
     "clear_cache",
     "disabled_slugs",
-    "is_admin_only",
     "is_disabled",
     "list_flags",
-    "set_admin_only",
     "set_disabled",
 ]
 

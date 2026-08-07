@@ -20,14 +20,6 @@ from apps.docs.services import endpoint_detail as detail_service
 from apps.docs.services import guides as guides_service
 
 
-def _is_staff(request: HttpRequest) -> bool:
-    """True iff a logged-in staff user is browsing (session auth).
-    With docs now staff-gated this is always True at view time; kept
-    because the catalog/detail services take it as a parameter."""
-    user = getattr(request, "user", None)
-    return bool(user is not None and user.is_authenticated and user.is_staff)
-
-
 @staff_member_required(login_url="login")
 @require_GET
 def index_view(request: HttpRequest) -> HttpResponse:
@@ -37,7 +29,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
     Alpine search filter. Tag groups are alphabetical with
     `Uncategorized` last; cards inside each group sort by slug.
     """
-    bundle = catalog_service.get_catalog(is_staff=_is_staff(request))
+    bundle = catalog_service.get_catalog()
     ctx = context.build_layout_context(request, active="index")
     ctx.update({"bundle": bundle})
     return render(request, "docs/index.html", ctx)
@@ -65,19 +57,9 @@ def endpoint_detail_view(request: HttpRequest, slug: str) -> HttpResponse:
         raise Http404(f"Endpoint {slug!r} not registered.")
     spec = next((s for s in matches if s.version == "v1"), matches[0])
 
-    # admin-only gate — a non-staff visitor must not be able to reach the
-    # detail page of a hidden endpoint by guessing its URL. 404 (not 403)
-    # keeps it indistinguishable from an unregistered slug. Staff fall
-    # through; `admin_only` rides into the context so the page can badge it.
-    from apps.core import endpoint_gating
-
-    admin_only = endpoint_gating.is_admin_only(slug)
-    if admin_only and not _is_staff(request):
-        raise Http404(f"Endpoint {slug!r} not registered.")
-
     bundle = detail_service.get_endpoint_detail(spec, request)
     ctx = context.build_layout_context(request, active=f"endpoint:{slug}")
-    ctx.update({"bundle": bundle, "spec": spec, "admin_only": admin_only})
+    ctx.update({"bundle": bundle, "spec": spec})
     return render(request, "docs/endpoint_detail.html", ctx)
 
 

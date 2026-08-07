@@ -23,7 +23,6 @@ def build_openapi(
     title: str | None = None,
     api_version: str = "1.0.0",
     server_url: str = "/api",
-    exclude_slugs: frozenset[str] | set[str] | None = None,
 ) -> dict[str, Any]:
     """Build the OpenAPI 3.1 doc for one API version.
 
@@ -31,20 +30,16 @@ def build_openapi(
     serves the path-relative form by default so it works behind any reverse
     proxy without rewriting.
 
-    `exclude_slugs` drops those endpoints from the document — the view layer
-    passes the admin-only set for non-staff callers so hidden endpoints
-    never appear in the published spec.
+    Every registered endpoint of this version appears. There used to be an
+    `exclude_slugs` parameter, fed the admin-only set so hidden endpoints
+    stayed out of the published spec; that flag was removed before launch
+    (see `apps.core.models.EndpointFlag`) and nothing else ever passed it.
 
     Schemas are namespaced per-endpoint (`<slug>_<version>_<ClassName>`) so
     two endpoints with `class Input(BaseModel)` don't collide in
     `components.schemas/`.
     """
-    excluded = exclude_slugs or frozenset()
-    specs = [
-        s
-        for s in registry.all()
-        if s.version == version and s.slug not in excluded
-    ]
+    specs = [s for s in registry.all() if s.version == version]
 
     components_schemas: dict[str, Any] = {}
     paths: dict[str, Any] = {}

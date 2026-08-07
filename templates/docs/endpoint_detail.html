@@ -33,16 +33,6 @@
 
 {% block content %}
 
-{# ---- Admin-only banner (staff-only — non-staff are 404'd before here) ---- #}
-{% if admin_only %}
-  <div role="alert" class="mb-6 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-900 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
-    <p class="font-semibold">{% trans "Admin-only endpoint" %}</p>
-    <p class="mt-1 text-indigo-800 dark:text-indigo-300">
-      {% trans "Hidden from non-staff users in /docs/, the playground, the MCP tool list, _catalog and _openapi.json — and their REST/MCP calls get 404. You see this because you are staff. Flip it public from the admin Endpoints page when ready." %}
-    </p>
-  </div>
-{% endif %}
-
 {# ---- 0. FinalPolish F3 — deprecation / sunset banners ---- #}
 {% if bundle.deprecation_state == "sunset_past" %}
   <div role="alert" class="mb-6 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">

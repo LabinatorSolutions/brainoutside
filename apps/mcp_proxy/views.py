@@ -205,9 +205,9 @@ def _slug_from_jsonrpc(body: bytes) -> str | None:
 
 def _is_tools_list(body: bytes) -> bool:
     """True iff `body` is a JSON-RPC `tools/list` request. Drives the
-    tool-hiding filter: disabled tools are dropped from the listing for
-    everyone, admin-only tools for non-staff callers. Best-effort parse —
-    a body we can't read just isn't treated as tools/list."""
+    tool-hiding filter: disabled tools are dropped from the listing.
+    Best-effort parse — a body we can't read just isn't treated as
+    tools/list."""
     if not body:
         return False
     try:
@@ -217,19 +217,17 @@ def _is_tools_list(body: bytes) -> bool:
     return isinstance(msg, dict) and msg.get("method") == "tools/list"
 
 
-def _hidden_tool_slugs(*, is_staff: bool) -> set[str]:
-    """Slugs to drop from a `tools/list` response for this caller.
+def _hidden_tool_slugs() -> set[str]:
+    """Slugs to drop from a `tools/list` response.
 
     Disabled endpoints are hidden from everyone — a disabled tool can't
     be called (the bridge refuses `tools/call`), so listing it would just
-    advertise something guaranteed to error. Admin-only endpoints are
-    hidden from non-staff only; staff see them (with a badge on the docs
-    side) so they can test before flipping public. Sync DB reads — call
-    via sync_to_async."""
-    hidden = endpoint_gating.disabled_slugs()
-    if not is_staff:
-        hidden |= endpoint_gating.admin_only_slugs()
-    return hidden
+    advertise something guaranteed to error. This used to also union in
+    the admin-only set for non-staff callers; that flag is gone (see
+    `apps.core.models.EndpointFlag`), and with it the last reason for
+    this listing to vary by caller. Sync DB read — call via
+    sync_to_async."""
+    return endpoint_gating.disabled_slugs()
 
 
 def _tool_names_for_slugs(slugs: set[str]) -> set[str]:
@@ -644,26 +642,11 @@ async def mcp_proxy_view(
     # restores this when the request completes.
     log_context.update_user_id(principal.user.pk)
 
-    # admin-only gate. `is_staff` decides both the tools/call block below
-    # (non-staff calling an admin-only tool → "tool not found") and the
-    # tools/list filter further down (non-staff listing → admin-only
-    # tools dropped; disabled tools are dropped for everyone, staff
-    # included). Staff see + use everything that isn't disabled.
-    is_staff = bool(getattr(principal.user, "is_staff", False))
-    if log_slug and not is_staff:
-        # The MCP tool name carries a `__<version>` suffix for v2+ (see
-        # EndpointSpec.mcp_tool_name); the admin-only flag is keyed by the
-        # bare slug. Slugs can't contain `__`, so splitting recovers it.
-        bare_slug = log_slug.split("__", 1)[0]
-        admin_only = await sync_to_async(
-            endpoint_gating.is_admin_only, thread_sensitive=True
-        )(bare_slug)
-        if admin_only:
-            # Mirror REST's 404: the tool stays invisible to non-staff —
-            # indistinguishable from one that was never registered.
-            return _not_found_tool_error_response(
-                request_id=request_id, slug=log_slug, body=body
-            )
+    # An `admin_only` gate used to sit here, mirroring REST's: a non-staff
+    # caller of an admin-only tool got "tool not found". It read
+    # `principal.user.is_staff`, which is True for every credential this
+    # single-operator product issues, so it never fired. Removed with the
+    # flag itself — see `apps.core.models.EndpointFlag`.
 
     # throttle on the MCP path, but only for tools/call.
     # tools/list / initialize / pings are bookkeeping and shouldn't
@@ -872,18 +855,18 @@ async def mcp_proxy_view(
 
     upstream_status = upstream.status_code
 
-    # Gating: rewrite tools/list so hidden tools never appear in the
-    # listing — disabled tools are dropped for everyone (the bridge
-    # refuses to call them anyway), admin-only tools for non-staff. The
-    # listing is small + bounded, so we buffer it, drop the hidden tools,
-    # and return it non-streamed. When nothing is hidden for this caller,
-    # and for every other JSON-RPC method, we fall through to the
-    # pass-through streamer below untouched. tools/list carries no credit
-    # charge (log_slug is None), so there's no charge CM to finalize here.
+    # Gating: rewrite tools/list so disabled tools never appear in the
+    # listing — the bridge refuses to call them anyway, so listing one
+    # just advertises a guaranteed error. The listing is small + bounded,
+    # so we buffer it, drop the hidden tools, and return it non-streamed.
+    # When nothing is disabled, and for every other JSON-RPC method, we
+    # fall through to the pass-through streamer below untouched.
+    # tools/list carries no credit charge (log_slug is None), so there's
+    # no charge CM to finalize here.
     if is_tools_list and 200 <= upstream_status < 400:
         hidden_slugs = await sync_to_async(
             _hidden_tool_slugs, thread_sensitive=True
-        )(is_staff=is_staff)
+        )()
         if hidden_slugs:
             try:
                 raw = await upstream.aread()

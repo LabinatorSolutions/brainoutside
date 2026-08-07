@@ -143,10 +143,14 @@ class EndpointFlag(models.Model):
     each spec at module load. There's no runtime way to take an
     endpoint offline without a redeploy. This row gives operators that
     knob: `disabled=True` makes `make_endpoint_view` return
-    503 endpoint_disabled before the body is parsed or credits charged.
-    The same row also carries `admin_only` — a hide-from-non-staff gate
-    (see the field help text) that reuses the same DB-backed + Redis-
-    cached read path as `disabled`.
+    503 endpoint_disabled before the body is parsed.
+
+    The row used to carry a second flag, `admin_only` ("hide from
+    non-staff"), inherited from the multi-tenant template. It was
+    removed before launch: this is a single-operator product, setup
+    sets `is_staff=True` on the one account every credential resolves
+    to, so the gate could never fire. It read as a live feature and
+    enforced nothing. `disabled` is the surviving knob.
 
     Storage strategy: DB is the source of truth, Redis caches the
     "is this slug disabled?" lookup on the hot path. Reasoning:
@@ -169,17 +173,6 @@ class EndpointFlag(models.Model):
 
     slug = models.CharField(max_length=64, unique=True)
     disabled = models.BooleanField(default=False, db_index=True)
-    admin_only = models.BooleanField(
-        default=False,
-        db_index=True,
-        help_text=(
-            "When True the endpoint is hidden from non-staff users in /docs/, "
-            "the playground, the MCP tool list, _catalog, and _openapi.json, "
-            "and a non-staff caller gets 404 on REST/MCP. Staff (is_staff=True) "
-            "still see and can call it — ship an endpoint dark, flip it public "
-            "when ready. Independent of `disabled`; both gates apply."
-        ),
-    )
     reason = models.CharField(
         max_length=200,
         blank=True,

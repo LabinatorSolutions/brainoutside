@@ -49,23 +49,16 @@ def _safe_url(url_name: str, **kwargs) -> str:
         return "#"
 
 
-def _endpoint_nav_section(
-    active: str, *, hidden_slugs: frozenset[str] = frozenset()
-) -> dict[str, Any]:
+def _endpoint_nav_section(active: str) -> dict[str, Any]:
     """Build the "Endpoints" section by walking the registry. One
     flat list ordered by slug for v1; tag grouping happens on the
     catalog page itself (sidebar stays flat to keep navigation
-    fast).
-
-    `hidden_slugs` are admin-only endpoints to omit for non-staff
-    visitors — keeps the sidebar consistent with the catalog cards."""
+    fast)."""
     items: list[dict[str, Any]] = []
     try:
         from apps.core.registry import registry
 
         for spec in registry.all():
-            if spec.slug in hidden_slugs:
-                continue
             slug_marker = f"endpoint:{spec.slug}"
             items.append(
                 {
@@ -134,7 +127,6 @@ def _server_nav_section() -> dict[str, Any]:
 def build_nav_sections(
     active: str,
     *,
-    hidden_slugs: frozenset[str] = frozenset(),
     is_staff: bool = False,
 ) -> list[dict[str, Any]]:
     sections = [
@@ -150,7 +142,7 @@ def build_nav_sections(
                 },
             ],
         },
-        _endpoint_nav_section(active, hidden_slugs=hidden_slugs),
+        _endpoint_nav_section(active),
         _guides_nav_section(active),
     ]
     if is_staff:
@@ -174,22 +166,10 @@ def build_top_links(*, is_staff: bool = False) -> list[dict[str, Any]]:
 
 
 def build_layout_context(request, *, active: str) -> dict[str, Any]:
-    # Hide admin-only endpoints from the sidebar for non-staff visitors so
-    # the nav matches the catalog cards (and the 404 they'd get on click).
-    hidden: frozenset[str] = frozenset()
     user = getattr(request, "user", None)
     is_staff = bool(user is not None and user.is_authenticated and user.is_staff)
-    if not is_staff:
-        try:
-            from apps.core import endpoint_gating
-
-            hidden = frozenset(endpoint_gating.admin_only_slugs())
-        except Exception:
-            hidden = frozenset()
     return {
-        "docs_nav_sections": build_nav_sections(
-            active, hidden_slugs=hidden, is_staff=is_staff
-        ),
+        "docs_nav_sections": build_nav_sections(active, is_staff=is_staff),
         "docs_top_links": build_top_links(is_staff=is_staff),
         "active_section": active,
     }

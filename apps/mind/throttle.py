@@ -28,10 +28,13 @@ proxy's address, which is a shared-fate DoS rather than a rate limit.
 """
 from __future__ import annotations
 
+import logging
 import time
 
 from django.conf import settings
 from django.core.cache import cache
+
+log = logging.getLogger(__name__)
 
 from apps.core.throttling import ThrottleResult
 from apps.mind.models import DEFAULT_RATE_LIMIT_PER_MIN, Consumer
@@ -75,6 +78,31 @@ def _is_operator(user) -> bool:
     )
 
 
+#: Reporting the degraded counter has to be throttled itself, and the
+#: cache is the one thing we cannot use to do it. Process-local clock.
+_DEGRADED_REPORT_INTERVAL = 60.0
+_last_degraded_report = 0.0
+
+
+def _report_counter_unavailable() -> None:
+    """Say it out loud, at most once a minute per process."""
+    global _last_degraded_report
+    now = time.monotonic()
+    if now - _last_degraded_report < _DEGRADED_REPORT_INTERVAL:
+        return
+    _last_degraded_report = now
+    log.warning(
+        "throttle: the cache counter is unavailable — requests are being "
+        "allowed WITHOUT being metered until it recovers"
+    )
+    try:
+        from apps.events.models import emit
+
+        emit("degraded", surface="throttle", reason="cache counter unavailable")
+    except Exception:  # pragma: no cover - the log line is the contract
+        log.debug("throttle: could not record the degraded event", exc_info=True)
+
+
 def _consume(key: str, limit: int, reason: str) -> ThrottleResult:
     """Fixed-window counter shared by both buckets."""
     window = int(time.time() // _WINDOW_SECONDS)
@@ -82,8 +110,25 @@ def _consume(key: str, limit: int, reason: str) -> ThrottleResult:
     try:
         count = cache.incr(cache_key)
     except ValueError:
+        # No counter for this window yet — the ordinary first request.
         cache.add(cache_key, 1, timeout=_COUNTER_TTL)
         count = 1
+
+    if count is None:
+        # django-redis runs with IGNORE_EXCEPTIONS=True, so a connection
+        # blip makes `incr` return None instead of raising. `None > limit`
+        # is a TypeError — which became a 500 on EVERY request across the
+        # entire read surface, REST and MCP alike, for as long as Redis
+        # was unwell, with an error log blaming the endpoint.
+        #
+        # A rate limiter that takes the API down is a far worse outcome
+        # than the abuse it exists to prevent, so this allows. But a
+        # limiter that cannot count must not pretend it did: say so in
+        # the log and the event stream, and let the operator decide.
+        _report_counter_unavailable()
+        return ThrottleResult(
+            allowed=True, remaining=max(0, limit - 1), retry_after_s=0, limit_per_min=limit
+        )
 
     if count > limit:
         return ThrottleResult(

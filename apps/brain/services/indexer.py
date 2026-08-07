@@ -303,6 +303,51 @@ class DuplicateEntityId(Exception):
     """Two files in the brain repo claim the same frontmatter `id:`."""
 
 
+#: Field limits read off the model so they cannot drift from the schema.
+_MAX_LENGTHS: dict[str, int] = {
+    f.name: f.max_length
+    for f in Entity._meta.get_fields()
+    if getattr(f, "max_length", None)
+}
+#: Truncating these is lossy but harmless. `path` and `entity_id` are
+#: lookup keys — truncating them would break file reads or collide with
+#: another note — so an over-long one skips the file instead.
+_CLAMPABLE = ("title", "status", "superseded_by", "source", "source_url", "date", "kind")
+
+
+def _fit_to_schema(parsed: list[ParsedEntity]) -> list[ParsedEntity]:
+    """Clamp over-long frontmatter values instead of failing the whole sync.
+
+    Postgres raises DataError on an over-length value and aborts the entire
+    rebuild; SQLite (dev) accepts anything, so this only ever bit in
+    production. A 300-char H1, `type: recommendation-notes` (kind is 16),
+    `date: January 2026` (10), or a long tracking URL were each enough to
+    freeze the index for every note in the repo.
+    """
+    kept: list[ParsedEntity] = []
+    for e in parsed:
+        too_long = [
+            (f, _MAX_LENGTHS[f])
+            for f in ("path", "entity_id")
+            if len(getattr(e, f)) > _MAX_LENGTHS[f]
+        ]
+        if too_long:
+            log.error(
+                "skipping %s: %s exceeds the schema limit and cannot be truncated safely",
+                e.path[:120],
+                ", ".join(f"{f} ({_MAX_LENGTHS[f]})" for f, _ in too_long),
+            )
+            continue
+        for f in _CLAMPABLE:
+            limit = _MAX_LENGTHS.get(f)
+            value = getattr(e, f)
+            if limit and isinstance(value, str) and len(value) > limit:
+                log.warning("%s: %s truncated to %d chars", e.path, f, limit)
+                setattr(e, f, value[:limit])
+        kept.append(e)
+    return kept
+
+
 def rebuild(trigger: str = "manual") -> SyncRun:
     """Full scan → prune → upsert. One SyncRun row per rebuild.
 
@@ -320,7 +365,7 @@ def rebuild(trigger: str = "manual") -> SyncRun:
     run = SyncRun.objects.create(trigger=trigger)
     try:
         run.commit_sha = gitrepo.head_sha()
-        parsed = parse_repo()
+        parsed = _fit_to_schema(parse_repo())
 
         # A duplicate id is a repo authoring error, not a transient fault.
         # Report it as itself instead of letting the DB raise IntegrityError

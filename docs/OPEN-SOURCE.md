@@ -156,8 +156,12 @@ engineering commentary above the fold on the dashboard.
 - [ ] Rings hero image for the README (M3.5.2 dashboard centrepiece is
       the shot; do NOT film the graph explorer until the lens/click bug
       above is fixed).
-- [ ] INSTALL (Coolify/compose), SECURITY (the §9 honest truths —
-      "private notes are only as private as your VPS").
+- [x] SECURITY (the §9 honest truths — "private notes are only as
+      private as your VPS"). *Written 2026-08-07 as `docs/SECURITY.md`;
+      it was already cited from `.env.example`, the wizard's write step,
+      the `BRAIN_GIT_WRITE_PAT` help string and `gitcreds`, all of which
+      pointed at a file that did not exist.*
+- [ ] INSTALL (Coolify/compose).
 - [ ] Verify clean setup on a fresh Linux/macOS box.
 
 ### Docs site outline (write at 5.4 — until then this list IS the doc)

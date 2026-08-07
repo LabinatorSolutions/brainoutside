@@ -147,10 +147,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = ""
     # CONN_MAX_AGE wires straight into `DATABASES["default"]["CONN_MAX_AGE"]`.
     # Default 60s keeps connections warm across requests on a stock deploy.
-    # Set to 0 when fronting Postgres with transaction-mode PgBouncer (see
-    # the opt-in `pgbouncer:` service in docker-compose.yml + docs/SCALING.md)
-    # — connections aren't sticky across requests so persistent connections
-    # poison the pool. Env-driven so operators A/B-testing pool sizes don't
+    # Set to 0 if you front Postgres with a transaction-mode pooler
+    # (PgBouncer and friends) — connections aren't sticky across requests
+    # there, so persistent connections poison the pool. This stack ships
+    # no such service; the comment here used to point at an opt-in
+    # compose service and a scaling doc, neither of which exists.
+    # Env-driven so operators A/B-testing pool sizes don't
     # need a code edit + redeploy.
     DB_CONN_MAX_AGE: int = 60
 

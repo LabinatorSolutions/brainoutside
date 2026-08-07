@@ -116,3 +116,43 @@ def test_forgetting_to_pass_a_credential_is_now_metered():
         for _ in range(5)
     ]
     assert allowed == [True, True, True, False, False]
+
+
+# ---- a third credential type ---------------------------------------------
+
+
+class _FutureCredential:
+    """Neither an APIKey nor a URLMCPToken — the shape an OAuth token or
+    any future credential class arrives in."""
+
+    pk = 7
+
+
+def test_a_third_credential_type_is_metered_not_a_500():
+    """`filter(api_key=<non-APIKey>)` raises ValueError at queryset
+    construction — commit 42a7682 fixed exactly this for URL tokens; any
+    later credential type re-created the 500-on-every-call. A stranger
+    gets the default per-key limit in its own bucket. DB-free: the
+    ValueError fires before any query would execute."""
+    results = [
+        throttle.check(credential=_FutureCredential(), ip="93.184.216.34")
+        for _ in range(61)
+    ]
+    assert results[0].allowed is True
+    assert results[0].limit_per_min == 60
+    assert results[-1].allowed is False
+    assert results[-1].reason == "per-credential limit exceeded"
+
+
+def test_unknown_credential_buckets_do_not_share_with_api_keys():
+    """The stranger's bucket is namespaced by type: a future credential
+    with pk 7 must not eat the budget of API key 7 (the same collision
+    the URL-token namespace comment warns about)."""
+
+    class _OtherCredential:
+        pk = 7
+
+    for _ in range(60):
+        throttle.check(credential=_FutureCredential(), ip="93.184.216.34")
+    assert throttle.check(credential=_FutureCredential(), ip="93.184.216.34").allowed is False
+    assert throttle.check(credential=_OtherCredential(), ip="93.184.216.34").allowed is True

@@ -167,7 +167,22 @@ def check(
                 "per-token limit exceeded",
             )
 
-        profile = Consumer.objects.filter(api_key=credential).first()
+        try:
+            profile = Consumer.objects.filter(api_key=credential).first()
+        except (TypeError, ValueError):
+            # Not an APIKey: a credential type this limiter has never been
+            # taught. `filter(api_key=<other>)` raises at queryset
+            # construction, which was a 500 on every call — the very shape
+            # commit 42a7682 fixed for URL tokens specifically. Meter the
+            # stranger at the default limit in its own namespace (typed,
+            # so two credential tables can't collide on pk): an unknown
+            # credential must not take the API down, and must not pass
+            # unmetered either.
+            return _consume(
+                f"brainrl:other:{type(credential).__name__}:{getattr(credential, 'pk', 'x')}",
+                DEFAULT_RATE_LIMIT_PER_MIN,
+                "per-credential limit exceeded",
+            )
         limit = profile.rate_limit_per_min if profile else DEFAULT_RATE_LIMIT_PER_MIN
         return _consume(
             f"brainrl:{getattr(credential, 'pk', 'x')}",

@@ -33,6 +33,14 @@ def _cred(ctx: Ctx):
     return ctx.credential if isinstance(ctx.credential, APIKey) else None
 
 
+def _via(ctx: Ctx) -> dict:
+    """`events.models.credential_via` for this ctx — the label that keeps
+    a connector read from rendering as "ops" in the activity feed."""
+    from apps.events.models import credential_via
+
+    return credential_via(ctx.credential)
+
+
 def _visible_entities(tier: str):
     # `.get(tier, 0)` like every sibling rank check: an unknown tier reads
     # as public — fail closed, never a KeyError that 500s the endpoint.
@@ -101,7 +109,7 @@ class GetIndex(Endpoint):
     def _work(self, inp: Input, ctx: Ctx) -> Output:
         tier = _tier(ctx)
         content = files.read(tier, "INDEX.md")
-        emit("read", consumer=_cred(ctx), entity_ids=["INDEX"], endpoint="get-index", tier=tier)
+        emit("read", consumer=_cred(ctx), entity_ids=["INDEX"], endpoint="get-index", tier=tier, **_via(ctx))
         return self.Output(tier=tier, index=content)
 
 
@@ -150,6 +158,7 @@ class ListNotes(Endpoint):
             tier=tier,
             filters=inp.model_dump(),
             count=len(rows),
+            **_via(ctx),
         )
         return self.Output(tier=tier, count=len(rows), notes=rows)
 
@@ -173,10 +182,10 @@ class GetNote(Endpoint):
         e = Entity.objects.filter(entity_id=inp.entity_id).first()
         if e is None or not tiers.allows(tier, e.visibility):
             if e is not None:
-                emit("auth_denied", consumer=_cred(ctx), entity_ids=[inp.entity_id], surface="get-note", tier=tier)
+                emit("auth_denied", consumer=_cred(ctx), entity_ids=[inp.entity_id], surface="get-note", tier=tier, **_via(ctx))
             raise ValueError(f"unknown entity: {inp.entity_id}")
         content = files.read(tier, e.path)
-        emit("read", consumer=_cred(ctx), entity_ids=[e.entity_id], endpoint="get-note", tier=tier)
+        emit("read", consumer=_cred(ctx), entity_ids=[e.entity_id], endpoint="get-note", tier=tier, **_via(ctx))
         return self.Output(tier=tier, entity_id=e.entity_id, path=e.path, content=content)
 
 
@@ -199,7 +208,7 @@ class GetLens(Endpoint):
         if e is None or not tiers.allows(tier, e.visibility):
             raise ValueError(f"unknown lens: {inp.name}")
         content = files.read(tier, e.path)
-        emit("read", consumer=_cred(ctx), entity_ids=[e.entity_id], endpoint="get-lens", tier=tier)
+        emit("read", consumer=_cred(ctx), entity_ids=[e.entity_id], endpoint="get-lens", tier=tier, **_via(ctx))
         return self.Output(tier=tier, name=inp.name, content=content)
 
 
@@ -237,6 +246,7 @@ class GetIdentity(Endpoint):
             entity_ids=[f.entity_id for f in out],
             endpoint="get-identity",
             tier=tier,
+            **_via(ctx),
         )
         return self.Output(tier=tier, files=out)
 
@@ -269,9 +279,9 @@ class GetRaw(Endpoint):
             # produces the friendlier message: `raw/../INDEX.md` passes it.
             content = files.read(tier, inp.path, subdir="raw")
         except files.SnapshotMiss:
-            emit("auth_denied", consumer=_cred(ctx), entity_ids=[], surface="get-raw", tier=tier, path=inp.path)
+            emit("auth_denied", consumer=_cred(ctx), entity_ids=[], surface="get-raw", tier=tier, path=inp.path, **_via(ctx))
             raise ValueError(f"unknown path: {inp.path}") from None
-        emit("read", consumer=_cred(ctx), entity_ids=[inp.path], endpoint="get-raw", tier=tier)
+        emit("read", consumer=_cred(ctx), entity_ids=[inp.path], endpoint="get-raw", tier=tier, **_via(ctx))
         return self.Output(tier=tier, path=inp.path, content=content)
 
 
@@ -327,6 +337,7 @@ class AssembleContext(Endpoint):
             tier=tier,
             lens=inp.lens or "",
             operation_id=result["operation_id"],
+            **_via(ctx),
         )
         return self.Output(
             tier=tier,

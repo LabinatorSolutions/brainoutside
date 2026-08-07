@@ -135,7 +135,14 @@ def activity_json(request):
                 "entity_ids": e.entity_ids or [],
                 "endpoint": (e.details or {}).get("endpoint", ""),
                 "tier": (e.details or {}).get("tier", ""),
-                "consumer": str(e.consumer) if e.consumer else "ops",
+                # A NULL consumer is only "ops" when nothing else claims
+                # the call: connector reads can't sit in the FK (it's an
+                # APIKey FK) and carry a `via` label instead.
+                "consumer": (
+                    str(e.consumer)
+                    if e.consumer
+                    else ((e.details or {}).get("via") or "ops")
+                ),
             }
             for e in rows[:ACTIVITY_LIMIT]
         ]

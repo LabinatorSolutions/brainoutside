@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from apps.core.ctx import Ctx
 from apps.core.registry import Endpoint, endpoint
-from apps.events.models import emit
+from apps.events.models import credential_via, emit
 from apps.feeds.services import intake
 from apps.mind import tiers
 
@@ -94,6 +94,7 @@ class ProposeFeed(Endpoint):
                 consumer=_api_key_or_none(ctx.credential),
                 surface="propose-feed",
                 tier=tier,
+                **credential_via(ctx.credential),
             )
             raise ValueError("propose-feed requires an agents-only key or above.")
         feed = intake.propose(

@@ -114,7 +114,11 @@ def dashboard(request):
     # can't push everything else off the card.
     recent_events = []
     for ev in Event.objects.select_related("consumer")[:40]:
-        key = (ev.type, ev.consumer_id)
+        # `via` is the connector label for credentials the consumer FK
+        # can't hold; in the key it keeps two different connectors from
+        # collapsing into one line.
+        via = (ev.details or {}).get("via", "")
+        key = (ev.type, ev.consumer_id, via)
         if recent_events and recent_events[-1]["key"] == key:
             recent_events[-1]["count"] += 1
             continue
@@ -122,7 +126,7 @@ def dashboard(request):
             {
                 "key": key,
                 "label": ev.type.replace("_", " "),
-                "consumer": ev.consumer if ev.consumer_id else None,
+                "consumer": ev.consumer if ev.consumer_id else (via or None),
                 "at": ev.created_at,
                 "count": 1,
             }

@@ -188,7 +188,8 @@
                   {{ row.e.type }}
                 </span>
               </td>
-              <td class="text-xs font-mono text-muted">{{ row.e.consumer|default:"—" }}</td>
+              {# consumer is an APIKey FK; connector calls carry a `via` label instead. #}
+              <td class="text-xs font-mono text-muted">{{ row.e.consumer|default:row.e.details.via|default:"—" }}</td>
               <td class="text-xs font-mono text-muted">{{ row.n_entities|default:"—" }}</td>
               {# min-w-64: without a floor this column collapses on phones #}
               {# and every row wraps ~20 lines tall; the table-wrap scroll #}

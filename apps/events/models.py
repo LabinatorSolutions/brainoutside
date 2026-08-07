@@ -52,6 +52,33 @@ def emit(type: str, *, consumer=None, entity_ids: list[str] | None = None, **det
     )
 
 
+def credential_via(credential) -> dict:
+    """Attribution detail for credentials the `consumer` FK cannot hold.
+
+    `Event.consumer` is an FK to `api_keys.APIKey`, so a connector
+    (URL-token) call lands with consumer NULL — and the activity feed's
+    fallback then renders it as "ops", the operator's own name on a
+    stranger's traffic. Spread the result into `emit(...)` alongside
+    `consumer=`: `{}` for API keys (and no credential) so the common
+    path's details JSON stays clean, `{"via": "connector:<name>"}` for
+    URL tokens, the class name for anything future.
+    """
+    if credential is None:
+        return {}
+    # Lazy imports: this module is imported app-registry-early, and both
+    # feature apps import it back.
+    from apps.api_keys.models import APIKey
+
+    if isinstance(credential, APIKey):
+        return {}
+    from apps.url_mcp_tokens import api as url_tokens
+
+    if url_tokens.is_url_token(credential):
+        # "Connector" is the ops UI's name for a URL token.
+        return {"via": f"connector:{credential.name or credential.prefix}"}
+    return {"via": type(credential).__name__}
+
+
 class SdkOperation(models.Model):
     """The token ledger — one row per Claude Agent SDK invocation.
 

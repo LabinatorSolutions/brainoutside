@@ -2,13 +2,16 @@
 
 Auth model, which is the subtle part:
 
-- While **no superuser exists** the account step is open to anyone who
-  can reach the server. That is unavoidable for a zero-terminal install —
-  something has to bootstrap the first identity, and the alternatives
-  (a token printed in container logs, a `docker exec`) put the terminal
-  back. The window is as small as we can make it: creating the account
-  closes it permanently, the page says so out loud, and the app logs a
-  warning on every boot while it is still open.
+- While **no superuser exists** the account step — and only the account
+  step — is open to anyone who can reach the server. That much is
+  unavoidable for a zero-terminal install: something has to bootstrap
+  the first identity, and the alternatives (a token printed in container
+  logs, a `docker exec`) put the terminal back. The window is as small
+  as we can make it: one page, which writes nothing but the account
+  itself. Creating it closes the window permanently, the page says so
+  out loud, and the app logs a warning on every boot while it is open.
+  The other five steps are staff-only at all times — see
+  `_require_staff`.
 - Once an account exists, every step is staff-only, so the wizard cannot
   be used to reconfigure a running server by a passer-by.
 """
@@ -51,11 +54,25 @@ def _context(request, slug: str, **extra) -> dict:
 
 
 def _require_staff(request):
-    """None when allowed, else a redirect. Open only before the first admin."""
-    if setup_state.needs_first_admin():
-        return None
+    """None when allowed, else a redirect. Staff-only, on every step.
+
+    The open window is exactly one page wide — the account step, which
+    `step()` dispatches without calling this. It used to be six pages
+    wide, because this answered "allowed" for the whole wizard while
+    `needs_first_admin()` was true. Every other step *writes*: `repo`
+    stores a setting, `read` mints the server's deploy key and renders
+    the public half back, `write` and `claude` take credentials (and the
+    Claude test spawns a CLI with the pasted key), `build` enqueues a
+    clone on the worker. On an unowned install every one of those was
+    reachable by anyone who could reach the port; two of them then
+    crashed on `updated_by = AnonymousUser`, which is not a defence.
+    """
     if request.user.is_authenticated and request.user.is_staff:
         return None
+    if setup_state.needs_first_admin():
+        # No account exists, so `/login/` is a dead end — there is
+        # nothing to log in as. Send them to the one open page.
+        return redirect("setup:step", slug="account")
     return redirect(f"{reverse('login')}?next={request.path}")
 
 

@@ -32,6 +32,7 @@ from pathlib import Path
 
 import yaml
 from django.conf import settings
+from django.db import transaction
 
 from apps.brain.models import Entity, SyncRun
 from apps.brain.services import gitrepo
@@ -260,50 +261,99 @@ def db_state_hash() -> str:
     return _sha256("\n".join(lines).encode())
 
 
+class DuplicateEntityId(Exception):
+    """Two files in the brain repo claim the same frontmatter `id:`."""
+
+
 def rebuild(trigger: str = "manual") -> SyncRun:
-    """Full scan → upsert → prune. One SyncRun row per rebuild."""
+    """Full scan → prune → upsert. One SyncRun row per rebuild.
+
+    Prune runs BEFORE the upsert, and the whole thing is one transaction.
+    Both matter: `entity_id` and `path` are each unique, so renaming a note
+    while keeping its frontmatter `id:` — the normal case, since `id` is
+    the stable identity — used to hit the new path first and raise
+    IntegrityError against the old row's `entity_id`. With no atomic block
+    the rows written before the collision stayed committed, so the index
+    was left half-migrated and every retry failed at the same file. Sync
+    stayed dead until someone renamed the file back or edited the DB, and
+    "Replace the clone" could not repair it because it re-runs this.
+    """
     t0 = time.monotonic()
     run = SyncRun.objects.create(trigger=trigger)
     try:
         run.commit_sha = gitrepo.head_sha()
         parsed = parse_repo()
-        seen_paths = set()
-        existing = {o.path: o for o in Entity.objects.all()}
-        added = changed = 0
+
+        # A duplicate id is a repo authoring error, not a transient fault.
+        # Report it as itself instead of letting the DB raise IntegrityError
+        # halfway through the loop with no indication of which files clash.
+        by_id: dict[str, list[str]] = {}
         for e in parsed:
-            seen_paths.add(e.path)
-            values = dict(
-                entity_id=e.entity_id,
-                kind=e.kind,
-                title=e.title,
-                description=e.description,
-                status=e.status,
-                superseded_by=e.superseded_by,
-                visibility=e.visibility,
-                topics=e.topics,
-                projects=e.projects,
-                source=e.source,
-                source_url=e.source_url,
-                date=e.date,
-                last_verified=e.last_verified,
-                content_hash=e.content_hash,
-            )
-            obj = existing.get(e.path)
-            if obj is None:
-                Entity.objects.create(path=e.path, **values)
-                added += 1
-                continue
-            # Field-by-field, not content_hash: a parser change must still
-            # repair rows whose file bytes didn't move (drift self-repair
-            # rebuilds through here). Identical rows are skipped so `changed`
-            # counts real changes, not upserts.
-            dirty = [f for f, v in values.items() if getattr(obj, f) != v]
-            if dirty:
-                for f in dirty:
-                    setattr(obj, f, values[f])
-                obj.save(update_fields=dirty)
-                changed += 1
-        removed, _ = Entity.objects.exclude(path__in=seen_paths).delete()
+            by_id.setdefault(e.entity_id, []).append(e.path)
+        clashes = {k: v for k, v in by_id.items() if len(v) > 1}
+        if clashes:
+            detail = "; ".join(f"{k!r} in {' and '.join(sorted(v))}" for k, v in sorted(clashes.items()))
+            raise DuplicateEntityId(f"duplicate frontmatter id: {detail}")
+
+        added = changed = 0
+        with transaction.atomic():
+            seen_paths = {e.path for e in parsed}
+            # Prune first so a renamed file's old row releases its unique
+            # entity_id before the new path claims it.
+            removed, _ = Entity.objects.exclude(path__in=seen_paths).delete()
+
+            # Both unique columns can also collide without any rename: two
+            # files swapping ids, or a file adopting an id a surviving row
+            # still holds. Drop those rows so the upsert below re-creates
+            # them cleanly instead of deadlocking on the constraint.
+            parsed_by_path = {e.path: e for e in parsed}
+            reidentified = {
+                o.path
+                for o in Entity.objects.all()
+                if parsed_by_path[o.path].entity_id != o.entity_id
+            }
+            if reidentified:
+                Entity.objects.filter(path__in=reidentified).delete()
+
+            existing = {o.path: o for o in Entity.objects.all()}
+
+            for e in parsed:
+                values = dict(
+                    entity_id=e.entity_id,
+                    kind=e.kind,
+                    title=e.title,
+                    description=e.description,
+                    status=e.status,
+                    superseded_by=e.superseded_by,
+                    visibility=e.visibility,
+                    topics=e.topics,
+                    projects=e.projects,
+                    source=e.source,
+                    source_url=e.source_url,
+                    date=e.date,
+                    last_verified=e.last_verified,
+                    content_hash=e.content_hash,
+                )
+                obj = existing.get(e.path)
+                if obj is None:
+                    Entity.objects.create(path=e.path, **values)
+                    # A row dropped just above for an id change is the same
+                    # entity, not a new one — count it honestly.
+                    if e.path in reidentified:
+                        changed += 1
+                    else:
+                        added += 1
+                    continue
+                # Field-by-field, not content_hash: a parser change must still
+                # repair rows whose file bytes didn't move (drift self-repair
+                # rebuilds through here). Identical rows are skipped so `changed`
+                # counts real changes, not upserts.
+                dirty = [f for f, v in values.items() if getattr(obj, f) != v]
+                if dirty:
+                    for f in dirty:
+                        setattr(obj, f, values[f])
+                    obj.save(update_fields=dirty)
+                    changed += 1
         run.added, run.changed, run.removed = added, changed, removed
         run.ok = True
     except Exception as exc:

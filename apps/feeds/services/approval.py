@@ -102,9 +102,31 @@ def _fetch_args(branch: str) -> list[str]:
 
 
 def _safe_target(repo: Path, relpath: str) -> Path:
+    """Resolve a proposal path inside the clone, or refuse to touch it.
+
+    This is the write door's last containment check, and until now it was a
+    string prefix test, which is not containment. With the clone at
+    `/data/brain-repo`, `../brain-repo-backup/x.md` resolves to
+    `/data/brain-repo-backup/x.md` — a different directory that happens to
+    start with the same characters — and it passed. Any sibling whose name
+    merely EXTENDS the clone's was writable by an approved proposal.
+
+    `.git/` is the second hole: it lives inside the boundary, so the prefix
+    test was happy to write it, and a proposal that lands `.git/config` or
+    `.git/hooks/pre-commit` turns the very next git call in this module
+    into arbitrary code execution on the worker.
+
+    The rules 5 checks in `validator` cover both shapes, but they cannot be
+    relied on here: the validator is a gate, and a gate has a lock on the
+    other side of it for the day it is bypassed, reordered, or edited.
+    """
+    root = repo.resolve()
     target = (repo / relpath).resolve()
-    if not str(target).startswith(str(repo.resolve())):
-        raise ApplyFailure(f"path escapes the repo: {relpath}")
+    if target == root or not target.is_relative_to(root):
+        raise ApplyFailure(f"path escapes the repo: {relpath!r}")
+    # Case-folded: on Windows and macOS `.GIT/config` IS `.git/config`.
+    if any(part.lower() == ".git" for part in target.relative_to(root).parts):
+        raise ApplyFailure(f"proposals may not write git internals: {relpath!r}")
     return target
 
 

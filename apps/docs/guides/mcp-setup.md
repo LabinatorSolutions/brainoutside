@@ -12,12 +12,16 @@ Every client below authenticates the same way: a bearer key from
 `agents-only` tier unless you specifically want the client to reach
 `private` notes. The secret is shown once.
 
-> **This build authenticates with bearer keys only.** OAuth /
-> Dynamic Client Registration and the `/mcp/k/<token>/` URL-token
-> surface are not enabled here, so Claude.ai's *custom connector*
-> flow — which expects a server that runs the OAuth handshake — will
-> not complete. Use a client that can send an `Authorization` header:
-> Claude Desktop, Claude Code, or Cursor, all below.
+> **Two ways in, depending on the client.** Clients that can send an
+> `Authorization` header — Claude Desktop, Claude Code, Cursor — use a
+> bearer key, as below. Clients that cannot, notably **claude.ai on web
+> and mobile**, need a URL that carries its own credential: mint one on
+> [Connectors]({{ OPS_CONNECTORS_URL }}), which issues a
+> `/mcp/k/<token>/` address. That surface is off by default — set
+> `MCP_URL_AUTH_ENABLED=true` and restart, or the minted URL will 404.
+>
+> OAuth / Dynamic Client Registration is not implemented, so a client
+> that insists on the OAuth handshake will not connect.
 
 ## Claude Desktop
 
@@ -48,7 +52,7 @@ Support/Claude/` on macOS, `%APPDATA%\Claude\` on Windows):
 Restart Claude Desktop. Open a new conversation; the available tools
 appear automatically — every endpoint registered with
 `@endpoint(slug=...)` surfaces as a tool named after its slug (e.g.
-the `hello` endpoint shows up as `hello`).
+`get-note`, `list-notes`, `assemble-context`).
 
 ## Claude Code
 

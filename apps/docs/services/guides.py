@@ -100,6 +100,9 @@ def _resolve_placeholders(text: str) -> str:
     _ops = "/" + (getattr(settings, "ADMIN_PANEL_URL_PATH", "") or "ops/").strip("/") + "/"
     mapping["OPS_KEYS_URL"] = f"{_ops}consumers/"
     mapping["OPS_LOGS_URL"] = f"{_ops}logs/"
+    mapping["OPS_CONNECTORS_URL"] = f"{_ops}connectors/"
+    mapping["OPS_SETTINGS_URL"] = f"{_ops}settings/"
+    mapping["OPS_HEALTH_URL"] = f"{_ops}health/"
 
     def repl(m: re.Match[str]) -> str:
         key = m.group(1)

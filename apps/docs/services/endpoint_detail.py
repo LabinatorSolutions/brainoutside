@@ -415,15 +415,26 @@ def _render_js(full_url: str, body_json: str) -> str:
 
 def _render_mcp_config(request) -> str:
     """Snippet to drop into Claude Desktop's `claude_desktop_config.json`.
-    Points the MCP client at this server's `/mcp/` endpoint with the
-    user's API key as the bearer token."""
-    base = request.build_absolute_uri("/mcp/").rstrip("/")
+
+    Claude Desktop natively speaks **stdio**, so a remote HTTP server
+    needs the `mcp-remote` shim — which is exactly what the MCP setup
+    guide prescribes. This used to emit a `{"url", "transport", "auth"}`
+    object instead: a shape Claude Desktop does not accept, so the
+    copy-pasted config silently produced no tools and sent the reader
+    hunting for a key problem that wasn't there.
+    """
+    base = request.build_absolute_uri("/mcp/").rstrip("/") + "/"
     config = {
         "mcpServers": {
-            "this-api": {
-                "url": base,
-                "transport": "http",
-                "auth": {"type": "bearer", "token": "mcpsk_<your_api_key>"},
+            "brainoutside": {
+                "command": "npx",
+                "args": [
+                    "-y",
+                    "mcp-remote",
+                    base,
+                    "--header",
+                    "Authorization: Bearer mcpsk_<your_api_key>",
+                ],
             }
         }
     }

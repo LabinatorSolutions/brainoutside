@@ -16,8 +16,8 @@ Some errors include extra fields alongside `code` + `message` —
 etc. Those are documented per-code below.
 
 The `X-Request-ID` **response header** carries a stable id that
-correlates the failure with our server logs. Quote it in any support
-ticket so we can jump straight to the failing row.
+correlates the failure with your server's logs. Grep for it in
+`docker compose logs web` to find the matching row.
 
 Match on `error.code` (stable across versions) and surface
 `error.message` to your users.
@@ -28,9 +28,8 @@ Match on `error.code` (stable across versions) and surface
 |---|---|---|---|
 | `400` | `invalid_json` | Body wasn't valid JSON | Verify your JSON encoder; common cause is unescaped quotes or trailing commas |
 | `400` | `idempotency_key_invalid` | `Idempotency-Key` header is malformed (too long, non-printable, or empty) | Use a printable string up to 255 chars (UUIDs are ideal) |
-| `401` | `auth_required` | No `Authorization` header on a paid endpoint | Add `Authorization: Bearer mcpsk_<key>`; see the [auth guide](/docs/guide/auth/) |
-| `401` | `invalid_credential` | Bad / unknown / revoked key (or expired OAuth token) | Mint a fresh key on the dashboard |
-| `402` | `insufficient_credits` | Credit balance is below the per-call cost | Top up on the [billing page](/dashboard/billing/) |
+| `401` | `auth_required` | No `Authorization` header | Add `Authorization: Bearer mcpsk_<key>`; see the [auth guide](/docs/guide/auth/) |
+| `401` | `invalid_credential` | Bad, unknown, revoked or expired key | Mint a fresh one on `/ops/consumers/` |
 | `404` | `not_found` | Resource referenced by id doesn't exist (or doesn't belong to you) — used by the `/api/v1/_jobs/<id>` poll endpoint | Verify the id, or wait for the job to be created |
 | `409` | `idempotency_request_in_flight` | A previous call with the same `Idempotency-Key` is still executing | Wait and retry; do not start a new call concurrently |
 | `422` | `input_validation_error` | Input failed Pydantic validation | Inspect the `errors` array on the response (Pydantic's standard shape: `loc`, `msg`, `type`, `input`) |
@@ -41,9 +40,8 @@ Match on `error.code` (stable across versions) and surface
 
 | Status | `error.code` | What happened | What to do |
 |---|---|---|---|
-| `500` | `internal_error` | Something broke on our side | Open a support ticket with the `X-Request-ID`. We're notified automatically, but a report accelerates triage |
-| `503` | `endpoint_disabled` | This endpoint is temporarily disabled (maintenance / incident response) | Honor `Retry-After`; retry once it elapses |
-| `503` | `payments_unavailable` | Our payment provider (Stripe) is unreachable; calls that would charge credits are blocked briefly | Retry with backoff; usually clears within a minute |
+| `500` | `internal_error` | The endpoint raised. Nothing is notified automatically — the traceback is in the server log | Find the `X-Request-ID` in `docker compose logs web` |
+| `503` | `endpoint_disabled` | This endpoint was switched off on the server | Re-enable it: `manage.py shell -c "from apps.core import endpoint_gating; endpoint_gating.set_disabled('<slug>', False)"` |
 
 ## Validation-error body shape
 
@@ -77,16 +75,18 @@ field; surface `msg` to your end user.
     the error message — not as a `{"error": {...}}` JSON payload. The
     machine code isn't preserved across the protocol boundary. If you
     need the structured code, call the endpoint via REST.
-  - **Webhook delivery failures**: not surfaced through these codes —
-    see the [webhooks guide](/docs/guide/webhooks/) for the retry
-    schedule.
+  - **This server sends no webhooks**, so there are no delivery
+    failures to surface. The only webhook is GitHub's inbound push hook
+    — see the [webhooks guide](/docs/guide/webhooks/).
 
 ## When in doubt
 
-Open the [Usage page](/dashboard/usage/) — every API call you've made
-is logged with status + latency + (for failures) the exception class.
-Filter to errors-only to see exactly what's failing.
+Open `/ops/logs/` — every call is recorded there with its status and the
+entities it served. Denied calls show up as `auth_denied` events with the
+reason.
 
-Failing that, email [{{ SUPPORT_EMAIL }}](mailto:{{ SUPPORT_EMAIL }}) —
-include the `X-Request-ID` from any failed response so we can jump
-straight to the matching log row.
+For anything that isn't in the log, the server's own output has it:
+
+```bash
+docker compose logs web --tail 200
+```

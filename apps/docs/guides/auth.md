@@ -18,10 +18,10 @@ no profile is treated as `public`.
 ## Sending the header
 
 ```bash
-curl -X POST {{ PUBLIC_BASE_URL }}/api/v1/hello \
+curl -X POST {{ PUBLIC_BASE_URL }}/api/v1/ping \
   -H "Authorization: Bearer mcpsk_your_key_here" \
   -H "Content-Type: application/json" \
-  -d '{"name": "world"}'
+  -d '{}'
 ```
 
 Python:
@@ -30,9 +30,9 @@ Python:
 import requests
 
 r = requests.post(
-    "{{ PUBLIC_BASE_URL }}/api/v1/hello",
+    "{{ PUBLIC_BASE_URL }}/api/v1/ping",
     headers={"Authorization": "Bearer mcpsk_your_key_here"},
-    json={"name": "world"},
+    json={},
 )
 r.raise_for_status()
 print(r.json())
@@ -41,13 +41,13 @@ print(r.json())
 JavaScript:
 
 ```javascript
-const r = await fetch("{{ PUBLIC_BASE_URL }}/api/v1/hello", {
+const r = await fetch("{{ PUBLIC_BASE_URL }}/api/v1/ping", {
   method: "POST",
   headers: {
     "Authorization": "Bearer mcpsk_your_key_here",
     "Content-Type": "application/json",
   },
-  body: JSON.stringify({ name: "world" }),
+  body: JSON.stringify({}),
 });
 if (!r.ok) throw new Error(`HTTP ${r.status}`);
 console.log(await r.json());

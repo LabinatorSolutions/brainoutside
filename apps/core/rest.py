@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from typing import Any, Awaitable, Callable
 
@@ -39,6 +40,7 @@ from pydantic import ValidationError
 from apps.core import endpoint_gating, error_hook, idempotency, log_context
 from apps.core.bearer import resolve as resolve_bearer
 from apps.core.ctx import build_ctx
+from apps.core.events import EndpointCalled, fire
 from apps.core.registry import EndpointSpec
 from apps.core.security.client_ip import client_ip
 from apps.core.security.lockout import is_token_locked
@@ -124,9 +126,10 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                     code="invalid_credential",
                     message="Bearer token is invalid, revoked, or expired.",
                 )
-        # Stash the resolved principal so the observability middleware can
-        # populate user_id + credential_id on the EndpointCalled event
-        # without re-doing the auth lookup.
+        # Stash the resolved principal so the `EndpointCalled` fire at the
+        # end of `view()` can attribute the call without re-doing the auth
+        # lookup. (This slot originally fed a RequestLogMiddleware that
+        # was never installed — the fire in `view()` is what reads it now.)
         request._principal = principal  # type: ignore[attr-defined]
 
         # backfill `user_id` on the log contextvar now that
@@ -444,6 +447,7 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                 response.headers[k] = v
             return response
 
+        start = time.perf_counter()
         response = await _dispatch(request)
 
         # Stamp the RFC 8594 advisory headers on EVERY response of a
@@ -452,6 +456,42 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         if spec.is_deprecation_active_at(now):
             for k, v in spec.deprecation_response_headers().items():
                 response.headers[k] = v
+
+        # Fire `EndpointCalled` — the MCP proxy has always done this
+        # (`_safe_record`), and `APIKey.last_used_*` is stamped by a
+        # subscriber on it. The REST path only *stashed* the principal,
+        # for a RequestLogMiddleware that was never installed, so a key
+        # used exclusively over REST read as "never used" in its own
+        # columns and the ops page had to work the truth out of the event
+        # log instead (`apps.mind.consumers.rows`). One fire per call,
+        # here, because every dispatch path funnels through this exit.
+        # (The 410 sunset short-circuit above doesn't reach it — no auth
+        # ran, so there is nothing to attribute; MCP behaves the same.)
+        principal = getattr(request, "_principal", None)
+        try:
+            await sync_to_async(fire, thread_sensitive=True)(
+                EndpointCalled(
+                    request_id=request_id,
+                    endpoint_slug=spec.slug,
+                    source="rest",
+                    status_code=response.status_code,
+                    latency_ms=max(1, int((time.perf_counter() - start) * 1000)),
+                    user_id=principal.user.pk if principal else None,
+                    credential_id=(
+                        principal.credential.pk
+                        if principal and principal.credential is not None
+                        else None
+                    ),
+                    credential_kind=(principal.credential_kind if principal else ""),
+                    ip=client_ip(request),
+                    user_agent=request.headers.get("User-Agent", ""),
+                )
+            )
+        except Exception:
+            log.exception(
+                "rest: EndpointCalled fire failed",
+                extra={"request_id": request_id, "slug": spec.slug},
+            )
         return response
 
     view.__name__ = f"endpoint_{spec.version}_{spec.slug}"

@@ -9,7 +9,8 @@ each version present we also register the three built-in routes:
 - `<version>/_health`        — minimal liveness check
 
 Phase 7.5 promotes `_health` to richer `/healthz` + `/readyz` endpoints.
-Phase 2.6 makes RequestLogMiddleware track every call here.
+Every call through `make_endpoint_view` fires `EndpointCalled` (there is
+no RequestLogMiddleware in this fork — the view itself is the fire site).
 
 `_openapi.json` and `_catalog` set an ETag header so
 `django.middleware.http.ConditionalGetMiddleware` short-circuits

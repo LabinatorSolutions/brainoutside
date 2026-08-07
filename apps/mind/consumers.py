@@ -215,14 +215,14 @@ def rows(user: "AbstractBaseUser", *, days: int = 7) -> list[dict]:
         .values_list("consumer_id")
         .annotate(n=Count("id"))
     )
-    # `APIKey.last_used_at` alone would UNDERSTATE: it is stamped from a
-    # subscriber on `EndpointCalled`, and only `apps.mcp_proxy` fires that
-    # event. The REST path stashes `request._principal` for a
-    # `RequestLogMiddleware` that is not in MIDDLEWARE, so a key used
-    # exclusively over REST reads as "never used" — the exact fact an
-    # operator checks before revoking something. The event log is written
-    # by the endpoints themselves and covers both surfaces, so take
-    # whichever is later.
+    # `APIKey.last_used_at` is stamped from a subscriber on
+    # `EndpointCalled`, which both surfaces now fire (REST joined MCP in
+    # the pre-launch hardening; before that a key used exclusively over
+    # REST read as "never used" — the exact fact an operator checks
+    # before revoking something). The event log still gets a say: it is
+    # written by the endpoints themselves, so it covers any window where
+    # the subscriber failed, and taking whichever is later costs one
+    # query.
     #
     # `settings_change` is excluded and that exclusion is load-bearing:
     # this module's own audit rows (created / updated / rotated / revoked)

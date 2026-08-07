@@ -25,6 +25,7 @@ Error contract:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -257,6 +258,9 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
                 return response
             if isinstance(outcome, idempotency.Pending):
                 idem_record = outcome.record
+                # Stashed for the cancellation guard in `view()`: a
+                # request killed mid-run must not squat on its key.
+                request._idem_record = idem_record  # type: ignore[attr-defined]
             # Skipped → idem_record stays None; flow continues normally.
 
         try:
@@ -448,7 +452,29 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
             return response
 
         start = time.perf_counter()
-        response = await _dispatch(request)
+        try:
+            response = await _dispatch(request)
+        except BaseException:
+            # `CancelledError` is a BaseException, so a client disconnect
+            # or a `docker compose up -d` mid-call escaped every handler
+            # in `_dispatch` — leaving the just-claimed Idempotency-Key
+            # row incomplete. Every retry with that key then 409'd
+            # "in flight" until the 24h purge. The claim is released here
+            # (best-effort, shielded from a second cancellation) so the
+            # retry takes the fresh-INSERT path instead.
+            record = getattr(request, "_idem_record", None)
+            if record is not None and not getattr(record, "is_complete", True):
+                try:
+                    await asyncio.shield(
+                        sync_to_async(record.delete, thread_sensitive=True)()
+                    )
+                except BaseException:  # noqa: BLE001 - cleanup must not mask the exit
+                    log.warning(
+                        "rest: could not release idempotency claim key=%s",
+                        getattr(record, "key", "?"),
+                        exc_info=True,
+                    )
+            raise
 
         # Stamp the RFC 8594 advisory headers on EVERY response of a
         # deprecated-but-not-yet-sunset endpoint — including 4xx errors

@@ -21,6 +21,12 @@ case "$ROLE" in
   web)
     python manage.py migrate --noinput
     python manage.py collectstatic --noinput
+    # Converge the Q2 cron schedule on every deploy (config/scheduled.py).
+    # web owns this for the same reason it owns migrate: exactly one role
+    # must do it. Non-fatal — a schedule that failed to sync must not stop
+    # the server from serving, and the next deploy retries.
+    python manage.py sync_scheduled \
+        || echo "entrypoint: sync_scheduled failed — background beats may be stale" >&2
     exec gunicorn config.asgi:application \
         -k uvicorn.workers.UvicornWorker \
         --bind 0.0.0.0:8000 \

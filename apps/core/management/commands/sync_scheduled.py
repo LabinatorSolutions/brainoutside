@@ -75,10 +75,18 @@ class Command(BaseCommand):
 
         prunes: list[str] = []
         if prune:
-            orphan_qs = Schedule.objects.exclude(name__in=list(declared.keys())).filter(
-                name__startswith=""  # everything; safety: only delete with --prune
-            )
+            # Only rows this file owns. The old query was
+            # `.exclude(declared).filter(name__startswith="")` — i.e.
+            # EVERY cron row not currently declared, which silently deleted
+            # an operator's hand-created Schedule despite the docstring
+            # promising the opposite. Declared names are namespaced
+            # `<app>:<task>`, so ownership is decidable: prune a row only
+            # if its namespace is one we declare but its full name is not.
+            owned_prefixes = {n.split(":", 1)[0] + ":" for n in declared if ":" in n}
+            orphan_qs = Schedule.objects.exclude(name__in=list(declared.keys()))
             for row in orphan_qs:
+                if not any(row.name.startswith(p) for p in owned_prefixes):
+                    continue
                 # Don't prune Schedule.ONCE rows -- those are one-off
                 # delivery retries the webhooks app creates ad hoc, not
                 # cron entries. They self-destruct on completion.
@@ -115,24 +123,35 @@ def _schedule_kwargs(task: ScheduledTask) -> dict[str, Any]:
     Schedule model's `kwargs` field (JSON-stored pickle). `repeats=-1`
     means "run indefinitely".
     """
-    import json
-
     return {
         "name": task.name,
         "func": task.func,
         "cron": task.cron,
         "schedule_type": task.schedule_type,
         "repeats": -1,
-        "kwargs": json.dumps(task.kwargs) if task.kwargs else "",
+        "kwargs": _kwargs_literal(task.kwargs),
     }
+
+
+def _kwargs_literal(kwargs: dict) -> str:
+    """Serialize kwargs the way django-q2 actually reads them back.
+
+    Q2's scheduler parses `Schedule.kwargs` with `ast.literal_eval` and, on
+    failure, falls back to keyword-syntax parsing and then to `{}` —
+    SILENTLY. JSON only round-trips by accident: `{"a": 1}` happens to be a
+    valid Python literal, but `true`/`false`/`null` are not, so a task
+    declared with `kwargs={"dry_run": False}` synced cleanly, diffed as
+    unchanged forever, and ran with no kwargs at all.
+
+    `repr()` of a dict is a Python literal by construction.
+    """
+    return repr(kwargs) if kwargs else ""
 
 
 def _diff_schedule_row(row: Any, task: ScheduledTask) -> list[str]:
     """Return human-readable list of fields that differ between the DB
     row and the declared task. Empty list = no drift."""
-    import json
-
-    declared_kwargs_json = json.dumps(task.kwargs) if task.kwargs else ""
+    declared_kwargs_json = _kwargs_literal(task.kwargs)
     diffs = []
     if row.func != task.func:
         diffs.append(f"func: {row.func} -> {task.func}")

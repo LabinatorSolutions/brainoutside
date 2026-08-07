@@ -305,16 +305,24 @@ def apply_feed(feed_id: int) -> str:
                 try:
                     ctx = validator.context_from_repo()
                     ctx.source_kind = str((feed.raw_payload or {}).get("source_kind") or "")
-                    _apply_files(repo, proposal)
-                    _apply_index_lines(repo, proposal)
-                    _apply_supersedes(repo, proposal, ctx.entities)
-                    _apply_taxonomy(repo, proposal)
+                    # Validate BEFORE writing anything. `validate` is pure
+                    # over (proposal, ctx) and `ctx` is captured from the
+                    # pre-apply repo either way, so this is the same answer
+                    # the old post-apply call produced — but now the gate
+                    # runs on the gate's side of the door. Previously every
+                    # invalid proposal was written to the shared clone
+                    # first and only `_rollback` took it back out, which
+                    # made a correctness check depend on cleanup working.
                     res = validator.validate(proposal, ctx)
                     if not res.valid:
                         raise ApplyFailure(
                             "pre-commit validation failed: "
                             + "; ".join(str(v) for v in res.violations[:5])
                         )
+                    _apply_files(repo, proposal)
+                    _apply_index_lines(repo, proposal)
+                    _apply_supersedes(repo, proposal, ctx.entities)
+                    _apply_taxonomy(repo, proposal)
                     gitrepo.run("add", "-A")
                     gitrepo.run(
                         "-c", f"user.name={dj_settings.BRAIN_COMMIT_NAME}",

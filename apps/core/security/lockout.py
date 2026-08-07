@@ -1,35 +1,35 @@
 """Brute-force / abuse counters.
 
-Two complementary primitives, both sharing Phase 6.1's cache + Redis
-infrastructure (so failure / throttle counters degrade gracefully when
-Redis is down — same contract as the rate-limit token bucket):
+One primitive, sharing the cache + Redis infrastructure (so failure
+counters degrade gracefully when Redis is down — same contract as the
+rate-limit token bucket):
 
-1. **Failure-driven lockout** (`record_failure` + `is_locked`) — bumps a
+**Failure-driven lockout** (`record_failure` + `is_locked`) — bumps a
    per-(scope, identifier) counter on each failed attempt; once the
    counter crosses a threshold within a window, sets a separate
    "locked" sentinel that survives for a longer cooldown period. Used
-   for: failed API-key auth (10 fails / 60s → 5min lockout per prefix)
-   + admin-login (5 fails / 5min → 15min lockout per IP).
+for: failed API-key auth (10 fails / 60s → 5min lockout per prefix),
+failed URL-token auth (same thresholds), admin-login (5 fails / 5min →
+15min lockout per IP), and honeypot hits.
 
-   Two cache keys per (scope, identifier):
-     - `lockout:{scope}:{identifier}:count`   (TTL = window_s)
-     - `lockout:{scope}:{identifier}:locked`  (TTL = lockout_s; set
-       when the counter first crosses the threshold)
+Two cache keys per (scope, identifier):
+  - `lockout:{scope}:{identifier}:count`   (TTL = window_s)
+  - `lockout:{scope}:{identifier}:locked`  (TTL = lockout_s; set
+    when the counter first crosses the threshold)
 
-   Why two keys instead of one bucket: a bucket model couples the
-   "how fast did fails arrive" question with "how long do we lock
-   them out for". The fail-count window is short (so a slow attacker
-   doesn't accumulate a death sentence over weeks) but the lockout
-   itself needs to be longer than the window so a freshly-locked
-   attacker can't immediately retry. Two TTLs handle that cleanly.
+Why two keys instead of one bucket: a bucket model couples the
+"how fast did fails arrive" question with "how long do we lock
+them out for". The fail-count window is short (so a slow attacker
+doesn't accumulate a death sentence over weeks) but the lockout
+itself needs to be longer than the window so a freshly-locked
+attacker can't immediately retry. Two TTLs handle that cleanly.
 
-2. **Volume-throttled consume** (`consume`) — wraps
-   `apps.rate_limit.redis_bucket.get_bucket().consume(...)` with a
-   namespace prefix so brute-force buckets don't collide with the
-   per-(user, slug) buckets the API rate limiter already uses. Used
-   for: magic-link issuance (5/hour per email + 20/hour per IP) and
-   OAuth /token (30/min per client_id) — these are pure rate-limit
-   patterns, not fail-then-lockout.
+There was a second primitive here, `consume` — a token-bucket wrapper
+that dispatched through a `register_bucket_provider` registry to
+`apps.rate_limit`. That app is not vendored, nothing registered a
+provider, and the two things it existed for (magic-link issuance, the
+OAuth /token endpoint) do not exist in this fork either. It had no
+callers and failed open when called. Removed before launch.
 
 `is_token_locked(token)` is a thin public wrapper rest.py + the MCP
 proxy call BEFORE bearer resolution: it sniffs an `mcpsk_<8>` prefix
@@ -41,25 +41,11 @@ spec is "even with a valid key").
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, NamedTuple, Optional
+from typing import NamedTuple, Optional
 
 from apps.core.cache import cache_bust, cache_get, cache_set, make_key
 
 log = logging.getLogger(__name__)
-
-# Bucket-provider registry. `apps.rate_limit.RateLimitConfig.ready()`
-# calls `register_bucket_provider(get_bucket)` so this module can
-# fulfill `consume(...)` calls without importing apps.rate_limit
-# directly (Contract 1: apps.core has no reverse deps on feature apps).
-_bucket_provider: Optional[Callable[[], Any]] = None
-
-
-def register_bucket_provider(provider: Callable[[], Any]) -> None:
-    """Wire the rate-limit bucket factory. Called from
-    `RateLimitConfig.ready()` at app boot."""
-    global _bucket_provider
-    _bucket_provider = provider
-
 
 # ---- Public dataclass shared by all helpers --------------------------------
 
@@ -192,50 +178,6 @@ def force_unlock(scope: str, identifier: str) -> None:
         return
     cache_bust(_counter_key(scope, identifier))
     cache_bust(_locked_key(scope, identifier))
-
-
-# ---- Volume-throttled consume ('s bucket, namespaced) -------------
-
-
-def consume(
-    scope: str,
-    identifier: str,
-    *,
-    capacity: int,
-    refill_per_min: float,
-) -> LockoutResult:
-    """Token-bucket consume keyed under `lockout:{scope}:{identifier}`.
-
-    Mirrors Phase 6.1's `redis_bucket.get_bucket().consume(...)` call
-    shape but isolates these counters from the API rate-limit buckets
-    (so an exhausted magic-link-issue bucket doesn't read like an
-    exhausted /api/v1/hello bucket in Redis introspection).
-
-    Float `refill_per_min` lets us express sub-1 rates (e.g. 5/hour =
-    `refill_per_min=5/60`). The Lua script + in-memory backend both
-    handle floats; only the public type hint shifts here.
-
-    `capacity == 0` or `refill_per_min <= 0` → never throttle. That
-    matches the bucket primitive's contract.
-    """
-    if not identifier:
-        return _OK
-    if _bucket_provider is None:
-        # `apps.rate_limit.RateLimitConfig.ready()` registers `get_bucket`
-        # at boot. If this app isn't installed we fail open — lockout is
-        # defense-in-depth, never the only line of defense.
-        log.warning("lockout.consume: bucket provider not registered; failing open")
-        return _OK
-
-    key = make_key("lockout", scope, identifier)
-    bucket = _bucket_provider()
-    decision = bucket.consume(
-        key, capacity=capacity, refill_per_min=refill_per_min
-    )
-    return LockoutResult(
-        allowed=decision.allowed,
-        retry_after_s=decision.retry_after_s,
-    )
 
 
 # ---- API-key-prefix lockout helper (used by REST + MCP proxy) --------------
@@ -373,7 +315,6 @@ __all__ = [
     "clear_api_key_fail",
     "clear_failures",
     "clear_url_token_fail",
-    "consume",
     "extract_api_key_prefix",
     "extract_url_token_prefix",
     "force_unlock",
@@ -383,5 +324,4 @@ __all__ = [
     "record_api_key_fail",
     "record_failure",
     "record_url_token_fail",
-    "register_bucket_provider",
 ]

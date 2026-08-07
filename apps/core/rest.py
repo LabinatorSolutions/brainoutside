@@ -303,10 +303,6 @@ def make_endpoint_view(spec: EndpointSpec) -> AsyncView:
         # let `ctx.trace.exception(...)` resolve the slug
         # without the endpoint having to pass it in explicitly.
         ctx.meta["endpoint_slug"] = spec.slug
-        # propagate the per-endpoint Q2 timeout
-        # override so `ctx.aenqueue(...)` can forward it to async_task.
-        if spec.async_timeout_seconds > 0:
-            ctx.meta["async_timeout_seconds"] = spec.async_timeout_seconds
 
         # A credit charge used to wrap `run()` here: build an idempotency
         # key, enter a charge context manager, map InsufficientCreditsError

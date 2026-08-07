@@ -75,14 +75,6 @@ class EndpointSpec:
     description: str = ""
     deprecated: bool = False
     tags: tuple[str, ...] = ()
-    # per-endpoint override for the Q2 task timeout
-    # (seconds). Default `0` means "use the cluster default" (currently
-    # 60s, set in `config/settings/base.py::Q_CLUSTER["timeout"]`). The
-    # REST view stashes this value on `ctx.meta["async_timeout_seconds"]`;
-    # `apps.jobs.services.enqueue` forwards it to `async_task(q_options=
-    # {"timeout": N})`. Sync endpoints can leave the default — only
-    # endpoints that `ctx.aenqueue(...)` a long-running task care.
-    async_timeout_seconds: int = 0
     # FinalPolish F3 — RFC 8594-style deprecation + sunset metadata.
     # `deprecated_at`: endpoint is still callable but the REST view stamps
     # `Deprecation:` + `Sunset:` + `Link:` headers on every response so
@@ -214,7 +206,6 @@ def endpoint(
     description: str = "",
     deprecated: bool = False,
     tags: tuple[str, ...] = (),
-    async_timeout_seconds: int = 0,
     deprecated_at: datetime | None = None,
     sunset_at: datetime | None = None,
     deprecation_message: str = "",
@@ -243,11 +234,6 @@ def endpoint(
         # If GET ever earns its keep, relax this check. (Phase 11.3 example endpoints
         # may revisit; for now, POST-only keeps the surface predictable.)
         raise RegistryError(f"Unsupported HTTP method {method!r}. Only POST for now.")
-    if async_timeout_seconds < 0:
-        raise RegistryError(
-            f"async_timeout_seconds must be >= 0 (0 = use cluster default), "
-            f"got {async_timeout_seconds}."
-        )
     # FinalPolish F3 — require tz-aware deprecation/sunset timestamps.
     # A naive datetime compared against `timezone.now()` (which is UTC and
     # aware) raises TypeError at request time; catch it at import instead
@@ -286,7 +272,6 @@ def endpoint(
             description=resolved_description,
             deprecated=deprecated,
             tags=tuple(tags),
-            async_timeout_seconds=async_timeout_seconds,
             deprecated_at=deprecated_at,
             sunset_at=sunset_at,
             deprecation_message=deprecation_message,

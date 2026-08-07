@@ -32,7 +32,6 @@ _SOURCES = [
     "apps/core/openapi.py",
     "apps/core/events.py",
     "apps/core/ctx.py",
-    "apps/core/jobs_hook.py",
     "apps/mcp_proxy/views.py",
     "apps/docs/services/catalog.py",
 ]

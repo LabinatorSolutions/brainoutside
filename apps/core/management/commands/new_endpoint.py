@@ -151,8 +151,6 @@ class {cls}(Endpoint):
         # TODO: implement. See CLAUDE.md for the 3 pattern shapes:
         #   - sync (this scaffold's default)
         #   - sync + safe_request for outbound HTTP
-        #   - async + ctx.aenqueue() returning a JobHandle (tell callers in
-        #     the description to poll the `get-job-status` tool every 1-2s)
         return self.Output(greeting=f"Hello, {{inp.name}}")
 '''
 

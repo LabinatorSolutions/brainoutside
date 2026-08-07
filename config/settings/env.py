@@ -204,25 +204,6 @@ class Settings(BaseSettings):
     Q_WORKER_COUNT: int = 4
     Q_RECYCLE_AFTER_TASKS: int = 500
 
-    # ----- Webhook completion (Pattern 4 — WEBHOOK_COMPLETION_PLAN.md) -----
-    # How long a job may sit in `awaiting_callback` before the
-    # `reconcile_awaiting_webhooks` reaper (runs every ~10 min) gives up on
-    # the provider's callback and dead-letters it (which refunds the credits
-    # the call charged). MUST exceed the longest provider job you submit via
-    # Pattern 4 — set it too low and slow-but-healthy jobs get reaped +
-    # refunded mid-flight. Default 1800s (30 min) covers typical AssemblyAI /
-    # Replicate / fal.ai turnarounds with headroom.
-    WEBHOOK_CALLBACK_TIMEOUT_SECONDS: int = 1800
-
-    # Per-provider inbound-webhook signing secret for the `transcribe-audio`
-    # Pattern 4 worked example (provider slug "demo-transcriber"). Canonical
-    # shape for a Pattern 4 receiver secret — one SecretStr per provider (a
-    # real deploy adds e.g. ASSEMBLYAI_WEBHOOK_SECRET the same way). Blank by
-    # default → the demo receiver's verify() fails closed, so the example
-    # endpoint is callable but its callback can't complete a job until an
-    # operator sets a secret. See apps/app_endpoints/transcribe_audio/.
-    DEMO_TRANSCRIBER_WEBHOOK_SECRET: SecretStr = SecretStr("")
-
     # bumping the version invalidates every cache key on the
     # next deploy (the prefix becomes `mcp:<env>:v<N>:` so old keys are
     # orphaned and TTL out). Use this when a release changes the cached
@@ -235,35 +216,14 @@ class Settings(BaseSettings):
     CACHE_ENV: str = "dev"
 
     # ----- Email -----
-    # Driver dispatch lives in `config/settings/base.py` — the driver name
-    # maps to a Django EMAIL_BACKEND dotted path via EMAIL_BACKENDS_BY_DRIVER.
-    # `dummy` routes to locmem (django.core.mail.outbox) so tests + the
-    # admin "send test email" probe can assert without touching SMTP.
+    # This server sends almost no mail — `security/alerts.py` is the only
+    # sender, and `base.py` pins EMAIL_BACKEND to the console backend, so
+    # an alert goes to the container's stdout. The SMTP / Postmark /
+    # Resend knobs that used to be declared here were never read by
+    # anything; wiring a real backend is a deliberate future change, not
+    # an env var somebody can set today.
     EMAIL_BACKEND_DRIVER: Literal["console", "dummy", "smtp", "postmark", "resend"] = "console"
     DEFAULT_FROM_EMAIL: str = "noreply@example.com"
-    EMAIL_HOST: str = ""
-    EMAIL_PORT: int = 587
-    EMAIL_HOST_USER: str = ""
-    EMAIL_HOST_PASSWORD: SecretStr = SecretStr("")
-    EMAIL_USE_TLS: bool = True
-    POSTMARK_API_TOKEN: SecretStr = SecretStr("")
-    # Anymail reads `ANYMAIL["POSTMARK_SERVER_TOKEN"]`; we pipe POSTMARK_API_TOKEN
-    # through to that key in base.py to keep the env var name stable.
-    RESEND_API_KEY: SecretStr = SecretStr("")
-
-    # ----- Stripe -----
-    STRIPE_SECRET_KEY: SecretStr = SecretStr("")
-    STRIPE_PUBLISHABLE_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: SecretStr = SecretStr("")
-    STRIPE_RETURN_URL: str = "http://localhost:8000"
-
-    # ----- Billing mode -----
-    # Drives which storefront page renders in the user dashboard.
-    # `"subscription"` (default) shows recurring plans only;
-    # `"credit_only"` shows one-off credit packs only; `"both"` shows
-    # both with credit packs first. Operators flip this from the admin
-    # Settings page; the env var is the cold-start default.
-    BILLING_MODE: str = "subscription"
 
     # ----- OAuth -----
     # Public issuer URL announced in /.well-known/oauth-authorization-server
@@ -280,26 +240,9 @@ class Settings(BaseSettings):
     #   - "iat_required"  → caller must present a pre-issued initial-access-token
     #   - "disabled"      → registration endpoint returns 403
     MCP_OAUTH_DCR_MODE: Literal["anonymous", "iat_required", "disabled"] = "anonymous"
-    # Rate limit per source IP per hour for /oauth/register/. Phase 6.1 swaps
-    # the placeholder cache-based counter for the Redis token-bucket module.
-    MCP_OAUTH_DCR_RATE_LIMIT_PER_IP_PER_HOUR: int = 10
-
-    # Access-token + auth-code lifetimes. Short auth code (~1 min) per RFC 6749
-    # § 4.1.2; access tokens 1 day for MCP — Claude.ai will refresh as needed.
-    OAUTH_AUTH_CODE_TTL_SECONDS: int = 60
-    OAUTH_ACCESS_TOKEN_TTL_SECONDS: int = 60 * 60 * 24
-    OAUTH_REFRESH_TOKEN_TTL_SECONDS: int = 60 * 60 * 24 * 30
-
-    # Social (allauth) — leave any of these blank to disable that provider.
-    # The login template hides the corresponding button when blank.
-    ALLAUTH_GOOGLE_CLIENT_ID: str = ""
-    ALLAUTH_GOOGLE_CLIENT_SECRET: SecretStr = SecretStr("")
-    ALLAUTH_GITHUB_CLIENT_ID: str = ""
-    ALLAUTH_GITHUB_CLIENT_SECRET: SecretStr = SecretStr("")
 
     # ----- Security -----
     FIELD_ENCRYPTION_KEY: SecretStr = SecretStr("")
-    CORS_ALLOWED_ORIGINS: Annotated[list[str], NoDecode] = Field(default_factory=list)
     STAFF_2FA_TIMEOUT: int = 8  # hours
     AUDIT_RETENTION_DAYS: int = 180
     # `True` emits `Content-Security-Policy-Report-Only`
@@ -323,16 +266,11 @@ class Settings(BaseSettings):
     FILE_UPLOAD_MAX_MEMORY_MB: int = 2
 
     # ----- Observability -----
+    # Read by `doctor` (which warns when it is unset in prod) and by
+    # base.py. No Sentry SDK is initialised here — setting it does not
+    # start reporting, which is why the sample-rate and environment
+    # knobs that used to sit beside it went: they configured nothing.
     SENTRY_DSN: str = ""
-    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
-    SENTRY_ENVIRONMENT: str = "dev"
-    # APICallLog PII retention. The compact_call_logs
-    # cron anonymizes `ip` + `user_agent` on rows older than this many
-    # days. The summary fields (status_code, latency_ms, endpoint_slug,
-    # credits_charged, source) stay intact so PerformanceDaily aggregates
-    # remain valid past the anonymization. Default 90d matches the GDPR
-    # best-practice retention for IP-class identifiers.
-    APICALL_LOG_COMPACT_DAYS: int = 90
     # Google Analytics 4 measurement ID (e.g. "G-XXXXXXXXXX"). Blank (the
     # default) disables analytics entirely: no gtag.js, no cookie-consent
     # banner, and the CSP stays tight (no googletagmanager / google-analytics
@@ -344,10 +282,10 @@ class Settings(BaseSettings):
     GOOGLE_ANALYTICS_ID: str = ""
 
     # ----- Backend driver registry (protocols) -----
+    # The only registry with a registrant. The payment / OAuth-provider /
+    # MCP-transport driver names that used to sit here selected between
+    # implementations this project does not have.
     STORAGE_DRIVER: str = "filesystem"
-    PAYMENT_PROVIDER_DRIVER: str = "stripe"
-    OAUTH_PROVIDER_DRIVER: str = "dot"
-    MCP_TRANSPORT_DRIVER: str = "subprocess"
 
     # ----- MCP subprocess -----
     # The Django proxy view at /mcp/ forwards to FastMCP on this loopback host:port.
@@ -361,10 +299,6 @@ class Settings(BaseSettings):
     MCP_LOOPBACK_PORT: int = 9001
     MCP_LOOPBACK_SECRET: SecretStr | None = None
 
-    # ----- Feature flags -----
-    FEATURE_WEBHOOKS_ENABLED: bool = True
-    FEATURE_BILLING_ENABLED: bool = True
-    FEATURE_MCP_OAUTH_ENABLED: bool = True
     # ----- URL-based MCP auth -----
     # Master switch for the `/mcp/k/<token>/` surface. When False:
     #   - the URL pattern returns 404 (the view sees the flag and bails
@@ -386,17 +320,12 @@ class Settings(BaseSettings):
     # stricter rotation. The mint flow always allows shorter/longer
     # values from the dropdown — this is just the default.
     URL_TOKEN_DEFAULT_TTL_DAYS: int = 90
-    # django-debug-toolbar dev panel. Off by default even in
-    # DEBUG mode because it adds DB roundtrips and an injected sidebar; flip
-    # to True (or set env var) when investigating an N+1 / slow query.
-    DJANGO_DEBUG_TOOLBAR: bool = False
 
     # ----- Validators -----
 
     @field_validator(
         "ALLOWED_HOSTS",
         "ADMIN_IP_ALLOWLIST",
-        "CORS_ALLOWED_ORIGINS",
         "TRUSTED_PROXY_IPS",
         mode="before",
     )
@@ -406,12 +335,6 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [s.strip() for s in v.split(",") if s.strip()]
         return v
-
-    @field_validator("SENTRY_TRACES_SAMPLE_RATE")
-    @classmethod
-    def _sample_rate_in_range(cls, v: float) -> float:
-        if not (0.0 <= v <= 1.0):
-            raise ValueError("SENTRY_TRACES_SAMPLE_RATE must be between 0 and 1")
         return v
 
     @model_validator(mode="after")

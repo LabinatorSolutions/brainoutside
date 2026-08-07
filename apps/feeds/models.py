@@ -76,6 +76,13 @@ class Feed(models.Model):
     # retry). Powers the in-flight button guard and the Tasks page —
     # a second Extract click while set is a double SDK spend.
     extract_queued_at = models.DateTimeField(null=True, blank=True)
+    # Set by the atomic approve claim, cleared on every terminal outcome.
+    # Q2 on the Redis broker has no ack: a worker killed mid-apply simply
+    # loses the task, and the Feed sits in `approving` forever — a status
+    # no ops action accepts, so the operator has no move at all. This is
+    # the timestamp `reconcile_stuck` needs to tell "a worker is still
+    # working on it" from "nobody is coming".
+    approve_claimed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -96,3 +103,18 @@ class Feed(models.Model):
             return False
         horizon = int(settings.Q_CLUSTER["timeout"]) * 3 + 15 * 60
         return (timezone.now() - self.extract_queued_at).total_seconds() < horizon
+
+    @property
+    def approval_in_flight(self) -> bool:
+        """Claimed, and still inside the window a live worker could need.
+
+        One Q2 task with up to MAX_PUSH_ATTEMPTS inside it, so the bound
+        is the cluster timeout plus slack — past that the task is gone,
+        not slow. A claim with no timestamp (taken before this field
+        existed) reads as NOT in flight: the alternative is a feed that
+        can never be recovered, which is the bug.
+        """
+        if self.status != "approving" or not self.approve_claimed_at:
+            return False
+        horizon = int(settings.Q_CLUSTER["timeout"]) + 5 * 60
+        return (timezone.now() - self.approve_claimed_at).total_seconds() < horizon

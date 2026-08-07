@@ -83,10 +83,28 @@
   </div>
 
   {% if feed.status == "approving" %}
-    <div class="notice mb-4 flex items-center gap-2.5">
-      <span class="dot dot-live"></span>
-      <span>Approval running — the worker is applying, committing, and pushing this feed. This page refreshes itself.</span>
-    </div>
+    {% if feed.approval_in_flight %}
+      <div class="notice mb-4 flex items-center gap-2.5">
+        <span class="dot dot-live"></span>
+        <span>Approval running — the worker is applying, committing, and pushing this feed. This page refreshes itself.</span>
+      </div>
+    {% else %}
+      <div class="notice mb-4">
+        <p class="font-medium">This approval never reported back.</p>
+        <p class="mt-1 text-sm">
+          It was claimed{% if feed.approve_claimed_at %} at {{ feed.approve_claimed_at|date:"Y-m-d H:i" }}{% endif %}
+          and the worker has been silent past its timeout — most likely it was restarted mid-apply.
+          Recovery checks the brain for a commit carrying this feed's <code>Feed-Id:</code> trailer:
+          if the push had already landed the feed is completed against that commit, otherwise it goes
+          back to pending for you to approve again. It runs automatically every ten minutes too.
+        </p>
+        <form method="post" x-data="{busy: false}" @submit="setTimeout(() => busy = true)" class="mt-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="recover" />
+          <button type="submit" :disabled="busy" class="btn-primary">Recover this approval</button>
+        </form>
+      </div>
+    {% endif %}
   {% endif %}
 
   {% if content %}
@@ -278,7 +296,11 @@
     {% endif %}
   {% endif %}
 
-  {% if feed.extraction_in_flight or feed.status == "approving" %}
+  {% comment %}
+    Only poll while something is actually running: a wedged `approving`
+    feed would otherwise reload every 5s forever, waiting on nobody.
+  {% endcomment %}
+  {% if feed.extraction_in_flight or feed.approval_in_flight %}
     {# Nonce REQUIRED — see the note in ops/tasks.html. #}
     <script nonce="{{ csp_nonce }}">setTimeout(function () { window.location.reload(); }, 5000);</script>
   {% endif %}

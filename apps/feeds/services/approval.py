@@ -540,7 +540,12 @@ def apply_feed(feed_id: int) -> str:
     feed.decided_at = timezone.now()
     feed.retries = attempts - 1
     feed.error = ""
-    feed.save(update_fields=["status", "commit_hash", "decided_at", "retries", "error"])
+    feed.approve_claimed_at = None
+    feed.save(
+        update_fields=[
+            "status", "commit_hash", "decided_at", "retries", "error", "approve_claimed_at",
+        ]
+    )
     emit(
         "feed",
         action="approved",
@@ -567,6 +572,114 @@ def apply_feed(feed_id: int) -> str:
     return f"approved as {commit[:12]} after {attempts} attempt(s) [{outcome}]"
 
 
+# ---- recovery for approvals that never reported back ---------------------
+
+
+def stuck_feeds(*, force: bool = False) -> list[Feed]:
+    """Feeds sitting in `approving` that no live worker can still be on."""
+    return [
+        f
+        for f in Feed.objects.filter(status="approving").order_by("pk")
+        if force or not f.approval_in_flight
+    ]
+
+
+def reconcile_stuck(*, force: bool = False) -> dict[str, int]:
+    """Resolve every Feed wedged in `approving`. Safe to run repeatedly.
+
+    Q2 on the Redis broker has no ack. A worker killed mid-approval loses
+    the task outright, and because every ops action requires `pending`,
+    the Feed becomes unreachable: it cannot be approved, rejected, edited
+    or retried, forever. The worst shape is a crash between a successful
+    `git push` and `feed.save` — the commit is in the brain and being
+    served, while the DB says `approving` with an empty `commit_hash`.
+
+    The `Feed-Id:` trailer settles it. If a commit on origin carries this
+    feed's trailer the approval DID land and the row is completed against
+    that commit; if none does, nothing was committed and the feed goes
+    back to `pending` for the operator to approve again.
+
+    Every write is a conditional `status="approving"` UPDATE, so a worker
+    that turns out to be alive after all wins the race rather than having
+    its result overwritten.
+
+    Content convergence is not this function's job: it moves DB rows to
+    match git, and `brain:sync` moves the clone to match origin.
+    """
+    feeds = stuck_feeds(force=force)
+    result = {"scanned": len(feeds), "recovered": 0, "returned": 0, "skipped": 0}
+    if not feeds:
+        return result
+
+    with gitrepo.repo_lock():
+        branch = gitrepo.run("rev-parse", "--abbrev-ref", "HEAD")
+        # The lost task may have pushed before it died, so judge against
+        # the origin as it stands now, not the clone as we last left it.
+        try:
+            gitrepo.run("fetch", *_fetch_args(branch), timeout=120)
+        except gitrepo.BrainRepoError:
+            log.warning(
+                "reconcile: fetch failed — judging against the last known origin",
+                exc_info=True,
+            )
+        for feed in feeds:
+            commit = landed_commit(feed.pk, branch)
+            if commit:
+                done = _finalize_recovered(feed, commit)
+                result["recovered" if done else "skipped"] += 1
+            else:
+                done = _finalize_lost(feed)
+                result["returned" if done else "skipped"] += 1
+
+    log.info(
+        "reconcile: scanned %s, recovered %s, returned to pending %s, skipped %s",
+        result["scanned"], result["recovered"], result["returned"], result["skipped"],
+    )
+    return result
+
+
+def _finalize_recovered(feed: Feed, commit: str) -> bool:
+    """The lost task had already pushed — record the commit it made."""
+    status = "edited" if feed.proposal_edited else "approved"
+    if not Feed.objects.filter(pk=feed.pk, status="approving").update(
+        status=status,
+        commit_hash=commit,
+        decided_at=timezone.now(),
+        error="",
+        approve_claimed_at=None,
+    ):
+        return False
+    emit(
+        "feed",
+        action="approved",
+        feed_id=feed.pk,
+        source_id=feed.source_id,
+        commit=commit,
+        retries=feed.retries,
+        edited=feed.proposal_edited,
+        outcome="reconciled",
+    )
+    return True
+
+
+def _finalize_lost(feed: Feed) -> bool:
+    """No commit carries this feed's trailer — the approval never landed."""
+    if not Feed.objects.filter(pk=feed.pk, status="approving").update(
+        status="pending",
+        decided_at=None,
+        approve_claimed_at=None,
+        error=(
+            "This approval was claimed but never reported back — the worker "
+            "was most likely restarted while it was running. Nothing was "
+            "committed: no commit in the brain carries this feed's "
+            "`Feed-Id:` trailer. Re-check the diff and approve again."
+        ),
+    ):
+        return False
+    emit("feed", action="approval_lost", feed_id=feed.pk, source_id=feed.source_id)
+    return True
+
+
 def _finalize_stale(feed: Feed, exc: StaleReview) -> None:
     """Back to `pending`, not `failed`.
 
@@ -580,7 +693,8 @@ def _finalize_stale(feed: Feed, exc: StaleReview) -> None:
     feed.status = "pending"
     feed.error = str(exc)[:2000]
     feed.decided_at = None
-    feed.save(update_fields=["status", "error", "decided_at"])
+    feed.approve_claimed_at = None
+    feed.save(update_fields=["status", "error", "decided_at", "approve_claimed_at"])
     emit(
         "feed",
         action="stale_review",
@@ -595,5 +709,8 @@ def _finalize_failed(feed: Feed, error: str, attempts: int = 0) -> None:
     feed.error = error[:2000]
     feed.decided_at = timezone.now()
     feed.retries = max(0, attempts - 1)
-    feed.save(update_fields=["status", "error", "decided_at", "retries"])
+    feed.approve_claimed_at = None
+    feed.save(
+        update_fields=["status", "error", "decided_at", "retries", "approve_claimed_at"]
+    )
     emit("feed", action="apply_failed", feed_id=feed.pk, source_id=feed.source_id, error=error[:500])

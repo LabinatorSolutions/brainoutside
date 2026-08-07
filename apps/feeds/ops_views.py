@@ -131,6 +131,25 @@ def feed_detail(request, pk: int):
 
 def _handle_action(request, feed: Feed) -> None:
     action = request.POST.get("action", "")
+
+    # The one action that exists BECAUSE the feed is not pending. Q2 has no
+    # ack on the Redis broker, so a worker restarted mid-apply leaves the
+    # feed in `approving` — a status every other action refuses, which
+    # made it permanently unreachable. This is the way out.
+    if action == "recover":
+        if feed.status != "approving":
+            messages.error(request, "This feed is not waiting on an approval.")
+        elif feed.approval_in_flight:
+            messages.info(
+                request, "The approval is still within its timeout — give it a moment."
+            )
+        else:
+            from apps.brainconfig import jobs, maintenance
+
+            started, message = jobs.enqueue(maintenance.RECONCILE_APPROVALS)
+            (messages.success if started else messages.error)(request, message)
+        return
+
     if feed.status != "pending":
         messages.error(request, f"Feed is {feed.status} — no further actions.")
         return
@@ -194,7 +213,11 @@ def _handle_action(request, feed: Feed) -> None:
             messages.error(request, "Proposal fails validation — fix or reject; approve stays disabled.")
             return
         # Atomic claim: double-clicks and racing tabs see 0 rows updated.
-        claimed = Feed.objects.filter(pk=feed.pk, status="pending").update(status="approving")
+        # The timestamp is what later tells "a worker is on it" from "the
+        # task was lost" — see `approval.reconcile_stuck`.
+        claimed = Feed.objects.filter(pk=feed.pk, status="pending").update(
+            status="approving", approve_claimed_at=timezone.now()
+        )
         if not claimed:
             messages.error(request, "Feed is already being applied.")
             return
@@ -203,7 +226,9 @@ def _handle_action(request, feed: Feed) -> None:
 
             async_task("apps.feeds.services.approval.apply_feed", feed_id=feed.pk)
         except Exception:
-            Feed.objects.filter(pk=feed.pk, status="approving").update(status="pending")
+            Feed.objects.filter(pk=feed.pk, status="approving").update(
+                status="pending", approve_claimed_at=None
+            )
             messages.error(request, "Could not reach the worker queue — approval not started.")
             return
         messages.success(

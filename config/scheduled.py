@@ -73,6 +73,16 @@ SCHEDULED_TASKS: list[ScheduledTask] = [
         func="apps.events.scheduled.run_prune_event_log",
         cron="41 3 * * *",
     ),
+    # Q2 on the Redis broker has no ack, so a worker killed mid-approval
+    # loses the task and the Feed sits in `approving` forever — a status
+    # every ops action refuses. That happens during a deploy, which is
+    # exactly when nobody is watching the feed queue. Cheap when there is
+    # nothing to do: no stuck feeds means no git call at all.
+    ScheduledTask(
+        name="feeds:reconcile-approvals",
+        func="apps.feeds.scheduled.run_reconcile_approvals",
+        cron="4-59/10 * * * *",
+    ),
 ]
 
 __all__ = ["ScheduledTask", "SCHEDULED_TASKS"]

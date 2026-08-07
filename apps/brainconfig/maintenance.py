@@ -51,9 +51,21 @@ SETUP_BUILD = JobSpec(
     label="Build the brain",
     task="apps.brainconfig.setup_services.run_build",
 )
+RECONCILE_APPROVALS = JobSpec(
+    name="reconcile_approvals",
+    label="Recover stuck approvals",
+    task="apps.feeds.scheduled.run_reconcile_approvals",
+)
 
 #: Everything the Tasks page knows how to display.
-ALL_JOBS = (SETUP_BUILD, VERIFY_READ, PULL_NOW, REBUILD_INDEX, REPLACE_CLONE)
+ALL_JOBS = (
+    SETUP_BUILD,
+    VERIFY_READ,
+    PULL_NOW,
+    REBUILD_INDEX,
+    REPLACE_CLONE,
+    RECONCILE_APPROVALS,
+)
 
 #: What the health page is allowed to start, by name.
 RUNNABLE = {j.name: j for j in (VERIFY_READ, PULL_NOW, REBUILD_INDEX, REPLACE_CLONE)}

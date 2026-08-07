@@ -420,19 +420,31 @@ async def _run_ledgered(
     return run
 
 
-async def test_connection_async(*, exempt_daily_cap: bool = True) -> RunResult:
+async def test_connection_async(
+    *, exempt_daily_cap: bool = True, candidate_key: str = ""
+) -> RunResult:
     """Minimal SDK ping for the Settings page 'Test connection' button.
 
     No tools, one turn, public-tier cwd — proves the whole chain works:
     key → CLI subprocess → API → usage accounting. Admin-triggered, so it
     is daily-cap-exempt by default (an operator debugging an outage must
     not be locked out by the breaker they're investigating).
+
+    `candidate_key` probes a credential that is NOT stored: the setup
+    wizard passes the pasted value so a failing key can be rejected
+    before anything persists it. Without it the probe reads the stored
+    key — the Settings-page behaviour.
     """
     from claude_agent_sdk import ClaudeAgentOptions
 
     from apps.brain.services import snapshots
 
-    api_key = await sync_to_async(_check_gates)(exempt_daily_cap=exempt_daily_cap)
+    if candidate_key:
+        # No stored-key gate to check: nothing is stored yet, and the
+        # wizard's probe is cap-exempt like every admin-triggered ping.
+        api_key = candidate_key
+    else:
+        api_key = await sync_to_async(_check_gates)(exempt_daily_cap=exempt_daily_cap)
     model = await sync_to_async(config.model_for)("reader")
     tier_path = snapshots.tier_dir("public")
     cwd = str(tier_path if tier_path.is_dir() else tier_path.parent)

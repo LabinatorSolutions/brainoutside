@@ -272,14 +272,18 @@ def _step_claude(request):
     result = request.session.pop("claude_result", None)
     if request.method == "POST":
         key = (request.POST.get("key") or "").strip()
-        if key:
-            cfg.set_value("ANTHROPIC_API_KEY", key, actor=request.user)
         action = request.POST.get("action", "")
         if action == "test":
             from apps.reader.services import sdk_runner
 
+            # Test the PASTED key before anything stores it — the write
+            # step's rule, applied here too. The step is marked done on
+            # key *presence*, so the old order (save, then test) meant a
+            # failing test still completed setup with a dead credential
+            # and nothing anywhere said so. A blank paste probes the
+            # stored key, the Settings-page behaviour.
             try:
-                run = sdk_runner.test_connection()
+                run = sdk_runner.test_connection(candidate_key=key)
                 request.session["claude_result"] = {
                     "ok": run.ok,
                     "model": run.model,
@@ -288,9 +292,15 @@ def _step_claude(request):
                     "output_tokens": run.usage.get("output_tokens"),
                     "error": run.error_class,
                 }
+                if run.ok and key:
+                    cfg.set_value("ANTHROPIC_API_KEY", key, actor=request.user)
             except Exception as exc:
                 request.session["claude_result"] = {"ok": False, "error": str(exc)}
             return redirect(request.path)
+        # Explicit continue: the operator chose to proceed without a
+        # test — presence completes the step, as documented on the page.
+        if key:
+            cfg.set_value("ANTHROPIC_API_KEY", key, actor=request.user)
         if cfg.get("ANTHROPIC_API_KEY"):
             return redirect("setup:step", slug="build")
         messages.error(request, "Paste a credential first.")

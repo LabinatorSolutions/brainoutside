@@ -74,8 +74,8 @@ def is_disabled(slug: str) -> bool:
             return cached == "1"
     except Exception:
         log.warning("endpoint_gating: cache read failed slug=%s", slug, exc_info=True)
-    # Lazy import — module loads at app start, before models are ready
-    # in some import orders (the resilience hook in apps.core.apps).
+    # Lazy import — this module loads at app start, before the app
+    # registry is populated in some import orders.
     from apps.core.models import EndpointFlag
 
     try:

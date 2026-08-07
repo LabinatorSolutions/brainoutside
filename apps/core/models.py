@@ -1,7 +1,7 @@
 """Framework-tier models for `apps.core`.
 
 apps.core is otherwise model-free — it owns the framework primitives
-(EndpointView, registry, security helpers, event bus, resilience).
+(EndpointView, registry, security helpers, event bus).
 The Idempotency-Key surface is the first thing here that needs
 durable per-row state (one row per (user, key) pair, 24h TTL), so
 this module exists to give it a home without dropping it into a

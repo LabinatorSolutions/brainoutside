@@ -9,6 +9,7 @@ page renders and what SdkRunner reads (PLAN.md §3 `apps/brainconfig`).
 """
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -255,11 +256,17 @@ def sdk_timeout_seconds() -> int:
 def daily_cost_cap() -> Decimal | None:
     """The breaker threshold, or None when disabled (value ≤ 0).
 
-    Disabling is always explicit: an unparseable or CLEARED value falls
-    back to the safe default, never to "off"."""
+    Disabling is always explicit: an unparseable, non-finite or CLEARED
+    value falls back to the safe default, never to "off"."""
     try:
         cap = Decimal(get("DAILY_COST_CAP"))
     except InvalidOperation:
+        return Decimal("10.00")
+    if not cap.is_finite():
+        # Decimal("nan") constructs without complaint and then raises
+        # InvalidOperation on its first comparison — which sat OUTSIDE
+        # this guard, so one stored "nan" 500'd every SDK run and the
+        # usage dashboard. NaN and ±Infinity are not thresholds.
         return Decimal("10.00")
     return None if cap <= 0 else cap
 
@@ -273,6 +280,11 @@ def _kind(kind: str) -> str:
 
 def _as_float(raw: str, fallback: float) -> float:
     try:
-        return float(raw)
+        value = float(raw)
     except ValueError:
         return fallback
+    # float("nan") parses, and NaN compares False with everything — a
+    # NaN budget is a soft cap that simply never trips, with no error
+    # anywhere. Infinity is "no cap" by stealth. Same rule as
+    # daily_cost_cap: fall back to the safe default, never to "off".
+    return value if math.isfinite(value) else fallback

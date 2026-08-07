@@ -23,6 +23,8 @@
       {% for link in nav_links %}
         <a href="{{ link.url }}" class="text-muted hover:text-ink">{{ link.label }}</a>
       {% endfor %}
+      {# Ops hides this whole bar at lg, so the sidebar carries its own copy. #}
+      {% include "partials/_theme_toggle.html" %}
     </nav>
   </div>
 </header>

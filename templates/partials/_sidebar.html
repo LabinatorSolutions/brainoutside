@@ -8,12 +8,17 @@
 <aside class="fixed inset-y-0 start-0 z-40 w-64 overflow-y-auto border-e border-line bg-surface-2 transition-transform duration-200 lg:translate-x-0"
        :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
        aria-label="Sidebar">
-  <div class="flex h-14 items-center border-b border-line px-4 font-display font-semibold">
+  <div class="flex h-14 items-center gap-2 border-b border-line px-4 font-display font-semibold">
     {# brand_url: the ops dashboard for staff, docs home for public readers. #}
-    <a href="{{ brand_url|default:'/docs/' }}" class="flex items-center gap-2">
+    <a href="{{ brand_url|default:'/docs/' }}" class="flex min-w-0 items-center gap-2">
       {% include "partials/_brand_mark.html" with size="h-5 w-5" %}
-      {{ APP_NAME }}
+      <span class="truncate">{{ APP_NAME }}</span>
     </a>
+    {% comment %}
+      The topbar is lg:hidden on ops, so on desktop this is the only
+      toggle on the page. -me-1 pulls it back to the padding edge.
+    {% endcomment %}
+    <span class="-me-1 ms-auto">{% include "partials/_theme_toggle.html" %}</span>
   </div>
   <nav class="px-3 pb-8">
     {% for section in nav_sections %}

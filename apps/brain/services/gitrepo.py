@@ -144,7 +144,14 @@ def _git(*args: str, cwd: Path | None = None, timeout: int = 300) -> str:
             cwd=str(cwd) if cwd else None,
             env=_git_env(),
             capture_output=True,
-            text=True,
+            # Explicit, not `text=True` alone: bare text decodes with the
+            # host locale, which on a Windows host is cp1252 — git's UTF-8
+            # output (any em dash, any accented name) arrives mangled.
+            # The containers are UTF-8 and never noticed. `replace` so a
+            # stray non-UTF-8 byte degrades one character instead of
+            # raising an exception no caller of _git() expects.
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
         )
     except FileNotFoundError as exc:

@@ -82,6 +82,16 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # 503 + Retry-After while the operator has maintenance mode on. Sits
+    # here because `request.user.is_staff` is the bypass condition, so it
+    # cannot run before AuthenticationMiddleware — and because a request
+    # that is going to 503 should not first go through message storage,
+    # clickjacking headers and the setup redirect.
+    #
+    # It was written, exported from `apps.core.security`, given a flag
+    # store with a DB-backed cache, a branded template and an audit
+    # call — and never listed here. Flipping the flag did nothing at all.
+    "apps.core.security.MaintenanceModeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Sends an unowned or unfinished install to /setup/. After auth, since

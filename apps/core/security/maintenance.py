@@ -1,24 +1,32 @@
 """Maintenance-mode middleware.
 
 When `apps.core.maintenance.is_enabled()` returns True, every request
-is short-circuited to a branded 503 page UNLESS:
+is short-circuited to a 503 UNLESS:
 
-- the request path is on the bypass list (`/healthz`, `/readyz`,
-  `/static/`, `/media/`),
-- OR the request targets the admin URL prefix (so an operator who
-  toggled it on can also toggle it back off — staff 2FA setup,
-  Settings page, etc.),
-- OR the resolved user is `is_staff` (so staff can keep using the
-  user-facing site to verify their changes during the window).
+- the request path is on the bypass list (health checks, static, and
+  every door the operator needs to get back in — see `_is_bypass_path`),
+- OR the resolved user is `is_staff` (the operator keeps browsing the
+  whole site, so they can verify whatever the window was for).
 
-Returns 503 with `Retry-After: 60` and a generic body so external
-health checks see the right semantics.
+Returns `Retry-After: 60` and `Cache-Control: no-store` either way. The
+body depends on who asked: a branded HTML page for a browser, and the
+project's JSON error envelope under `/api/` and `/mcp/`, because a
+consumer that parses every other error as JSON should not get an HTML
+blob for this one.
 
-Position in MIDDLEWARE: AFTER `AuthenticationMiddleware` so we can
-read `request.user.is_staff`, BEFORE the request reaches user-facing
-views. Sits below `OTPMiddleware` for parity with the rest of the
-auth-aware chain — staff identity is the bypass condition, the 2FA
-flag is irrelevant here.
+Position in MIDDLEWARE: AFTER `AuthenticationMiddleware`, since
+`request.user` is the bypass condition, and before the request reaches
+a view.
+
+**Getting back out.** The bypass list is the whole safety story here. A
+maintenance flag that locks the operator out of the page that turns it
+off is worse than no maintenance flag, so the list is derived from
+settings rather than hardcoded: `ADMIN_PANEL_URL_PATH`,
+`DJANGO_ADMIN_URL_PATH`, `LOGIN_URL`, logout, and `/setup/`. The
+original list had a hardcoded `/auth/` inherited from the template,
+which is not a route in this project — the login page is at `LOGIN_URL`
+— so a logged-out operator who turned maintenance on could not have
+signed back in to turn it off.
 """
 from __future__ import annotations
 
@@ -27,7 +35,7 @@ from typing import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.conf import settings
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 
 from apps.core import maintenance
@@ -40,32 +48,47 @@ _BYPASS_PREFIXES = (
     "/static/",
     "/media/",
     "/.well-known/",
+    # The operator's own doors. `/setup/` matters because an install can
+    # be mid-setup when the flag is flipped, and the setup middleware
+    # would otherwise bounce them into a 503.
+    "/logout/",
+    "/setup/",
 )
 
+# Surfaces whose entire error contract is JSON. `apps.core.rest` and the
+# MCP proxy both answer `{"error": {"code", "message"}}` for every other
+# failure mode.
+_JSON_PREFIXES = ("/api/", "/mcp/", "/mcp")
 
-def _admin_prefix() -> str:
-    raw = getattr(settings, "ADMIN_PANEL_URL_PATH", "") or ""
-    return ("/" + raw.strip("/") + "/") if raw else ""
+
+def _settings_prefix(name: str) -> str:
+    """`/<value>/` for a settings key holding a bare URL path segment."""
+    raw = getattr(settings, name, "") or ""
+    return ("/" + str(raw).strip("/") + "/") if raw else ""
 
 
-def _django_admin_prefix() -> str:
-    raw = getattr(settings, "DJANGO_ADMIN_URL_PATH", "") or ""
-    return ("/" + raw.strip("/") + "/") if raw else ""
+def _login_prefix() -> str:
+    raw = str(getattr(settings, "LOGIN_URL", "") or "")
+    if not raw or not raw.startswith("/"):
+        return ""
+    return raw if raw.endswith("/") else raw + "/"
 
 
 def _is_bypass_path(path: str) -> bool:
     if any(path.startswith(p) for p in _BYPASS_PREFIXES):
         return True
-    admin = _admin_prefix()
-    if admin and path.startswith(admin):
-        return True
-    django_admin = _django_admin_prefix()
-    if django_admin and path.startswith(django_admin):
-        return True
-    # Auth flow stays open so staff can sign in to flip the flag back.
-    if path.startswith("/auth/"):
-        return True
+    for prefix in (
+        _settings_prefix("ADMIN_PANEL_URL_PATH"),
+        _settings_prefix("DJANGO_ADMIN_URL_PATH"),
+        _login_prefix(),
+    ):
+        if prefix and path.startswith(prefix):
+            return True
     return False
+
+
+def _wants_json(path: str) -> bool:
+    return path.startswith(_JSON_PREFIXES)
 
 
 def _user_is_staff(request: HttpRequest) -> bool:
@@ -73,23 +96,50 @@ def _user_is_staff(request: HttpRequest) -> bool:
     return bool(user and user.is_authenticated and getattr(user, "is_staff", False))
 
 
+def _stamp(response: HttpResponse) -> HttpResponse:
+    response["Retry-After"] = "60"
+    response["Cache-Control"] = "no-store"
+    return response
+
+
 def _render_503(request: HttpRequest) -> HttpResponse:
+    message = maintenance.get_message()
+
+    if _wants_json(request.path or ""):
+        # Matches the envelope every other error on these surfaces uses.
+        return _stamp(
+            JsonResponse(
+                {"error": {"code": "maintenance", "message": message}},
+                status=503,
+            )
+        )
+
     # Local import: apps/core is the vendored framework and must not gain a
     # module-level dependency on a brain app.
     from apps.brainconfig import services as brainconfig_services
 
-    body = render_to_string(
-        "errors/maintenance.html",
-        {
-            "APP_NAME": brainconfig_services.app_name(),
-            "maintenance_message": maintenance.get_message(),
-        },
-        request=request,
+    try:
+        body = render_to_string(
+            "errors/maintenance.html",
+            {
+                "APP_NAME": brainconfig_services.app_name(),
+                "maintenance_message": message,
+            },
+            request=request,
+        )
+    except Exception:
+        # The maintenance window may be *for* whatever broke the template
+        # loader or the settings table. Answering 503 is the job; the
+        # branding is not.
+        log.exception("maintenance: 503 template render failed")
+        return _stamp(
+            HttpResponse(
+                message, status=503, content_type="text/plain; charset=utf-8"
+            )
+        )
+    return _stamp(
+        HttpResponse(body, status=503, content_type="text/html; charset=utf-8")
     )
-    response = HttpResponse(body, status=503, content_type="text/html; charset=utf-8")
-    response["Retry-After"] = "60"
-    response["Cache-Control"] = "no-store"
-    return response
 
 
 class MaintenanceModeMiddleware:

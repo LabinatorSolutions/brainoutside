@@ -142,4 +142,66 @@
       </button>
     </div>
   </form>
+
+  {% comment %}
+    Maintenance mode. Its own <form>, a sibling of the save form above —
+    nesting would be illegal HTML and the browser would drop the inner
+    one. Same hidden-input-carries-the-action pattern as Test connection,
+    for the same reason: a submitter disabled during submit is excluded
+    from the form data, so a button whose name/value was the action would
+    post without one.
+
+    Placed last and styled apart because it is the one control on this
+    page that changes what the outside world sees. Everything above it is
+    configuration; this is a switch.
+  {% endcomment %}
+  <section class="card mt-4 xl:mt-6">
+    <div class="card-header">
+      <h2 class="card-title">Maintenance mode</h2>
+      {% if maintenance_on %}
+        <span class="badge badge-danger">ON — consumers are being turned away</span>
+      {% else %}
+        <span class="badge badge-muted">off</span>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <p class="max-w-2xl text-xs text-muted">
+        While this is on, every consumer — API keys, connector URLs, and
+        anonymous visitors — gets a 503 with <span class="font-mono">Retry-After: 60</span>.
+        Browsers see a branded page; <span class="font-mono">/api/</span> and
+        <span class="font-mono">/mcp/</span> get the usual JSON error envelope.
+        You keep full access: this page, the Django admin, the login page,
+        logout and <span class="font-mono">/setup/</span> are never blocked, so
+        you can always turn it back off.
+      </p>
+      <form method="post" class="mt-4 space-y-3"
+            x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="maintenance" />
+        <label class="field">
+          <span class="field-label" for="maintenance_message">Banner message</span>
+          <input type="text" id="maintenance_message" name="maintenance_message"
+                 maxlength="500" autocomplete="off"
+                 placeholder="{{ maintenance_message }}"
+                 class="field-input" />
+          <span class="mt-1 block text-xs text-muted">
+            Shown on the 503 page. Leave blank to keep the current one.
+          </span>
+        </label>
+        <div class="flex flex-wrap items-center gap-3">
+          {% if maintenance_on %}
+            <button type="submit" class="btn-signal" :disabled="busy">
+              Turn maintenance off
+            </button>
+          {% else %}
+            {# The checkbox is what `enabled` reads; a bare submit posts it absent, i.e. off. #}
+            <input type="checkbox" name="enabled" value="on" id="enabled" class="sr-only" checked />
+            <button type="submit" class="btn-danger" :disabled="busy">
+              Turn maintenance on
+            </button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </section>
 {% endblock %}

@@ -12,6 +12,8 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
+from apps.core import maintenance as maintenance_mode
+from apps.core.security.client_ip import client_ip
 from apps.reader.services import sdk_runner
 
 from . import services
@@ -72,6 +74,8 @@ def settings_page(request):
         action = request.POST.get("action", "save")
         if action == "test_connection":
             return _test_connection(request)
+        if action == "maintenance":
+            return _set_maintenance(request)
         _save(request)
         return redirect(request.path)
 
@@ -104,9 +108,44 @@ def settings_page(request):
             "sections": _sectioned(rows),
             "today_cost": sdk_runner.today_cost_usd(),
             "test_result": request.session.pop("test_result", None),
+            "maintenance_on": maintenance_mode.is_enabled(),
+            "maintenance_message": maintenance_mode.get_message(),
             **ops_context(request),
         },
     )
+
+
+def _set_maintenance(request):
+    """Flip maintenance mode. The only way to reach the flag.
+
+    It had a store, a cache, a middleware, a branded 503 page and an audit
+    call, and no surface anywhere that could set it — so it was off
+    forever. Lives on Settings rather than Health because it is a stored
+    value, not an action on the world; Health is for re-clone and rotate.
+
+    Turning it ON does not lock the operator out: `/ops/`, the Django
+    admin, `LOGIN_URL`, logout and `/setup/` are all on the middleware's
+    bypass list, so this page stays reachable to turn it back off.
+    """
+    enabled = request.POST.get("enabled") == "on"
+    raw_message = (request.POST.get("maintenance_message") or "").strip()
+    maintenance_mode.set_enabled(
+        enabled,
+        # Empty means "leave the current banner alone", matching the
+        # store's own contract — not "blank the message".
+        message=raw_message[:500] or None,
+        actor=request.user,
+        request_id=getattr(request, "request_id", "") or "",
+        ip=client_ip(request),
+    )
+    if enabled:
+        messages.success(
+            request,
+            "Maintenance mode is ON. Consumers get 503; you keep full access.",
+        )
+    else:
+        messages.success(request, "Maintenance mode is OFF. The server is serving again.")
+    return redirect(request.path)
 
 
 def _save(request) -> None:

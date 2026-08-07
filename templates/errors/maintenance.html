@@ -14,11 +14,21 @@
   {{ maintenance_message }}
 {% endblock %}
 
+{% comment %}
+  "Try again" was a <button @click="window.location.reload()">. Alpine
+  never bound it: this page has no x-data ancestor, and the enforced CSP
+  drops the handler regardless. It rendered as a button that did nothing.
+
+  An anchor back to the same URL reloads with no JavaScript at all, which
+  is what this page should be made of — it is served when things are
+  already going wrong, and a 503 that depends on a script bundle having
+  loaded is the wrong bet.
+{% endcomment %}
 {% block error_actions %}
   <div class="mt-8 flex flex-wrap justify-center gap-2">
     {% if STATUS_PAGE_URL %}
       <a href="{{ STATUS_PAGE_URL }}" class="btn btn-secondary text-sm" target="_blank" rel="noopener">{% trans "Status page" %}</a>
     {% endif %}
-    <button type="button" @click="window.location.reload()" class="btn btn-primary text-sm">{% trans "Try again" %}</button>
+    <a href="{{ request.get_full_path }}" class="btn btn-primary text-sm">{% trans "Try again" %}</a>
   </div>
 {% endblock %}

@@ -183,11 +183,23 @@ def logs(request):
     # get_page clamps junk and out-of-range values instead of 404ing.
     paginator = Paginator(events_qs, LOGS_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get("page"))
+    # `credential` is resolved HERE, not in the template. The template
+    # had `{{ row.e.consumer|default:row.e.details.via|default:"—" }}`,
+    # and Django resolves a filter ARGUMENT strictly: a missing key
+    # raises VariableDoesNotExist instead of rendering empty, the way a
+    # missing `{{ variable }}` does. Most event types carry no `via` at
+    # all — `settings_change`, `csp_violation`, `endpoint_error` — so one
+    # of those anywhere in the window 500'd the whole page. Same
+    # expression as `activity.json` above, which never had the problem
+    # because it does the lookup in Python.
     event_rows = [
         {
             "e": e,
             "details_json": json.dumps(e.details, ensure_ascii=False, default=str)[:300],
             "n_entities": len(e.entity_ids or []),
+            "credential": (
+                str(e.consumer) if e.consumer else ((e.details or {}).get("via") or "")
+            ),
         }
         for e in page_obj
     ]

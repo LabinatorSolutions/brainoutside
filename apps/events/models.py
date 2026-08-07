@@ -21,6 +21,11 @@ class Event(models.Model):
         ("auth_denied", "auth_denied"),
         ("settings_change", "settings_change"),
         ("degraded", "degraded"),
+        # A request died, or a browser reported a CSP violation. Written
+        # by `apps.events.sinks.record_error` via the `apps.core.error_hook`
+        # bridge. Distinct from `degraded`, which means a subsystem
+        # recovered (a feed extraction retried and went on).
+        ("error", "error"),
     ]
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)

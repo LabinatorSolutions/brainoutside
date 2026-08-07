@@ -144,16 +144,86 @@
   </form>
 
   {% comment %}
-    Maintenance mode. Its own <form>, a sibling of the save form above —
+    Endpoint switches. One small <form> per row, siblings of the save
+    form above — nesting would be illegal HTML and the browser would drop
+    the inner ones. The hidden input carries the action for the same
+    reason Test connection's does: a submitter disabled during submit is
+    excluded from the form data.
+
+    This card and Maintenance mode below are the page's switches — the
+    controls that change what the outside world sees. Everything above
+    them is configuration.
+  {% endcomment %}
+  <section class="card mt-4 xl:mt-6">
+    <div class="card-header">
+      <h2 class="card-title">Endpoints</h2>
+      <span class="text-xs text-muted">runtime kill switch — no redeploy</span>
+    </div>
+    {% for row in endpoint_rows %}
+      <div class="card-row grid gap-x-6 gap-y-3 xl:grid-cols-12">
+        <div class="min-w-0 xl:col-span-5">
+          <div class="font-mono text-sm font-medium">{{ row.slug }}</div>
+          {% if row.registered %}
+            <p class="mt-1.5 max-w-md text-xs text-muted">{{ row.description }}</p>
+            <div class="mt-0.5 font-mono text-xs text-muted">{{ row.versions }}</div>
+          {% else %}
+            <p class="mt-1.5 max-w-md text-xs text-warn-ink">
+              No endpoint is registered under this slug any more — the flag
+              is left over from an old version. It gates nothing today, but
+              would apply again if the slug ever comes back.
+            </p>
+          {% endif %}
+        </div>
+
+        <div class="min-w-0 xl:col-span-4">
+          <div class="mb-1 text-xs font-medium uppercase tracking-wide text-muted xl:hidden">Status</div>
+          {% if row.disabled %}
+            <span class="badge badge-danger">disabled</span>
+            {% if row.reason %}<div class="mt-1.5 text-sm">{{ row.reason }}</div>{% endif %}
+            <div class="mt-1.5 text-xs text-muted">
+              {% if row.updated_at %}since {{ row.updated_at|date:"M j, H:i" }}{% endif %}
+              {% if row.updated_by %}by {{ row.updated_by }}{% endif %}
+            </div>
+          {% else %}
+            <span class="badge badge-ok">serving</span>
+          {% endif %}
+        </div>
+
+        <div class="min-w-0 xl:col-span-3">
+          {% if row.disabled %}
+            <form method="post" x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="endpoint" />
+              <input type="hidden" name="slug" value="{{ row.slug }}" />
+              <input type="hidden" name="disabled" value="0" />
+              <button type="submit" class="btn-signal btn-sm" :disabled="busy">Enable</button>
+            </form>
+          {% else %}
+            <form method="post" class="flex flex-wrap items-center gap-2"
+                  x-data="{busy: false}" @submit="setTimeout(() => busy = true)">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="endpoint" />
+              <input type="hidden" name="slug" value="{{ row.slug }}" />
+              <input type="hidden" name="disabled" value="1" />
+              <input type="text" name="reason" maxlength="200" autocomplete="off"
+                     placeholder="why (shown here until re-enabled)"
+                     class="field-input min-w-0 flex-1 text-xs" />
+              <button type="submit" class="btn-danger-ghost btn-sm" :disabled="busy">Disable</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+
+  {% comment %}
+    Maintenance mode — the whole-site switch; the per-endpoint ones are
+    in the card above. Its own <form>, a sibling of the save form —
     nesting would be illegal HTML and the browser would drop the inner
     one. Same hidden-input-carries-the-action pattern as Test connection,
     for the same reason: a submitter disabled during submit is excluded
     from the form data, so a button whose name/value was the action would
     post without one.
-
-    Placed last and styled apart because it is the one control on this
-    page that changes what the outside world sees. Everything above it is
-    configuration; this is a switch.
   {% endcomment %}
   <section class="card mt-4 xl:mt-6">
     <div class="card-header">

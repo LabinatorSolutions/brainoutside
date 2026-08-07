@@ -41,7 +41,7 @@ Match on `error.code` (stable across versions) and surface
 | Status | `error.code` | What happened | What to do |
 |---|---|---|---|
 | `500` | `internal_error` | The endpoint raised. Nothing is notified automatically — the traceback is in the server log | Find the `X-Request-ID` in `docker compose logs web` |
-| `503` | `endpoint_disabled` | This endpoint was switched off on the server | Re-enable it: `manage.py shell -c "from apps.core import endpoint_gating; endpoint_gating.set_disabled('<slug>', False)"` |
+| `503` | `endpoint_disabled` | This endpoint was switched off on the server | Re-enable it in the Endpoints card on `/ops/settings/` |
 
 ## Validation-error body shape
 

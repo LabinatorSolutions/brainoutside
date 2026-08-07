@@ -165,8 +165,8 @@ def list_flags() -> list[FlagRow]:
 
 
 def disabled_slugs() -> set[str]:
-    """Bulk lookup used by the Endpoints list page so the page render
-    doesn't fan out one cache.get per row. One DB query, no cache."""
+    """Bulk lookup used by the MCP proxy's `tools/list` filter so one
+    listing doesn't fan out a cache.get per tool. One DB query, no cache."""
     from apps.core.models import EndpointFlag
 
     try:

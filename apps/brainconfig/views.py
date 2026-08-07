@@ -12,7 +12,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods
 
+from apps.core import endpoint_gating
 from apps.core import maintenance as maintenance_mode
+from apps.core.registry import registry
 from apps.core.security.client_ip import client_ip
 from apps.reader.services import sdk_runner
 
@@ -76,6 +78,8 @@ def settings_page(request):
             return _test_connection(request)
         if action == "maintenance":
             return _set_maintenance(request)
+        if action == "endpoint":
+            return _set_endpoint(request)
         _save(request)
         return redirect(request.path)
 
@@ -110,6 +114,7 @@ def settings_page(request):
             "test_result": request.session.pop("test_result", None),
             "maintenance_on": maintenance_mode.is_enabled(),
             "maintenance_message": maintenance_mode.get_message(),
+            "endpoint_rows": _endpoint_rows(),
             **ops_context(request),
         },
     )
@@ -145,6 +150,97 @@ def _set_maintenance(request):
         )
     else:
         messages.success(request, "Maintenance mode is OFF. The server is serving again.")
+    return redirect(request.path)
+
+
+def _endpoint_rows() -> list[dict]:
+    """Registered endpoints merged with their persisted disable flags.
+
+    One row per slug, not per (slug, version): `is_disabled` gates on the
+    bare slug in both the REST view and the MCP proxy, so disabling
+    `get-note` takes every version of it offline — the row says so.
+
+    Flags whose slug is no longer in the registry (the endpoint was
+    renamed or removed after the flag was written) still render, marked
+    stale: a disabled=True orphan is invisible otherwise, yet springs
+    back to life the moment the slug returns.
+    """
+    flags = {f.slug: f for f in endpoint_gating.list_flags()}
+    by_slug: dict[str, list] = {}
+    for spec in registry.all():
+        by_slug.setdefault(spec.slug, []).append(spec)
+
+    rows = []
+    for slug, specs in sorted(by_slug.items()):
+        flag = flags.pop(slug, None)
+        rows.append(
+            {
+                "slug": slug,
+                "versions": ", ".join(s.version for s in specs),
+                "description": specs[0].description,
+                "disabled": bool(flag and flag.disabled),
+                "reason": flag.reason if flag else "",
+                "updated_at": flag.updated_at if flag else None,
+                "updated_by": flag.updated_by_email if flag else "",
+                "registered": True,
+            }
+        )
+    for slug, flag in sorted(flags.items()):
+        rows.append(
+            {
+                "slug": slug,
+                "versions": "",
+                "description": "",
+                "disabled": flag.disabled,
+                "reason": flag.reason,
+                "updated_at": flag.updated_at,
+                "updated_by": flag.updated_by_email,
+                "registered": False,
+            }
+        )
+    return rows
+
+
+def _set_endpoint(request):
+    """Flip the runtime disable flag for one endpoint.
+
+    Same story as maintenance mode one function up: the flag had a DB
+    model, a Redis cache, an audit call and enforcement in the REST view
+    and the MCP proxy — and `set_disabled` had zero callers, so the only
+    way to take a buggy endpoint offline was a Django shell. This is the
+    switch. Lives on Settings for the same reason maintenance does: it is
+    a stored value, not an action on the world.
+    """
+    slug = (request.POST.get("slug") or "").strip()
+    disable = request.POST.get("disabled") == "1"
+    reason = (request.POST.get("reason") or "").strip()
+
+    # Known = registered now, or carrying a flag row from when it was.
+    # The second half is what lets an orphaned flag be switched back off;
+    # anything else would let a typo mint junk rows.
+    known = {spec.slug for spec in registry.all()}
+    if slug not in known and not any(f.slug == slug for f in endpoint_gating.list_flags()):
+        messages.error(request, f"Unknown endpoint {slug!r}.")
+        return redirect(request.path)
+
+    changed = endpoint_gating.set_disabled(
+        slug,
+        disable,
+        reason=reason,
+        actor=request.user,
+        request_id=getattr(request, "request_id", "") or "",
+        ip=client_ip(request),
+    )
+    if not changed:
+        messages.info(request, f"{slug} was already {'disabled' if disable else 'enabled'}.")
+    elif disable:
+        messages.success(
+            request,
+            f"{slug} is disabled — REST calls get 503 and the MCP tool is "
+            f"hidden. Cached gates catch up within 30 seconds.",
+        )
+    else:
+        messages.success(request, f"{slug} is serving again.")
     return redirect(request.path)
 
 

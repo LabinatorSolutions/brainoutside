@@ -25,6 +25,7 @@ text for the generated index) — never status/visibility (grill B7).
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -36,6 +37,8 @@ from django.db import transaction
 
 from apps.brain.models import Entity, SyncRun
 from apps.brain.services import gitrepo
+
+log = logging.getLogger(__name__)
 
 KNOWLEDGE_TYPES = {"takes": "take", "stories": "story", "lessons": "lesson", "facts": "fact"}
 
@@ -64,17 +67,30 @@ class ParsedEntity:
     content_hash: str = ""
 
 
-def split_frontmatter(text: str) -> tuple[dict, str]:
+def parse_frontmatter(text: str) -> tuple[dict, str, bool]:
+    """(frontmatter, body, malformed).
+
+    `malformed` is True only when a `---` block IS present but does not
+    yield a YAML mapping. That distinction matters: a file with no block at
+    all is legitimate (catalogs have none), but a block the author wrote
+    and we could not read must not be treated as "no metadata" — see
+    `_resolve_visibility`, which fails closed on it.
+    """
     m = _FRONTMATTER_RE.match(text)
     if not m:
-        return {}, text
+        return {}, text, False
     try:
         fm = yaml.safe_load(m.group(1)) or {}
     except yaml.YAMLError:
-        fm = {}
+        return {}, text[m.end():], True
     if not isinstance(fm, dict):
-        fm = {}
-    return fm, text[m.end():]
+        return {}, text[m.end():], True
+    return fm, text[m.end():], False
+
+
+def split_frontmatter(text: str) -> tuple[dict, str]:
+    fm, body, _malformed = parse_frontmatter(text)
+    return fm, body
 
 
 def _title_of(body: str, fallback: str) -> str:
@@ -125,7 +141,19 @@ def _harvest_index_descriptions(repo: Path) -> dict[str, str]:
     return out
 
 
-def _resolve_visibility(explicit: object, default: str) -> str:
+def _resolve_visibility(explicit: object, default: str, *, malformed: bool = False) -> str:
+    """Explicit frontmatter wins; otherwise the path default.
+
+    When the frontmatter block exists but could not be parsed we cannot
+    know what the author asked for, so we fall back to the MOST restrictive
+    tier rather than the path default. Previously a YAML typo (or a UTF-8
+    BOM, which stopped the block matching at all) silently turned a note
+    marked `visibility: private` into the path default `agents-only` — and
+    then copied it into the agents-only snapshot and served it. A file that
+    fails to parse must never become more visible than it was.
+    """
+    if malformed:
+        return "private"
     v = str(explicit).strip() if explicit else ""
     return v if v in {"public", "agents-only", "private"} else default
 
@@ -136,17 +164,27 @@ def parse_repo() -> list[ParsedEntity]:
     descriptions = _harvest_index_descriptions(repo)
     entities: list[ParsedEntity] = []
 
-    def read(p: Path) -> tuple[dict, str, str]:
+    def read(p: Path) -> tuple[dict, str, str, bool]:
         raw = p.read_bytes()
-        fm, body = split_frontmatter(raw.decode("utf-8", errors="replace"))
-        return fm, body, _sha256(raw)
+        # utf-8-sig, not utf-8: a UTF-8 BOM (Notepad's default for years)
+        # survived the decode and sat before the opening `---`, so
+        # _FRONTMATTER_RE never matched and every field -- including
+        # `visibility` -- was silently lost. content_hash still hashes the
+        # raw bytes, BOM included.
+        fm, body, malformed = parse_frontmatter(raw.decode("utf-8-sig", errors="replace"))
+        if malformed:
+            log.warning(
+                "unparseable frontmatter in %s — indexing it as private",
+                p.relative_to(repo).as_posix(),
+            )
+        return fm, body, _sha256(raw), malformed
 
     # --- knowledge notes ---
     for folder, kind in KNOWLEDGE_TYPES.items():
         for p in sorted((repo / "knowledge" / folder).glob("*.md")):
             if p.name == "_TEMPLATE.md":
                 continue
-            fm, body, digest = read(p)
+            fm, body, digest, malformed = read(p)
             rel = p.relative_to(repo).as_posix()
             entities.append(
                 ParsedEntity(
@@ -157,7 +195,7 @@ def parse_repo() -> list[ParsedEntity]:
                     description=descriptions.get(rel, ""),
                     status=str(fm.get("status") or "current"),
                     superseded_by=str(fm.get("superseded_by") or "") if fm.get("superseded_by") else "",
-                    visibility=_resolve_visibility(fm.get("visibility"), "agents-only"),
+                    visibility=_resolve_visibility(fm.get("visibility"), "agents-only", malformed=malformed),
                     topics=as_list(fm.get("topics")),
                     projects=as_list(fm.get("projects")),
                     source=str(fm.get("source") or ""),
@@ -171,7 +209,7 @@ def parse_repo() -> list[ParsedEntity]:
     for p in sorted((repo / "projects").glob("*.md")):
         if p.name == "_TEMPLATE.md":
             continue
-        fm, body, digest = read(p)
+        fm, body, digest, malformed = read(p)
         rel = p.relative_to(repo).as_posix()
         entities.append(
             ParsedEntity(
@@ -181,7 +219,7 @@ def parse_repo() -> list[ParsedEntity]:
                 title=_title_of(body, p.stem),
                 description=descriptions.get(rel, ""),
                 status="current",
-                visibility=_resolve_visibility(fm.get("visibility"), "agents-only"),
+                visibility=_resolve_visibility(fm.get("visibility"), "agents-only", malformed=malformed),
                 topics=as_list(fm.get("topics")),
                 last_verified=_parse_date(fm.get("last-verified")),
                 content_hash=digest,
@@ -192,7 +230,7 @@ def parse_repo() -> list[ParsedEntity]:
     for p in sorted((repo / "identity").glob("*.md")):
         if p.name == "_TEMPLATE.md":
             continue
-        fm, body, digest = read(p)
+        fm, body, digest, malformed = read(p)
         rel = p.relative_to(repo).as_posix()
         entities.append(
             ParsedEntity(
@@ -201,7 +239,7 @@ def parse_repo() -> list[ParsedEntity]:
                 path=rel,
                 title=_title_of(body, p.stem),
                 description=descriptions.get(rel, ""),
-                visibility=_resolve_visibility(fm.get("visibility"), "agents-only"),
+                visibility=_resolve_visibility(fm.get("visibility"), "agents-only", malformed=malformed),
                 last_verified=_parse_date(fm.get("last-verified")),
                 content_hash=digest,
             )
@@ -211,7 +249,7 @@ def parse_repo() -> list[ParsedEntity]:
     for p in sorted((repo / "lenses").glob("*.md")):
         if p.name == "_TEMPLATE.md":
             continue
-        fm, body, digest = read(p)
+        fm, body, digest, malformed = read(p)
         rel = p.relative_to(repo).as_posix()
         entities.append(
             ParsedEntity(
@@ -220,7 +258,7 @@ def parse_repo() -> list[ParsedEntity]:
                 path=rel,
                 title=_title_of(body, p.stem),
                 description=descriptions.get(rel, ""),
-                visibility=_resolve_visibility(fm.get("visibility"), "public"),
+                visibility=_resolve_visibility(fm.get("visibility"), "public", malformed=malformed),
                 topics=as_list(fm.get("topics")),
                 content_hash=digest,
             )

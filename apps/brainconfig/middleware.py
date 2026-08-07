@@ -44,6 +44,16 @@ class SetupRequiredMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         self._ops_prefix = "/" + (settings.ADMIN_PANEL_URL_PATH or "ops/").strip("/") + "/"
+        # The settings page is exempt from the unfinished-setup redirect.
+        # Completion is DERIVED (see setup_state), so clearing a required
+        # value — the ANTHROPIC_API_KEY "clear" checkbox on that very
+        # page — used to flip `is_complete()` and eject the operator from
+        # the whole ops UI, including the one page that edits stored
+        # settings. Same rule as the maintenance-mode bypass list: the
+        # switch you would use to undo a state must survive that state.
+        # Everything else still routes to the wizard, which is built for
+        # the incomplete case.
+        self._settings_prefix = self._ops_prefix + "settings/"
 
     def __call__(self, request):
         path = request.path
@@ -52,7 +62,9 @@ class SetupRequiredMiddleware:
 
             if setup_state.needs_first_admin():
                 return redirect("setup:home")
-            if path.startswith(self._ops_prefix):
+            if path.startswith(self._ops_prefix) and not path.startswith(
+                self._settings_prefix
+            ):
                 user = getattr(request, "user", None)
                 if (
                     user is not None

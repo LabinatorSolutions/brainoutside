@@ -156,7 +156,7 @@ def logs(request):
     event log grows without bound, and a flat newest-200 cap silently
     hid everything older."""
     from apps.brainconfig import services as config
-    from apps.reader.services.sdk_runner import today_cost_usd
+    from apps.reader.services.sdk_runner import today_cost_usd, today_unpriced
 
     try:
         days = int(request.GET.get("days") or 7)
@@ -212,6 +212,11 @@ def logs(request):
     today_cost = today_cost_usd()
     cap = config.daily_cost_cap()  # None = breaker disabled (cap 0)
     cap_pct = min(100, round(today_cost / float(cap) * 100)) if cap else None
+    # Runs that burned tokens but never reported a cost (timeout, client
+    # disconnect). Real spend the cap cannot see — shown rather than
+    # priced, because a made-up dollar figure inside a breaker is worse
+    # than an admitted blind spot.
+    unpriced = today_unpriced()
 
     return render(
         request,
@@ -230,6 +235,7 @@ def logs(request):
             "today_cost": today_cost,
             "cap": cap,
             "cap_pct": cap_pct,
+            "unpriced": unpriced,
             **ops_context(request),
         },
     )

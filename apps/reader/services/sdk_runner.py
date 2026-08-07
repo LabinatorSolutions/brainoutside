@@ -95,6 +95,92 @@ def today_cost_usd() -> float:
     return float(total or 0)
 
 
+def today_unpriced() -> dict[str, int]:
+    """Today's finished runs that burned tokens but produced no cost.
+
+    A run that timed out, or whose client hung up, never receives the
+    ResultMessage carrying `total_cost_usd` — so the spend is real and
+    `today_cost_usd()` cannot see any of it. The breaker was therefore
+    measuring against incomplete data with nothing saying so.
+
+    Reporting the gap is the honest alternative to inventing a number
+    for it: pricing is per-model and changes, and a made-up dollar
+    figure inside a spend breaker is worse than an admitted blind spot.
+    """
+    from django.db.models import Count, Q, Sum
+
+    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    agg = (
+        SdkOperation.objects.filter(
+            created_at__gte=start, cost_usd__isnull=True, finished_at__isnull=False
+        )
+        .filter(Q(input_tokens__gt=0) | Q(output_tokens__gt=0))
+        .aggregate(
+            runs=Count("id"),
+            input_tokens=Sum("input_tokens"),
+            output_tokens=Sum("output_tokens"),
+        )
+    )
+    return {
+        "runs": agg["runs"] or 0,
+        "input_tokens": agg["input_tokens"] or 0,
+        "output_tokens": agg["output_tokens"] or 0,
+    }
+
+
+#: Input-side counters the Anthropic `message_start` payload carries.
+_PARTIAL_INPUT_KEYS = (
+    "input_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
+)
+
+
+class _PartialUsage:
+    """Token counts accumulated from raw stream events as they arrive.
+
+    `StreamEvent.event` is the raw Anthropic streaming payload, and those
+    carry usage even though no `ResultMessage` has been seen yet:
+    `message_start` has the turn's input and cache counts, `message_delta`
+    carries the running output count for the turn in progress. A run cut
+    short by a timeout or a disconnect used to record no usage at all, so
+    the ledger showed zero tokens for work that really consumed them.
+
+    Output counts are per-turn and cumulative WITHIN a turn, so each turn
+    is banked when the next `message_start` arrives rather than summed as
+    it grows. Cost is deliberately not derived from any of this.
+    """
+
+    def __init__(self) -> None:
+        self.totals = dict.fromkeys(_PARTIAL_INPUT_KEYS, 0)
+        self.output_tokens = 0
+        self._turn_output = 0
+
+    def observe(self, event: dict) -> None:
+        kind = event.get("type")
+        if kind == "message_start":
+            self._bank_turn()
+            usage = ((event.get("message") or {}).get("usage")) or {}
+            for key in _PARTIAL_INPUT_KEYS:
+                self.totals[key] += int(usage.get(key) or 0)
+            self._turn_output = int(usage.get("output_tokens") or 0)
+        elif kind == "message_delta":
+            usage = event.get("usage") or {}
+            if usage.get("output_tokens") is not None:
+                self._turn_output = int(usage["output_tokens"])
+
+    def _bank_turn(self) -> None:
+        self.output_tokens += self._turn_output
+        self._turn_output = 0
+
+    def as_usage(self) -> dict[str, int]:
+        """Accumulated counts in the shape `ResultMessage.usage` uses."""
+        self._bank_turn()
+        out = dict(self.totals)
+        out["output_tokens"] = self.output_tokens
+        return out if any(out.values()) else {}
+
+
 def _auth_env(api_key: str) -> dict[str, str]:
     """Map the stored credential to the env var the CLI expects.
 
@@ -114,11 +200,24 @@ def _check_gates(*, exempt_daily_cap: bool) -> str:
     if not api_key:
         raise NotConfigured("ANTHROPIC_API_KEY is not configured")
     cap = config.daily_cost_cap()  # None = breaker disabled (cap set to 0)
-    if not exempt_daily_cap and cap is not None and today_cost_usd() >= float(cap):
-        raise DailyCapExceeded(
-            f"daily cost cap {cap} USD reached — raise DAILY_COST_CAP, "
-            "set it to 0 to disable the breaker, or wait for tomorrow"
-        )
+    if not exempt_daily_cap and cap is not None:
+        unpriced = today_unpriced()
+        if unpriced["runs"]:
+            # Not a refusal: this is real spend the breaker is blind to,
+            # and the operator has to know the cap is being measured
+            # against incomplete data. /ops/logs/ shows the same figure.
+            log.warning(
+                "sdk runner: %s run(s) today consumed %s tokens that could not "
+                "be priced (no ResultMessage) — the daily cap is being checked "
+                "against incomplete spend",
+                unpriced["runs"],
+                unpriced["input_tokens"] + unpriced["output_tokens"],
+            )
+        if today_cost_usd() >= float(cap):
+            raise DailyCapExceeded(
+                f"daily cost cap {cap} USD reached — raise DAILY_COST_CAP, "
+                "set it to 0 to disable the breaker, or wait for tomorrow"
+            )
     return api_key
 
 
@@ -441,6 +540,7 @@ async def stream_agent(
     chunks: list[str] = []
     read_paths: list[str] = []
     model = ""
+    partial = _PartialUsage()
     started = _time.monotonic()
     stream = query(prompt=prompt, options=options)
     client_gone = False
@@ -468,6 +568,10 @@ async def stream_agent(
                 break
             if isinstance(message, StreamEvent):
                 ev = message.event or {}
+                # Bank usage as it arrives: a run cut short by a timeout
+                # or a disconnect never sees the ResultMessage that
+                # carries it, and used to record no tokens at all.
+                partial.observe(ev)
                 if ev.get("type") == "content_block_delta":
                     delta = ev.get("delta") or {}
                     if delta.get("type") == "text_delta" and delta.get("text"):
@@ -518,6 +622,11 @@ async def stream_agent(
         if not client_gone:
             await _aclose(stream)
         run.read_paths = read_paths
+        # Only when the run never produced its own totals — a completed
+        # ResultMessage is authoritative and must not be overwritten by
+        # the partials that led up to it.
+        if not run.usage:
+            run.usage = partial.as_usage()
         op.finished_at = timezone.now()
         op.ok = run.ok
         op.error_class = run.error_class

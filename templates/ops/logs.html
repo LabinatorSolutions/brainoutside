@@ -52,6 +52,20 @@
       {% else %}
         <div class="text-xs text-muted">Breaker disabled — set a daily cap in <a class="link-accent" href="{% url 'brainconfig:settings' %}">Settings</a> to arm it</div>
       {% endif %}
+      {% comment %}
+        Runs that burned tokens and never reported a cost — a timeout, or
+        a browser that hung up mid-stream. That spend is real and the
+        figure above cannot see it, so the gap is stated rather than
+        priced: per-model pricing changes, and a made-up dollar amount
+        inside a circuit breaker is worse than an admitted blind spot.
+      {% endcomment %}
+      {% if unpriced.runs %}
+        <div class="mt-1 text-xs text-warn-ink">
+          Not counted above: {{ unpriced.runs }} run{{ unpriced.runs|pluralize }} used
+          {{ unpriced.input_tokens|add:unpriced.output_tokens }} tokens the CLI never priced
+          (timed out or disconnected).
+        </div>
+      {% endif %}
     </div>
 
     <div class="stat-tile">

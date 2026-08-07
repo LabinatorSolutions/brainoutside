@@ -117,8 +117,25 @@ async def _drain(**kw):
     return out
 
 
-def _run(coro):
-    return asyncio.run(asyncio.wait_for(coro, timeout=20))
+def _run(coro_fn):
+    """Drive an async generator from a sync test, in THIS thread.
+
+    `asyncio.run` would push every `sync_to_async` DB call onto asgiref's
+    executor thread, which has its own connection — so the ledger rows
+    would commit for real and leak into every later test instead of
+    rolling back with this one. Under `async_to_sync`, `sync_to_async`
+    with its default `thread_sensitive=True` runs the callable back in
+    the calling thread, inside the test transaction.
+
+    The 20s guard is the safety net for the bug under test: unfixed,
+    `stream_agent` never returns at all.
+    """
+    from asgiref.sync import async_to_sync
+
+    async def _guarded():
+        return await asyncio.wait_for(coro_fn(), timeout=20)
+
+    return async_to_sync(_guarded)()
 
 
 class TestAWedgedCliDoesNotHang:
@@ -128,7 +145,7 @@ class TestAWedgedCliDoesNotHang:
         stream = _Stream([], stall_after=0)
         stub_sdk.query = lambda **kw: stream
 
-        events = _run(_drain())
+        events = _run(_drain)
 
         kind, run = events[-1]
         assert kind == "result"
@@ -138,7 +155,7 @@ class TestAWedgedCliDoesNotHang:
         stream = _Stream([_delta("hel"), _delta("lo")], stall_after=2)
         stub_sdk.query = lambda **kw: stream
 
-        events = _run(_drain())
+        events = _run(_drain)
 
         assert ("delta", "hel") in events
         assert events[-1][1].error_class == "Timeout"
@@ -149,7 +166,7 @@ class TestAWedgedCliDoesNotHang:
         )
         stub_sdk.query = lambda **kw: stream
 
-        run = _run(_drain())[-1][1]
+        run = _run(_drain)[-1][1]
 
         assert run.text == "partial answer"
 
@@ -157,7 +174,7 @@ class TestAWedgedCliDoesNotHang:
         stream = _Stream([], stall_after=0)
         stub_sdk.query = lambda **kw: stream
 
-        _run(_drain())
+        _run(_drain)
 
         assert stream.closed is True
 
@@ -165,7 +182,7 @@ class TestAWedgedCliDoesNotHang:
         stream = _Stream([], stall_after=0)
         stub_sdk.query = lambda **kw: stream
 
-        _run(_drain())
+        _run(_drain)
 
         op = SdkOperation.objects.latest("id")
         assert op.ok is False
@@ -185,7 +202,7 @@ class TestNormalStreamingIsUnchanged:
         )
         stub_sdk.query = lambda **kw: stream
 
-        events = _run(_drain())
+        events = _run(_drain)
 
         assert [e for e in events if e[0] == "delta"] == [("delta", "he"), ("delta", "llo")]
         assert events[-1][0] == "result"
@@ -203,7 +220,7 @@ class TestNormalStreamingIsUnchanged:
         )
         stub_sdk.query = lambda **kw: stream
 
-        run = _run(_drain())[-1][1]
+        run = _run(_drain)[-1][1]
 
         assert run.read_paths == ["/data/brain-views/public/a.md"]
 
@@ -211,7 +228,7 @@ class TestNormalStreamingIsUnchanged:
         stream = _Stream([ResultMessage()])
         stub_sdk.query = lambda **kw: stream
 
-        _run(_drain())
+        _run(_drain)
 
         assert stream.closed is True
 
@@ -219,7 +236,7 @@ class TestNormalStreamingIsUnchanged:
         stream = _Stream([ResultMessage()])
         stub_sdk.query = lambda **kw: stream
 
-        _run(_drain())
+        _run(_drain)
 
         op = SdkOperation.objects.latest("id")
         assert op.ok is True
@@ -236,7 +253,7 @@ class TestNormalStreamingIsUnchanged:
 
         stub_sdk.query = lambda **kw: Boom()
 
-        run = _run(_drain())[-1][1]
+        run = _run(_drain)[-1][1]
 
         assert run.ok is False
         assert run.error_class == "RuntimeError"

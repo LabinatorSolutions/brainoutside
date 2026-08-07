@@ -19,9 +19,12 @@ rather than facts, so both are stored explicitly:
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from apps.core import runtime_setting_store as store
+
+log = logging.getLogger(__name__)
 
 KEY_WRITE_SKIPPED = "setup.write_skipped"
 KEY_READ_VERIFIED_URL = "setup.read_verified_url"
@@ -218,8 +221,29 @@ def is_complete(states: list[dict] | None = None) -> bool:
 
 
 def needs_first_admin() -> bool:
-    """No operator account exists — the app is unusable and unowned."""
-    return not _safe(has_admin)
+    """No operator account exists — the app is unusable and unowned.
+
+    Deliberately **not** `_safe`. `_safe` reads a raising predicate as
+    not-done, which is right for a checklist and inverted here: `not
+    _safe(has_admin)` turns one `OperationalError` into "nobody owns
+    this server". That answer unlocks things. `SetupRequiredMiddleware`
+    redirects every human-facing route to the wizard on it, and
+    `setup_views.step()` dispatches the account step without its staff
+    guard on it — so a connection-pool hiccup would replace an
+    established install with "Create your account", offered to whoever
+    happened to be looking.
+
+    So this one fails closed: assume an owner exists, and let the page
+    that genuinely needs the database raise on its own terms.
+    """
+    try:
+        return not has_admin()
+    except Exception:
+        log.exception(
+            "setup: could not determine whether an operator account exists; "
+            "assuming one does"
+        )
+        return False
 
 
 # ---- Build-step progress ------------------------------------------------

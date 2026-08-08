@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a change to the engine.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        One honest expectation up front: BrainOutside is single-user and
+        single-brain **by design** — multi-tenancy, user management and team
+        features are out of scope, kindly. Everything else is fair game,
+        and proposals that start from a real problem you hit get the most
+        traction.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What were you trying to do when you hit the wall?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: >-
+        The change you have in mind. If you're unsure of the shape, describe
+        the outcome — the architecture in docs/PLAN.md has opinions about
+        the how.
+    validations:
+      required: true

@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Brain repo / contract questions
+    url: https://github.com/hassancs91/brainoutside-template/discussions
+    about: >-
+      Note kinds, frontmatter, lenses, the CLAUDE.md contract — the brain
+      format lives in the template repo, so questions about it belong there.
+  - name: Security issue
+    url: https://github.com/hassancs91/brainoutside/blob/main/docs/SECURITY.md#reporting-a-vulnerability
+    about: Please do not open a public issue for vulnerabilities — see the reporting section.

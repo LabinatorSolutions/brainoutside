@@ -1,0 +1,49 @@
+name: Bug report
+description: Something broke on your BrainOutside server.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thanks — reports from real self-hosted deployments are the most
+        valuable input this project gets. Two pages usually contain the
+        answer: `/ops/health/` and your container logs.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what happened instead?
+      placeholder: |
+        1. Approved a feed on /ops/feeds/…
+        2. Expected the commit to land on my brain repo
+        3. The feed shows "failed" with …
+    validations:
+      required: true
+  - type: textarea
+    id: health
+    attributes:
+      label: /ops/health/ and logs
+      description: >-
+        The relevant lines from `/ops/health/` and `docker compose logs web`
+        (or `worker`/`mcp` if the problem is there). Redact anything you
+        consider private — but note the server never logs credentials or
+        note content.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Version / commit
+      description: The image tag or `git rev-parse HEAD` of your deployment.
+    validations:
+      required: true
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: How is it deployed?
+      options:
+        - Coolify
+        - docker compose (no Coolify)
+        - dev stack (dev.sh / dev.ps1)
+        - other
+    validations:
+      required: true

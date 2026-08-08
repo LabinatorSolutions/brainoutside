@@ -9,9 +9,18 @@ visibility tiers enforced server-side and a human gate on every write.
 Single-user and single-brain by design. That is the product, not a
 limitation waiting to be fixed.
 
-> Status: pre-release. The engine is built and running; the setup
-> experience described in [`docs/SETUP-DESIGN.md`](docs/SETUP-DESIGN.md)
-> is being implemented before the public beta.
+**Two ways to run a brain, one repo between them.** Start local:
+clone [brainoutside-template](https://github.com/hassancs91/brainoutside-template),
+open it in VS Code, and Claude Code is the whole interface — free,
+private, zero infrastructure. Or self-host this server as the brain's
+online head, so every agent you run anywhere can read your mind over
+MCP and REST. They compose: the local repo IS the repo the server
+clones. Start local today, add the server when you want it, migrate
+nothing. Site and docs: [brainoutside.com](https://brainoutside.com).
+
+> Status: pre-release. The engine and the first-run wizard are built
+> and verified end to end; what remains before the public beta is
+> packaging, docs, and launch assets.
 
 ## Where this came from
 
@@ -43,6 +52,13 @@ Building mine, I kept hitting four walls, and they became this project:
 
 The llm-wiki was not the only influence; if you recognize your project
 in this lineage and want a link here, open an issue.
+
+The server itself grew out of my
+[MCP API boilerplate](https://learnwithhasan.com/boilerplates/mcp-api-boilerplate/)
+— a Django starter that already had the REST + MCP plumbing, API keys
+and self-documenting endpoint pages wired up. That heritage is why you
+may occasionally find a feature the brain doesn't use; they get removed
+as they're found, and a report is welcome.
 
 ## Why not just use a vector database
 
@@ -97,8 +113,12 @@ without API billing.
 
 ## Getting started
 
-Not yet — the first-run wizard lands with the beta. Until then the manual
-path is [`docs/DEPLOY.md`](docs/DEPLOY.md).
+The 10-minute path is [`docs/INSTALL.md`](docs/INSTALL.md): two
+environment variables, `docker compose up`, and the `/setup` wizard
+does the rest in the browser — account, brain repo from the template,
+deploy key, write credential, Claude credential, first build. No
+terminal after the compose command. On Coolify it is shorter still:
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Your brain repo
 
@@ -114,33 +134,36 @@ you have to clean out.
 
 | | |
 |---|---|
-| [`docs/PLAN.md`](docs/PLAN.md) | Full architecture, data model, security posture, milestones |
-| [`docs/SETUP-DESIGN.md`](docs/SETUP-DESIGN.md) | How setup and deployment are being rebuilt for the beta |
+| [`docs/INSTALL.md`](docs/INSTALL.md) | Installing: compose happy path, Coolify pointer, updating |
+| [`docs/DEPLOY.md`](docs/DEPLOY.md) | The full Coolify runbook — proxy/CDN client IPs, backups, webhook |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | The honest security posture, and how to report a vulnerability |
+| [`docs/PLAN.md`](docs/PLAN.md) | Full architecture, data model, milestones |
 | [`docs/OPEN-SOURCE.md`](docs/OPEN-SOURCE.md) | Running release checklist |
-| [`docs/DEPLOY.md`](docs/DEPLOY.md) | Current (manual) Coolify runbook |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Ground rules, dev stack, tests, guardrails |
 
 ## Running it locally
 
-```powershell
-.\dev.ps1
+```sh
+./dev.sh        # macOS / Linux
+.\dev.ps1       # Windows — same commands
 ```
 
 Builds on first run and starts web + mcp + worker + postgres + redis,
 waits for the healthcheck, prints the URLs. Same containers as the
-deploy; only `docker-compose.local.yml` differs. A bash/Makefile twin is
-coming with the beta.
+deploy; only `docker-compose.local.yml` differs.
 
 | Command | |
 |---|---|
-| `.\dev.ps1` | build if needed, start everything, wait for health |
-| `.\dev.ps1 reload [svc]` | restart app containers — picks up code, no rebuild |
-| `.\dev.ps1 rebuild [-NoCache]` | rebuild images and recreate containers |
-| `.\dev.ps1 down [-Volumes]` | stop and remove (`-Volumes` also drops the DB) |
-| `.\dev.ps1 logs [svc]` / `ps` / `status` | follow logs / container state / `+ /readyz` |
-| `.\dev.ps1 shell [svc]` / `manage <args>` / `superuser` | bash in / `manage.py` in / create a login |
+| `./dev.sh` | build if needed, start everything, wait for health |
+| `./dev.sh reload [svc]` | restart app containers — picks up code, no rebuild |
+| `./dev.sh rebuild [--no-cache]` | rebuild images and recreate containers |
+| `./dev.sh down [--volumes]` | stop and remove (`--volumes` also drops the DB) |
+| `./dev.sh logs [svc]` / `ps` / `status` | follow logs / container state / `+ /readyz` |
+| `./dev.sh shell [svc]` / `manage <args>` / `superuser` | bash in / `manage.py` in / create a login |
+| `./dev.sh css [--watch]` | rebuild the committed Tailwind artifact |
 
 Source edits are live — the repo is bind-mounted, so `web` reloads
-itself. `mcp` and `worker` need `.\dev.ps1 reload`. Only a
+itself. `mcp` and `worker` need `./dev.sh reload`. Only a
 `requirements.txt` or `Dockerfile` change needs `rebuild`.
 
 App on <http://localhost:8000>, Postgres on `localhost:5433`, Redis on

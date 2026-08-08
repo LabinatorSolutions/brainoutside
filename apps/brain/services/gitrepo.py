@@ -51,6 +51,18 @@ CONTRACT_PATHS: tuple[str, ...] = (
     "knowledge",
 )
 
+#: The contract THIS server speaks, matching the `contract-version` in
+#: `brain-template/CLAUDE.md` (a test pins them together). A brain is a
+#: copy of that template and never auto-updates — we have no push access
+#: to it — so this constant and the number in someone's clone are the
+#: only way to notice they have drifted apart.
+#:
+#: Bump when an existing brain would be SERVED DIFFERENTLY by this
+#: server. An additive section that defaults to off changes nothing for a
+#: brain that omits it and is not a bump; a renamed field, a new required
+#: one, or a changed default is.
+CONTRACT_VERSION = "1.0"
+
 LOCK_TIMEOUT_SECONDS = 120
 
 
@@ -292,7 +304,14 @@ def head_sha() -> str:
 
 
 def verify_contract() -> None:
-    """Fail loudly when the clone is missing the operating contract."""
+    """Fail loudly when the clone is missing the operating contract.
+
+    Deliberately says nothing about `contract-version`: this is the
+    function that refuses to serve, and `/readyz` gates on it. A brain
+    written against an older contract is still a brain, and taking the
+    server down over a number would be a worse failure than the drift.
+    `contract_version_probe()` is the warn-only counterpart.
+    """
     d = repo_dir()
     missing = [p for p in CONTRACT_PATHS if not (d / p).exists()]
     if missing:
@@ -301,6 +320,66 @@ def verify_contract() -> None:
             f"Missing: {', '.join(missing)}. "
             "Did the brain repo push include CLAUDE.md/.claude/lenses?"
         )
+
+
+def read_contract_version(text: str) -> str:
+    """The `contract-version` declared in a CLAUDE.md, "" when absent.
+
+    Never raises: an absent, keyless or malformed frontmatter block all
+    read as undeclared, which the caller reports as "unknown" rather than
+    treating as current. The value is stringified because
+    `contract-version: 1.0` unquoted is a YAML *float*, and a version
+    that renames itself to "1" on the way through is worse than none.
+    """
+    # Deferred: `indexer` imports this module at module scope, and the
+    # five-dialect frontmatter parser lives there. Reusing it beats a
+    # second parser that drifts.
+    from apps.brain.services.indexer import parse_frontmatter
+
+    try:
+        fm, _body, _malformed = parse_frontmatter(text)
+    except Exception:  # pragma: no cover - parse_frontmatter swallows its own
+        return ""
+    value = fm.get("contract-version")
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _version_tuple(value: str) -> tuple[int, ...] | None:
+    parts = value.split(".")
+    try:
+        return tuple(int(p) for p in parts)
+    except ValueError:
+        return None
+
+
+def contract_version_probe() -> dict[str, str]:
+    """Compare the clone's declared contract to the one we speak.
+
+    Warn-only by construction — it returns a state, never raises, and no
+    caller is allowed to turn any state into a refusal. States:
+    `ok`, `older`, `newer`, `unknown` (undeclared or unparseable).
+    """
+    info = {"server": CONTRACT_VERSION, "brain": "", "state": "unknown"}
+    try:
+        text = (repo_dir() / "CLAUDE.md").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return info
+    declared = read_contract_version(text)
+    info["brain"] = declared
+    if not declared:
+        return info
+    theirs, ours = _version_tuple(declared), _version_tuple(CONTRACT_VERSION)
+    if theirs is None or ours is None:
+        return info
+    if theirs == ours:
+        info["state"] = "ok"
+    elif theirs < ours:
+        info["state"] = "older"
+    else:
+        info["state"] = "newer"
+    return info
 
 
 def bootstrap() -> dict[str, str]:
@@ -401,6 +480,9 @@ def status_probe() -> dict[str, object]:
             info["contract_ok"] = not missing
             if missing:
                 info["contract_missing"] = missing
+            # Reported beside `contract_ok`, never folded into it: readyz
+            # gates on that flag and a version drift must not close it.
+            info["contract_version"] = contract_version_probe()
             origin = origin_probe()
             info["origin_ok"] = origin["ok"]
             if not origin["ok"]:

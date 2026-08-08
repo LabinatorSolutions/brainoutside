@@ -213,6 +213,50 @@ def check_clone() -> dict:
                   f"HEAD {str(probe.get('head', ''))[:12]}")
 
 
+def check_contract_version() -> dict:
+    """Does the clone speak the contract this server was built against?
+
+    Never "danger". Your brain is a copy of the template taken on the day
+    you made it, and nothing can push an update into it — so an old
+    contract is an ordinary state of affairs, not a fault. The value here
+    is naming it, because the symptom otherwise arrives as some unrelated
+    field being ignored.
+    """
+    from apps.brain.services import gitrepo
+
+    probe = gitrepo.contract_version_probe()
+    server, brain, state = probe["server"], probe["brain"], probe["state"]
+
+    if state == "ok":
+        return _check("contract_version", "ok", f"Brain contract {server}",
+                      "Your brain declares the contract this server speaks.")
+    if state == "unknown":
+        return _check(
+            "contract_version", "warn", "Your brain does not declare a contract version",
+            (f"This server speaks contract {server}. The clone's CLAUDE.md has no "
+             "readable `contract-version` in its frontmatter"
+             + (f" (it reads {brain!r})" if brain else "")
+             + ". Brains created before the field existed look like this. Nothing "
+             "is broken; the server simply cannot tell you whether your contract "
+             "has fallen behind."),
+        )
+    if state == "older":
+        return _check(
+            "contract_version", "warn", f"Your brain is on contract {brain}, this server speaks {server}",
+            (f"Your brain was created from a {brain} template and never updated — "
+             "which is normal, since nothing can push changes into your repo. "
+             "Compare your CLAUDE.md against the current template and bring across "
+             "what you want. The server keeps serving either way."),
+        )
+    return _check(
+        "contract_version", "warn", f"Your brain is on contract {brain}, ahead of this server's {server}",
+        (f"The clone declares {brain} but this server was built against {server}, so "
+         "it may ignore parts of your contract it does not know about. This usually "
+         "means the brain was updated and the server image was not — upgrade the "
+         "server."),
+    )
+
+
 def check_ahead_of_github() -> dict:
     from apps.brain.services import gitcreds, gitrepo
 
@@ -314,6 +358,7 @@ def all_checks(request) -> list[dict]:
         ("debug", check_debug),
         ("secrets", check_unreadable_secrets),
         ("clone", check_clone),
+        ("contract_version", check_contract_version),
         ("ahead", check_ahead_of_github),
         ("write", check_write_credential),
         ("webhook", check_webhook),

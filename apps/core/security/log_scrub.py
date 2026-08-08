@@ -9,10 +9,17 @@ front of uvicorn.
 Three coordinated mitigations land in this module:
 
 1. **`URLTokenScrubMiddleware`** — runs BEFORE `RequestIdMiddleware` so
-   no inner middleware ever sees a dirty path. Stashes the plaintext
-   token at `request._url_token_plain` (only the proxy view reads it),
-   and rewrites `request.path` / `request.path_info` /
-   `META["PATH_INFO"]` to the `mcpurl_<8>***` shape.
+   its attributes are published before any inner middleware runs. It
+   stashes the plaintext token at `request._url_token_plain` (only the
+   proxy view reads it) and publishes a scrubbed copy of the path at
+   `request._scrubbed_path`.
+
+   It does NOT rewrite `request.path`, `request.path_info` or
+   `META["PATH_INFO"]` — see the class docstring for why that would 404
+   the very route this protects. **`request.path` stays dirty for the
+   whole request**, so any new code that persists a path must read
+   `_scrubbed_path`, and anything that logs `request.path` relies on
+   `ScrubLogFilter` (3) to catch it downstream.
 
 2. **`scrub_url_token(s)`** — pure regex helper, exported so the JSON
    log formatter's pre-filter and Sentry's `before_send` hook can

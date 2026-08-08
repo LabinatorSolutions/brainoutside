@@ -144,8 +144,10 @@ The first-run wizard's account step is open to anyone who can reach the
 server **until the first operator account exists**, because something has
 to bootstrap the first identity without a terminal. That window is one
 page wide (no other step is reachable), it closes permanently the moment
-you create the account, and the app logs a warning on every boot while it
-is still open. Create your account before you point DNS at the box.
+you create the account, and the app logs a loud warning the first time
+anything reaches it while the window is still open — once per process,
+not once per request, so it is visible rather than buried. Create your
+account before you point DNS at the box.
 
 ---
 

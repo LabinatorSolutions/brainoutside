@@ -17,9 +17,46 @@ redirects would report a broken server as healthy.
 """
 from __future__ import annotations
 
+import logging
+
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.conf import settings
 from django.shortcuts import redirect
+
+log = logging.getLogger(__name__)
+
+#: Latched so an open window costs one log line per process, not one per
+#: request. An unclaimed server can sit for days; a warning that scrolls
+#: is a warning nobody reads.
+_open_window_warned = False
+
+
+def reset_open_window_warning() -> None:
+    """Test hook — the latch is module state and outlives a test case."""
+    global _open_window_warned
+    _open_window_warned = False
+
+
+def _warn_open_window() -> None:
+    """Say, once, that anyone who can reach this box can claim it.
+
+    SECURITY.md promises this warning. It is emitted here rather than from
+    `AppConfig.ready()` because `ready()` runs before the database is
+    reliably available, and querying there is a well-known way to build an
+    app that cannot start. The middleware already asks the question on the
+    way through, so the answer costs nothing.
+    """
+    global _open_window_warned
+    if _open_window_warned:
+        return
+    _open_window_warned = True
+    log.warning(
+        "SETUP IS UNCLAIMED: no operator account exists, so anyone who can "
+        "reach this server can create the first one and take ownership of "
+        "the ops UI — every private note and every stored credential. "
+        "Create your account now, before this box is publicly reachable. "
+        "This warning stops once the account exists."
+    )
 
 #: Prefixes that must answer normally even with nothing configured.
 _EXEMPT_PREFIXES = (
@@ -92,6 +129,7 @@ class SetupRequiredMiddleware:
         from apps.brainconfig import setup_state
 
         if setup_state.needs_first_admin():
+            _warn_open_window()
             return redirect("setup:home")
         path = request.path
         if path.startswith(self._ops_prefix) and not path.startswith(

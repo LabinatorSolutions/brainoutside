@@ -27,7 +27,13 @@ from apps.core import runtime_setting_store as store
 log = logging.getLogger(__name__)
 
 KEY_WRITE_SKIPPED = "setup.write_skipped"
+KEY_CLAUDE_SKIPPED = "setup.claude_skipped"
 KEY_READ_VERIFIED_URL = "setup.read_verified_url"
+
+#: Steps an operator may decline. The stored decision lives under
+#: `setup.<slug>_skipped` — see the module docstring on why a *decision*
+#: cannot be derived the way a fact can.
+SKIPPABLE = ("write", "claude")
 
 #: The Build step is one of the named ops jobs (`jobs.py`), so it shows up
 #: on the Tasks page next to every other background action instead of
@@ -52,8 +58,15 @@ STEPS: tuple[Step, ...] = (
          "Install a read-only deploy key so the server can clone and pull."),
     Step("write", "Let the server write back",
          "A token so approved feeds can be pushed to GitHub.", optional=True),
+    # Optional, and measured rather than assumed: on a keyless install
+    # ping, get-identity, get-index, list-notes, get-note, get-lens and
+    # propose-feed all answer 200. Only assemble-context needs the key,
+    # and it says so cleanly. Marking it required made `is_complete()`
+    # permanently False, and the middleware bounced a fully built brain
+    # back into the wizard — an operator could not reach their dashboard.
     Step("claude", "Connect Claude",
-         "An API key, or a Claude subscription token — no API billing."),
+         "An API key, or a Claude subscription token — no API billing.",
+         optional=True),
     Step("build", "Build your brain",
          "Clone, index, and materialise the per-tier snapshots."),
 )
@@ -120,6 +133,14 @@ def set_write_skipped(skipped: bool) -> None:
     store.set_value(KEY_WRITE_SKIPPED, "1" if skipped else "")
 
 
+def claude_skipped() -> bool:
+    return bool(store.get_str(KEY_CLAUDE_SKIPPED, ""))
+
+
+def set_claude_skipped(skipped: bool) -> None:
+    store.set_value(KEY_CLAUDE_SKIPPED, "1" if skipped else "")
+
+
 def claude_configured() -> bool:
     from apps.brainconfig import services as cfg
 
@@ -163,6 +184,9 @@ _PREDICATES = {
 # ---- aggregate ----------------------------------------------------------
 
 
+_SKIP_FLAGS = {"write": write_skipped, "claude": claude_skipped}
+
+
 def step_states() -> list[dict]:
     """Every step with `done` / `skipped`, in order."""
     out = []
@@ -175,7 +199,10 @@ def step_states() -> list[dict]:
             "blurb": s.blurb,
             "optional": s.optional,
             "done": done,
-            "skipped": s.slug == "write" and not done and _safe(write_skipped),
+            # Was hardcoded to the write step. A second skippable step
+            # made that a silent no-op — the flag stored, the checklist
+            # ignoring it, `first_incomplete()` returning the step forever.
+            "skipped": s.slug in SKIPPABLE and not done and _safe(_SKIP_FLAGS[s.slug]),
         })
     return out
 

@@ -337,13 +337,29 @@ def _step_claude(request):
             except Exception as exc:
                 request.session["claude_result"] = {"ok": False, "error": str(exc)}
             return redirect(request.path)
+        if action == "skip":
+            # The step is optional and the page has always said so. Without
+            # this the operator had no way off the page: the nav has no
+            # links, Continue refused an empty field, and `is_complete()`
+            # stayed False so /ops/ redirected back into the wizard.
+            setup_state.set_claude_skipped(True)
+            messages.info(
+                request,
+                "Skipped. Your notes are served over the API and MCP without "
+                "it — chat, the reader agent and feed extraction stay off "
+                "until you add a credential on the Settings page.",
+            )
+            return redirect("setup:step", slug="build")
         # Explicit continue: the operator chose to proceed without a
         # test — presence completes the step, as documented on the page.
         if key:
             cfg.set_value("ANTHROPIC_API_KEY", key, actor=request.user)
         if cfg.get("ANTHROPIC_API_KEY"):
+            # A configured step is not a skipped one; the checklist would
+            # otherwise keep calling it skipped forever.
+            setup_state.set_claude_skipped(False)
             return redirect("setup:step", slug="build")
-        messages.error(request, "Paste a credential first.")
+        messages.error(request, "Paste a credential first, or choose 'Skip for now'.")
         return redirect(request.path)
 
     key_set = bool(cfg.get("ANTHROPIC_API_KEY"))

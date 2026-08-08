@@ -63,6 +63,16 @@
               class="btn-ink btn-lg">
         Continue
       </button>
+      <button type="submit" name="action" value="skip" :disabled="busy"
+              class="rounded-lg border px-4 py-2 text-sm border-line text-muted">
+        Skip for now
+      </button>
     </div>
+    <p class="mt-2 text-xs text-muted">
+      Skipping is fine. Your notes are still served over the API and MCP —
+      that is how a claude.ai connector reads this brain, and it brings its
+      own model. Chat, the reader agent and feed extraction stay off until
+      you add a credential, which you can do later on the Settings page.
+    </p>
   </form>
 {% endblock %}

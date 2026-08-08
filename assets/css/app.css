@@ -188,6 +188,19 @@
     font-display: swap;
     src: url("/static/fonts/JetBrainsMono-Bold.woff2") format("woff2");
   }
+  /* Variable, not static instances: the UI sets the display font at
+     600 (font-semibold), a weight Space Grotesk ships no static file
+     for — only the variable axis covers it exactly. One file, 300-700.
+     Until this existed, headings rendered Space Grotesk only on
+     machines that had it installed (the author's) and system-ui for
+     everyone else — every screenshot lied. */
+  @font-face {
+    font-family: "Space Grotesk";
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url("/static/fonts/SpaceGrotesk-Variable.woff2") format("woff2");
+  }
 }
 
 /* ----- Design tokens + base resets ----- */

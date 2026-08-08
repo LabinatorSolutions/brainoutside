@@ -257,8 +257,17 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       Note the fix is NOT "add unsafe-inline alongside the nonce"; that is
       a no-op.
 
-- [ ] **The display font is not self-hosted, so only this machine sees
-      it.** `--font-display` is `'Space Grotesk', system-ui, sans-serif`,
+- [x] **The display font is not self-hosted — CLOSED 2026-08-08.**
+      `SpaceGrotesk-Variable.woff2` (v2.0.0, wght 300–700, OFL) is
+      vendored next to the others with an `@font-face` carrying the
+      variable range — variable rather than static instances because
+      the UI uses weight 600, which Space Grotesk ships no static file
+      for. `static/fonts/LICENSES.md` now records all three families'
+      OFL attribution. Verified in Chromium against the running stack:
+      the woff2 serves 200, `document.fonts` lists the face as
+      `loaded` (an OS-installed font never appears there, so this
+      proves it came from the server), and headings compute to it.
+      Historical detail below — the reason it hid was worth keeping: `--font-display` is `'Space Grotesk', system-ui, sans-serif`,
       but `static/fonts/` contains only Inter (4 weights) and JetBrains
       Mono (2), and the build emits `@font-face` for exactly those.
       Measured in Chromium against the prod instance:

@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party components vendored into this repository keep their own licenses.
-See `static/vendor/README.md` for the per-library version and license table
-(Alpine, HTMX, Cytoscape, Lucide, ApexCharts, focus-trap), and the
-`*.LICENSE.txt` files alongside them. The self-hosted webfonts in
-`static/fonts/` — Inter and JetBrains Mono — are SIL Open Font License 1.1.

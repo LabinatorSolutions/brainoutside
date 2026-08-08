@@ -179,10 +179,15 @@ site-only CSS addition, documented in the file: the typography
 plugin's `.prose` colours are mapped onto the semantic tokens in an
 **unlayered** block — the plugin emits into `@layer utilities`, which
 no layered override can beat (layer order trumps specificity).
-Remaining: write the 7 docs pages, an OG image, Hasan pushes to a
-private GitHub repo, Coolify deploy + DNS. Note: `--font-display` is
-Space Grotesk and still not self-hosted — the product's open font item
-now covers the site too; everyone else sees system-ui until it's fixed.
+**Status 2026-08-08:** the 7 docs pages are WRITTEN — the docs-factory
+process ran in the site repo (drafts → verification sweeps → a real
+Coolify deploy exercised against a throwaway repo; see its git log).
+Two pages carried the "no periodic pull" claim from before the sync
+beat existed; corrected 2026-08-08 to match DEPLOY.md §7. Space
+Grotesk is now self-hosted in BOTH repos (variable woff2, OFL,
+`static/fonts/LICENSES.md`) — verified loading from the server via
+`document.fonts` on each. Remaining: an OG image, Hasan pushes the
+site to a private GitHub repo, Coolify deploy + DNS.
 
 **Stack (decided 2026-08-02):** a deliberately small Django project —
 a handful of template views, no DB-driven content, no accounts — in a

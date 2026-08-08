@@ -138,7 +138,6 @@ you have to clean out.
 | [`docs/DEPLOY.md`](docs/DEPLOY.md) | The full Coolify runbook — proxy/CDN client IPs, backups, webhook |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | The honest security posture, and how to report a vulnerability |
 | [`docs/PLAN.md`](docs/PLAN.md) | Full architecture, data model, milestones |
-| [`docs/OPEN-SOURCE.md`](docs/OPEN-SOURCE.md) | Running release checklist |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Ground rules, dev stack, tests, guardrails |
 
 ## Running it locally

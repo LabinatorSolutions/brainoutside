@@ -519,10 +519,10 @@ M4, with 3.5.4–.5 landing whenever their data exists.
 ### M5 — Open-source beta (decided 2026-07-30: after M3/M3.5, MIT)
 The project goes public as **BrainOutside** (brainoutside.com), a
 self-hosted "build your own brain" tool: single-user, single-brain by
-design — multi-user is a different product. Running checklist lives in
-`docs/OPEN-SOURCE.md`; the setup/deployment rebuild that 5.3 and 5.4
-carry out is designed in `docs/SETUP-DESIGN.md` (de-Hasanify happened
-continuously, not as a big-bang at M5).
+design — multi-user is a different product. The running release
+checklist and the setup/deployment design doc are internal working
+notes (untracked since 2026-08-08; they exist in older history).
+De-Hasanify happened continuously, not as a big-bang at M5.
 
 - **5.1** De-Hasanify the engine: commit identity/email → setting, theme
   naming generic, no personal URLs/paths in code. *Check: grep for
@@ -544,10 +544,10 @@ continuously, not as a big-bang at M5).
   configured repo; `/ops/health/` reports and repairs.
   **One release blocker found and NOT fixed here:** the enforced CSP
   strips inline style attributes, so the ops UI is largely unstyled on a
-  real deployment — dev runs CSP report-only, which hid it. The fix is a
-  security-posture decision; options are in `docs/OPEN-SOURCE.md`.
+  real deployment — dev runs CSP report-only, which hid it. (Resolved by
+  5.6: every inline style attribute is gone and the strict CSP ships.)
 - **5.6** **UI rewrite — runs BEFORE 5.4/5.5** (decided 2026-07-31).
-  Designed in `docs/UI-REWRITE.md`. Restore a real Tailwind build (v4,
+  Restore a real Tailwind build (v4,
   standalone CLI, no Node in the repo), wire `tokens.css` into `@theme`
   so the semantic tokens become utilities, build a component layer, then
   redesign all ~13 ops pages and delete all 455 inline `style="…"`
@@ -612,4 +612,4 @@ into §§3–11 where they land.
 4. Postgres stays (settled — worker queue + events benefit; SQLite dropped).
 5. ~~Open source?~~ — **resolved 2026-07-30: yes, MIT, beta release after
    M3/M3.5 (M5); M4 eval runs in public. Visuals: all four M3.5 views,
-   staged. Checklist: `docs/OPEN-SOURCE.md`.**
+   staged.**

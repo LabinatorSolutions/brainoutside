@@ -6,8 +6,10 @@ tiers enforced server-side, and gates every write behind human approval.
 
 Single-user, single-brain. That is the product, not a limitation.
 
-Full architecture and milestones: `docs/PLAN.md`. Release checklist:
-`docs/OPEN-SOURCE.md`. Deploying: `docs/DEPLOY.md`.
+Full architecture and milestones: `docs/PLAN.md`. Deploying:
+`docs/DEPLOY.md`. (Internal working docs — launch plan, release
+checklist, design docs — live untracked under `docs/`, maintainer's
+machine only; see `.gitignore`.)
 
 **This repo is NOT the brain.** The brain is a separate repo the server
 clones into `data/brain-repo`. Never edit brain content from here.

@@ -138,8 +138,11 @@ complete product on its own.
 The release checklist is [OPEN-SOURCE.md](OPEN-SOURCE.md) and stays
 there. This planning round adds only:
 
-- [ ] README gains the short-form story (§1) and links: site, template
-      repo, and the two-paths framing up top.
+- [x] README gains the short-form story (§1) and links: site, template
+      repo, and the two-paths framing up top — *done 2026-08-08, plus
+      an owner-requested lineage credit to the MCP API boilerplate the
+      server grew from (the honest explanation for any unused feature
+      someone finds). The brainoutside.com link goes live with §4.*
 - [x] Publish mode — decided 2026-08-02: **fresh history**, even though
       the audit (5.5) came back clean. It closes the commit-email
       exposure categorically and matches how `brainoutside-template` launches.

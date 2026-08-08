@@ -78,7 +78,10 @@ Hasan-config goes in settings/DB/brain-repo, never in code.
       deploy key, generate a webhook secret).
 - [x] Subscription-token support is a headline feature (no API billing) —
       offered as a first-class choice on the wizard's Claude step.
-- [ ] `docker compose up` happy path documented in ≤10 lines.
+- [x] `docker compose up` happy path documented in ≤10 lines —
+      *done 2026-08-08: the six-line block at the top of
+      `docs/INSTALL.md` (clone, .env, loopback-bind override, up,
+      proxy, wizard).*
 - [ ] Decide the CSP inline-style question (see the release blocker
       below) — until then a deployed install is functional but unstyled.
 - [x] The wizard's template deep link 404s until `brainoutside-template` is
@@ -142,7 +145,12 @@ engineering commentary above the fold on the dashboard.
 ## Cross-platform + docs (5.4)
 
 - [ ] Publish `ghcr.io/<owner>/brainoutside` — multi-arch, semver, built
-      on tag by GitHub Actions. + CHANGELOG.
+      on tag by GitHub Actions. + CHANGELOG. *(2026-08-08: the workflow
+      (`.github/workflows/release.yml`, amd64+arm64 on `v*` tags, image
+      name derived from the repository) and CHANGELOG.md are in place;
+      the publish itself happens with the first tag on the public repo —
+      Actions never ran in this private one, so the workflow is
+      YAML-validated but unexercised.)*
 - [ ] Design the contract-version story BEFORE v1.0: users' brains are
       copies of `brain-template` that never update, and we cannot migrate
       a repo we don't own. Plan: `contract-version:` in CLAUDE.md,
@@ -162,7 +170,11 @@ engineering commentary above the fold on the dashboard.
       `contract_ok` stays True. **Only `upgrade_brain` is left**, and §10
       hedges it ("may propose the upgrade as a diff"), so shipping without
       it is not a broken promise.)*
-- [ ] bash/Makefile twin of `dev.ps1`.
+- [x] bash/Makefile twin of `dev.ps1` — *done 2026-08-08: `dev.sh`,
+      same commands/compose files/project name. Syntax-checked on Git
+      Bash + Linux bash; `ps`/`status` ran against the live stack. NOT
+      verified: `up`/`css` on a real Linux/macOS box (the fresh-box
+      item below).*
 - [x] README: what/why, quickstart — rewritten as BrainOutside.
 - [ ] Rings hero image for the README (M3.5.2 dashboard centrepiece is
       the shot; do NOT film the graph explorer until the lens/click bug
@@ -172,7 +184,10 @@ engineering commentary above the fold on the dashboard.
       it was already cited from `.env.example`, the wizard's write step,
       the `BRAIN_GIT_WRITE_PAT` help string and `gitcreds`, all of which
       pointed at a file that did not exist.*
-- [ ] INSTALL (Coolify/compose).
+- [x] INSTALL (Coolify/compose) — *done 2026-08-08: `docs/INSTALL.md`
+      (compose happy path + Coolify pointer + updating); DEPLOY.md §7
+      corrected at the same time — the 15-min sync beat exists now, so
+      "there is no periodic pull" stopped being true.*
 - [ ] Verify clean setup on a fresh Linux/macOS box.
 
 ### Docs site outline (write at 5.4 — until then this list IS the doc)
@@ -311,9 +326,16 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       public commit. The audit still mattered: it proved the *tree* is
       publishable. NOT verified: nothing — every claim above was
       independently grepped, not assumed.
-- [ ] LICENSE (MIT), CONTRIBUTING, issue templates.
-- [ ] Vendored template code (mcp-api-starter-template) license header —
-      Hasan's own code, confirm relicensing under MIT is clean.
+- [x] LICENSE (MIT), CONTRIBUTING, issue templates — *done 2026-08-08.
+      CONTRIBUTING states the single-user boundary up front; the bug
+      template asks for `/ops/health/` + logs; contract questions route
+      to the template repo's Discussions (enable Discussions there —
+      LAUNCH §2 — or that link 404s).*
+- [x] Vendored template code (mcp-api-starter-template) license header —
+      *2026-08-08: the owner directed a public README credit to the MCP
+      API boilerplate it came from and approved the release-packaging
+      pass that adds the MIT LICENSE — treating that as the
+      confirmation this item waited on. Say so if that's wrong.*
 - [x] Vendor the graph JS lib — no CDN anywhere. Cytoscape 3.34.0 (MIT)
       for the 3.5.3 force layout only; rings (3.5.2) and timeline
       (3.5.5) are plain SVG, since a polar layout of ~50 circles and a

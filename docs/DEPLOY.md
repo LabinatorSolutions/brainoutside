@@ -167,22 +167,19 @@ Rebuildable from your repo: entities, sync runs, snapshots. **Not**
 rebuildable: feeds, events, SDK ledger, chat history — and
 `boot-secrets.json`, which is why the state volume is in the list.
 
-## 7. Webhook (not optional in practice)
+## 7. Webhook (the fast path)
 
 Repo → Webhooks → `https://your-domain/webhooks/github`, content type
 JSON, secret = `GITHUB_WEBHOOK_SECRET`, push events only.
 
-This used to say the periodic pull would pick changes up anyway, just
-more slowly. **There is no periodic pull.** The only three things that
-sync the clone are this webhook, the "Pull from GitHub" button on
-`/ops/health/`, and `manage.py sync_brain`. Without the webhook the
-server keeps serving the brain as of the last manual pull, indefinitely,
-and nothing warns you that it is behind.
-
-(`config/scheduled.py`, which `manage.py sync_scheduled` imports to
-register Q2 cron rows, is absent from the repo — so no scheduled task of
-any kind is registered on a deploy, including the idempotency-key purge.
-Tracked separately; it is not something this page can work around.)
+With the webhook, a push to your brain repo reindexes in seconds.
+Without it, the **15-minute sync beat** picks changes up — the
+`brain:sync` schedule in `config/scheduled.py`, registered on every
+deploy by the entrypoint's `sync_scheduled` run. (An earlier version of
+this page said there was no periodic pull; that was true at the time
+and is not any more.) So the webhook is a latency upgrade, not a
+correctness requirement — but wire it anyway: fifteen minutes is a long
+time to wonder why your new note isn't being served.
 
 ## 8. Post-deploy checks
 
@@ -191,6 +188,6 @@ Tracked separately; it is not something this page can work around.)
       boundary
 - [ ] Settings → Test connection returns model/latency/tokens
 - [ ] Push to your brain repo → the server reindexes within seconds.
-      Only the webhook does this; see §7. If nothing happens, the webhook
-      is not wired, and nothing else will pick the change up.
+      If it takes minutes instead, the webhook is not wired and the
+      15-minute beat is doing the work; see §7.
 - [ ] Restore-from-backup drill into a scratch Postgres, `/readyz` green

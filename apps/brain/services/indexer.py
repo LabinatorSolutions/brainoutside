@@ -123,6 +123,51 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _contained_md(directory: Path, repo: Path) -> list[Path]:
+    """Sorted `*.md` in `directory`, minus anything resolving out of `repo`.
+
+    `glob` matches symlinks and `read_bytes()` follows them, so
+    `identity/leak.md -> /data/state/boot-secrets.json` used to be read,
+    parsed and published at whatever tier its frontmatter implied. `raw/`
+    was never exposed this way — `snapshots._inside_raw()` resolves before
+    accepting a path — but the five content globs never got the same
+    treatment.
+
+    Planting the link needs write access to the brain repo, so this is
+    the operator or whoever has taken their git host. It is worth closing
+    because the repo holds notes while the container holds the deploy
+    key, the write PAT and the encryption key: "someone can write to my
+    notes" must not escalate to "...and read the credentials that push to
+    them".
+
+    Skip and warn, never raise. One bad link must not stop the brain
+    being served — and a dangling link used to do exactly that, crashing
+    the sync with FileNotFoundError from `read_bytes()`.
+
+    Containment, not a ban: a symlink resolving back inside the repo is
+    ordinary content and is kept.
+    """
+    root = repo.resolve()
+    kept: list[Path] = []
+    for p in sorted(directory.glob("*.md")):
+        try:
+            resolved = p.resolve(strict=True)
+        except OSError:
+            log.warning(
+                "indexer: skipping %s — broken symlink or unreadable path",
+                p.name,
+            )
+            continue
+        if root not in resolved.parents:
+            log.warning(
+                "indexer: skipping %s — it resolves outside the brain repo",
+                p.name,
+            )
+            continue
+        kept.append(p)
+    return kept
+
+
 def _harvest_index_descriptions(repo: Path) -> dict[str, str]:
     """path -> one-line description, cosmetic only (never status/visibility)."""
     out: dict[str, str] = {}
@@ -181,7 +226,7 @@ def parse_repo() -> list[ParsedEntity]:
 
     # --- knowledge notes ---
     for folder, kind in KNOWLEDGE_TYPES.items():
-        for p in sorted((repo / "knowledge" / folder).glob("*.md")):
+        for p in _contained_md(repo / "knowledge" / folder, repo):
             if p.name == "_TEMPLATE.md":
                 continue
             fm, body, digest, malformed = read(p)
@@ -206,7 +251,7 @@ def parse_repo() -> list[ParsedEntity]:
             )
 
     # --- project cards ---
-    for p in sorted((repo / "projects").glob("*.md")):
+    for p in _contained_md(repo / "projects", repo):
         if p.name == "_TEMPLATE.md":
             continue
         fm, body, digest, malformed = read(p)
@@ -227,7 +272,7 @@ def parse_repo() -> list[ParsedEntity]:
         )
 
     # --- identity ---
-    for p in sorted((repo / "identity").glob("*.md")):
+    for p in _contained_md(repo / "identity", repo):
         if p.name == "_TEMPLATE.md":
             continue
         fm, body, digest, malformed = read(p)
@@ -246,7 +291,7 @@ def parse_repo() -> list[ParsedEntity]:
         )
 
     # --- lenses ---
-    for p in sorted((repo / "lenses").glob("*.md")):
+    for p in _contained_md(repo / "lenses", repo):
         if p.name == "_TEMPLATE.md":
             continue
         fm, body, digest, malformed = read(p)
@@ -265,7 +310,7 @@ def parse_repo() -> list[ParsedEntity]:
         )
 
     # --- catalogs (no frontmatter) ---
-    for p in sorted((repo / "content-catalog").glob("*.md")):
+    for p in _contained_md(repo / "content-catalog", repo):
         if p.name in {"README.md", "_TEMPLATE.md"}:
             continue
         raw = p.read_bytes()

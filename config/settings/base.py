@@ -79,7 +79,11 @@ MIDDLEWARE = [
     # sync-only, and one sync middleware here forces Django to run the
     # entire inner chain through async_to_sync (see the adapter docstring).
     "apps.core.middleware.AsyncWhiteNoiseMiddleware",
-    "django.middleware.gzip.GZipMiddleware",
+    # NOT the stock GZipMiddleware: Django's async streaming path gzips
+    # every chunk as its own gzip member and Chromium truncates at the
+    # first member boundary — the chat SSE stream rendered one delta and
+    # dropped the rest. The subclass skips async streaming responses.
+    "apps.core.middleware.StreamSafeGZipMiddleware",
     "django.middleware.http.ConditionalGetMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

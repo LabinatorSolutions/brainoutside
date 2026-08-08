@@ -23,6 +23,7 @@ from typing import Awaitable, Callable
 
 from asgiref.sync import iscoroutinefunction, markcoroutinefunction, sync_to_async
 from django.http import HttpRequest, HttpResponse
+from django.middleware.gzip import GZipMiddleware
 from whitenoise.middleware import WhiteNoiseMiddleware
 
 from apps.core import log_context
@@ -60,6 +61,33 @@ class RequestIdMiddleware:
         # client always sees the canonical id we recorded.
         response.headers["X-Request-ID"] = request_id
         return response
+
+
+class StreamSafeGZipMiddleware(GZipMiddleware):
+    """GZipMiddleware that leaves async streaming responses alone.
+
+    Upstream's two streaming paths are not equivalent. The sync path
+    (`compress_sequence`) emits ONE gzip stream — header once,
+    Z_SYNC_FLUSH between chunks — and browsers decode it progressively.
+    The async path runs `compress_string` on EVERY chunk, so the body
+    is a concatenation of complete gzip members, one per chunk.
+    Multi-member gzip is legal (RFC 1952 §2.2), but Chromium's fetch
+    decoder stops at the first member boundary: an SSE consumer renders
+    the first frame and the stream then goes silent with no error.
+
+    On this app that was the whole chat surface — the bubble showed the
+    first delta (one character) while the full answer sat correctly in
+    ChatMessage, and the `done` frame (sources, token note) never
+    reached the page. The MCP proxy's SSE listen channel is the same
+    shape. Async streaming responses here are SSE, where compression
+    buys nothing worth the framing risk; buffered and sync-streaming
+    responses keep upstream behaviour untouched.
+    """
+
+    def process_response(self, request, response):
+        if response.streaming and getattr(response, "is_async", False):
+            return response
+        return super().process_response(request, response)
 
 
 class AsyncWhiteNoiseMiddleware(WhiteNoiseMiddleware):

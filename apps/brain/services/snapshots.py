@@ -44,7 +44,13 @@ TIERS = ("public", "agents-only", "private")
 TIER_ORDER = {"public": 0, "agents-only": 1, "private": 2}
 
 #: Inline span convention from CLAUDE.md §4 — stripped below agents-only.
-_SPAN_RE = re.compile(r"\(agents-only:[^)]*\)", re.DOTALL)
+#: Scanned with a paren counter, NOT a regex. The regex this replaced was
+#: `\(agents-only:[^)]*\)`, and `[^)]*` stops at the first closing paren:
+#: a span holding a parenthetical aside, a citation or a URL like
+#: `x.com/a_(b)` was matched only as far as that inner paren and the rest
+#: of the secret went into the public snapshot verbatim. A pattern that
+#: cannot count parens cannot enforce a containment boundary.
+_SPAN_OPEN = "(agents-only:"
 _RAW_REF_RE = re.compile(r"raw/[A-Za-z0-9_\-./]+?\.md")
 
 
@@ -52,8 +58,51 @@ def views_dir() -> Path:
     return Path(settings.BRAIN_VIEWS_DIR)
 
 
-def strip_agents_only_spans(text: str) -> str:
-    return _SPAN_RE.sub("", text)
+def _span_close(text: str, start: int) -> int | None:
+    """Index of the paren that closes the span opened at `start`, or None.
+
+    None means the span never closes — the input is malformed, and the
+    caller must not guess where the secret ended.
+    """
+    depth = 0
+    for k in range(start, len(text)):
+        if text[k] == "(":
+            depth += 1
+        elif text[k] == ")":
+            depth -= 1
+            if depth == 0:
+                return k
+    return None
+
+
+def strip_agents_only_spans(text: str, source: str = "") -> str:
+    """Remove `(agents-only: ...)` spans, counting nested parens.
+
+    An unterminated span fails CLOSED: everything from the marker to the
+    end of the file is dropped and the file is named in a warning. The
+    alternative is guessing where the author meant the secret to end, and
+    the old regex's guess — "it isn't a span at all" — published the lot.
+    A note that reads short in public can be repaired; one that published
+    a private aside cannot be unpublished.
+    """
+    out: list[str] = []
+    i = 0
+    while True:
+        start = text.find(_SPAN_OPEN, i)
+        if start < 0:
+            out.append(text[i:])
+            return "".join(out)
+        out.append(text[i:start])
+        close = _span_close(text, start)
+        if close is None:
+            log.warning(
+                "snapshot: unterminated '(agents-only:' span in %s — dropping "
+                "everything from it to end of file rather than risk publishing "
+                "it. Close the parenthesis in the brain repo.",
+                source or "<unknown file>",
+            )
+            return "".join(out)
+        i = close + 1
 
 
 def _visible(tier: str):
@@ -165,11 +214,11 @@ def stage_tier(tier: str) -> dict[str, object]:
         if not src.is_file():
             continue  # drift; the sync layer logs it
         text = src.read_text(encoding="utf-8", errors="replace")
-        emit(e.path, strip_agents_only_spans(text) if strip else text)
+        emit(e.path, strip_agents_only_spans(text, source=e.path) if strip else text)
 
     for rel in sorted(_linked_raw_paths(repo, entities) if tier != "private" else _all_raw(repo)):
         text = (repo / rel).read_text(encoding="utf-8", errors="replace")
-        emit(rel, strip_agents_only_spans(text) if strip else text)
+        emit(rel, strip_agents_only_spans(text, source=rel) if strip else text)
 
     emit("INDEX.md", _generated_index(tier, entities, head))
     manifest = {

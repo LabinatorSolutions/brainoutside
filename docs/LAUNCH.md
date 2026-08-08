@@ -108,9 +108,20 @@ complete product on its own.
       needed.*
 - [x] LICENSE (MIT) + README ownership line — *done 2026-08-02: "the
       license governs the template, not your mind."*
-- [ ] Issue templates; Discussions on (questions will be contract
-      questions, not bug reports).
-- [ ] Repo meta: description, topics, social-preview image.
+- [x] Issue templates; Discussions on (questions will be contract
+      questions, not bug reports) — *done 2026-08-08: Discussions
+      enabled via API (page 200s); `.github/ISSUE_TEMPLATE/` (config.yml
+      routing + a contract-problem form) pushed as `ee27de6`, noreply
+      author, mirrored into the in-tree fixture. Kept to two small
+      files deliberately — template generation copies `.github/` into
+      every generated brain, where they read as pointers back to the
+      product.*
+- [x] Repo meta: description, topics, social-preview image — *2026-08-08:
+      description was already set; topics extended to
+      ai-brain, brain-mcp, mcp, second-brain, claude-code,
+      knowledge-base, markdown, pkm. NOT done: the social-preview
+      image — GitHub has no API for it (manual upload in repo
+      settings), and the image itself is a §5.5 launch asset.*
 - [x] Canonical-copy decision — *decided 2026-08-08: the public repo is
       canonical, `brain-template/` is a fixture, sync is a checklist line
       (below), no cross-repo CI. Contract changes are authored in
@@ -122,10 +133,14 @@ complete product on its own.
       from reaching for it. NOT covered: fixture-vs-published drift,
       which needs network from the suite; the checklist line is the
       accepted answer.*
-- [ ] **Before each release: `diff -r brain-template/ <a fresh clone of
-      brainoutside-template>` is empty.** The fixture is only evidence
-      about the published template while they match, and nothing
-      enforces it.
+- [ ] **Before each release: `diff -r --strip-trailing-cr
+      brain-template/ <a fresh clone of brainoutside-template>` is
+      empty.** The fixture is only evidence about the published
+      template while they match, and nothing enforces it.
+      (`--strip-trailing-cr` because a Windows checkout with autocrlf
+      holds CRLF working copies of byte-identical blobs — the bare
+      `diff -r` this line used to prescribe can never come back empty
+      there. Last run clean 2026-08-08, after the issue-routing push.)
 - [ ] Release gate: the server boots clean against a **fresh clone of
       the published repo** (re-run of the 5.2 verification, against the
       real thing). *(Published content is byte-identical to the tree

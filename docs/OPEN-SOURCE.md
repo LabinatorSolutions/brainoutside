@@ -257,17 +257,21 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       the stack. Not a deploy blocker; purely cosmetic, but it makes the
       marketing shots dishonest.
 
-- [ ] **Snapshot swap is not atomic.** `snapshots.build_tier` does
-      `rmtree(final)` then `rename(tmp, final)`, so there is a window
-      where a tier directory does not exist. Anything reading the
-      snapshot in that instant — the dumb endpoint layer, a running
-      reader agent — sees a missing path rather than the old or the new
-      build. Observed once on Windows as a `PermissionError` on the
-      rename right after a container restart (bind-mount flake, not
-      reproducible); the underlying window is real on Linux too, just
-      narrow. Fix is a rename-out/rename-in swap, or building into
-      `public.<sha>/` and flipping a symlink. Low frequency, but it is a
-      correctness bug rather than a cosmetic one.
+- [x] **Snapshot swap is not atomic — CLOSED 2026-08-07 by `4d0388e`**
+      (the hardening pass). The swap was `rmtree(final)` then
+      `rename(tmp, final)`: a whole-tier delete during which every read
+      422'd, and a process killed between the calls left no directory
+      at all. Now every tier is STAGED first and swapped after
+      (`stage_tier` / `swap_in`), the swap renames the live directory
+      aside instead of deleting it — a two-rename window, with the
+      previous snapshot kept on disk — and
+      `recover_interrupted_swaps()` restores a tier whose swap was
+      interrupted, at the start of the next build. The same commit made
+      a failed publish mark its `SyncRun` not-ok (it used to stay
+      green). 15 tests in `test_snapshot_publish.py`, 12 of which fail
+      against the unfixed code. The Windows bind-mount
+      `PermissionError` now costs disk, not correctness (the trailing
+      cleanup tolerates it).
 
 - [ ] **Graph explorer: click-through breaks after using the lens picker.**
       Clicking a node opens its note reliably on a fresh page load (6/6),

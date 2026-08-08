@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions about the brain format
+    url: https://github.com/hassancs91/brainoutside-template/discussions
+    about: Note kinds, frontmatter, visibility, lenses, the skills — ask in Discussions.
+  - name: BrainOutside server issues
+    url: https://github.com/hassancs91/brainoutside/issues
+    about: Problems with the self-hosted server belong on its own repo.

@@ -1,0 +1,24 @@
+name: Contract problem
+description: Something in the template itself — CLAUDE.md, a skill, a note template — is wrong, contradictory, or unclear.
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        This tracker is for the template's contract files. If your question
+        is "how do I…", Discussions is faster. If your brain repo was
+        generated from this template, note that fixes here don't reach it
+        automatically — you apply them to your copy.
+  - type: input
+    id: where
+    attributes:
+      label: Which file / section
+      placeholder: CLAUDE.md §5.3, .claude/skills/mind-reader/SKILL.md, …
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's wrong
+      description: The contradiction, error, or ambiguity — and what you expected it to say.
+    validations:
+      required: true

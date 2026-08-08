@@ -159,7 +159,7 @@ there. This planning round adds only:
       server grew from (the honest explanation for any unused feature
       someone finds). The brainoutside.com link goes live with §4.*
 - [x] Publish mode — ~~fresh history (2026-08-02)~~ **reversed
-      2026-08-09: the owner made THIS repo public with its full
+      2026-08-08: the owner made THIS repo public with its full
       216-commit history**, against a video deadline and after a fresh
       clean secret scan of everything post-audit. The commit log doubles
       as the public changelog CONTRIBUTING points at. Personal commit

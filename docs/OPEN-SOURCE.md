@@ -324,7 +324,7 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       / TEST-NET test fixtures. Personal *references* in docs and old
       code versions exist and are acceptable per the 5.1 rule.
       ~~Decided 2026-08-02: publish with FRESH history anyway.~~
-      **REVERSED 2026-08-09 by the owner: the repo went public with its
+      **REVERSED 2026-08-08 by the owner: the repo went public with its
       full history, deliberately.** The original reasoning (commit-email
       exposure, clean-by-construction optics) gave way to a launch
       deadline plus a better argument that surfaced late: CONTRIBUTING

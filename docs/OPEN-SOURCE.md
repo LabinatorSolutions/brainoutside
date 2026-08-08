@@ -148,9 +148,20 @@ engineering commentary above the fold on the dashboard.
       a repo we don't own. Plan: `contract-version:` in CLAUDE.md,
       startup check warns (never fails), `upgrade_brain` proposes the
       diff through the normal approval queue. *(2026-08-02: the template
-      half is done — `contract-version: "1.0"` frontmatter + §9 in
-      brain-template/CLAUDE.md. The startup warn and `upgrade_brain`
-      are still to build.)*
+      half is done — `contract-version: "1.0"` frontmatter + §10 in
+      brain-template/CLAUDE.md. 2026-08-08: the warn is done too —
+      `CONTRACT_VERSION` beside CONTRACT_PATHS, `contract_version_probe()`
+      returning ok/older/newer/unknown, and a health row that can only be
+      "ok" or "warn". Fail-open is structural, not a convention:
+      `verify_contract()` stays silent about the version and
+      `status_probe()` reports it beside `contract_ok` rather than folded
+      into it, because readyz gates on that flag. The bump rule lives in
+      the constant's docstring — bump when an existing brain would be
+      SERVED DIFFERENTLY, not when the template gains text. Verified live:
+      the real brain declares nothing and reports "unknown" while
+      `contract_ok` stays True. **Only `upgrade_brain` is left**, and §10
+      hedges it ("may propose the upgrade as a diff"), so shipping without
+      it is not a broken promise.)*
 - [ ] bash/Makefile twin of `dev.ps1`.
 - [x] README: what/why, quickstart — rewritten as BrainOutside.
 - [ ] Rings hero image for the README (M3.5.2 dashboard centrepiece is

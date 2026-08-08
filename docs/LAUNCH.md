@@ -90,11 +90,17 @@ complete product on its own.
       done: the screenshot/GIF of a real local session — that is a
       launch asset, made once against the final flow (§5.5).*
 - [x] `contract-version:` field in CLAUDE.md + the upgrade story —
-      *done 2026-08-02: `contract-version: "1.0"` frontmatter + §9 in
-      the template CLAUDE.md. Verified both server taxonomy parsers
-      anchor to the §7 heading (position-independent), so top-of-file
-      frontmatter cannot break them. The server-side warn check +
-      `upgrade_brain` remain 5.4 work in OPEN-SOURCE.md.*
+      *done 2026-08-02: `contract-version: "1.0"` frontmatter + §10 in
+      the template CLAUDE.md (§9 until the blocked-scripts section
+      renumbered it). Verified both server taxonomy parsers anchor to
+      the §7 heading (position-independent), so top-of-file frontmatter
+      cannot break them. **Server-side warn check done 2026-08-08** —
+      `CONTRACT_VERSION`, `contract_version_probe()`, a warn-only health
+      row; warn-only in three places rather than by convention, since
+      readyz gates on `contract_ok`. Stayed at "1.0": blocked-scripts is
+      additive and defaults to off, so no existing brain is served
+      differently. `upgrade_brain` remains 5.4 work — §10 hedges it
+      ("may propose"), so it is not a broken promise.*
 - [x] Example-content decision — *decided 2026-08-02: ships as
       recommended (one project card + one lens, zero knowledge notes).
       Both files were already DELETE-THIS/edit-or-delete marked — the
@@ -105,12 +111,21 @@ complete product on its own.
 - [ ] Issue templates; Discussions on (questions will be contract
       questions, not bug reports).
 - [ ] Repo meta: description, topics, social-preview image.
-- [ ] Canonical-copy decision. Recommendation: the public repo becomes
-      canonical; `brain-template/` in this repo becomes a test fixture
-      (the app's startup contract check boots against it) with a
-      "fixture synced with template repo" item on the release
-      checklist. No CI cross-repo diffing — a checklist line is enough
-      at this scale.
+- [x] Canonical-copy decision — *decided 2026-08-08: the public repo is
+      canonical, `brain-template/` is a fixture, sync is a checklist line
+      (below), no cross-repo CI. Contract changes are authored in
+      `brainoutside-template` and copied down here. The copies had
+      already drifted — §8 blocked-scripts existed only in-tree — so the
+      first act of the decision was bringing them to parity; verified
+      byte-identical by `diff -r`. `test_brain_template_is_a_fixture.py`
+      pins the fixture against CONTRACT_PATHS and forbids engine code
+      from reaching for it. NOT covered: fixture-vs-published drift,
+      which needs network from the suite; the checklist line is the
+      accepted answer.*
+- [ ] **Before each release: `diff -r brain-template/ <a fresh clone of
+      brainoutside-template>` is empty.** The fixture is only evidence
+      about the published template while they match, and nothing
+      enforces it.
 - [ ] Release gate: the server boots clean against a **fresh clone of
       the published repo** (re-run of the 5.2 verification, against the
       real thing). *(Published content is byte-identical to the tree

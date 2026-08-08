@@ -11,7 +11,7 @@ brainoutside.com website. The server-repo release checklist stays in
 |---|---|---|
 | `my-brain` | private, forever | Hasan's actual brain. Never published; the generalized version is `brainoutside-template`, not a cleaned copy of this. |
 | `brainoutside-template` | public, template-flagged | The local-brain product. Split out from `brain-template/` in this repo. |
-| `brainoutside` | public (this repo) | The server — the online head. Publishes with fresh history (decided 2026-08-02). |
+| `brainoutside` | public (this repo) | The server — the online head. Public since 2026-08-08, full history (see §3). |
 | site repo | **private** | Django site serving brainoutside.com (landing + docs). The site is public; its source is not. |
 
 ---

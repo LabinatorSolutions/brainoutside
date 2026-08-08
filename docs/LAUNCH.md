@@ -158,13 +158,13 @@ there. This planning round adds only:
       an owner-requested lineage credit to the MCP API boilerplate the
       server grew from (the honest explanation for any unused feature
       someone finds). The brainoutside.com link goes live with §4.*
-- [x] Publish mode — decided 2026-08-02: **fresh history**, even though
-      the audit (5.5) came back clean. It closes the commit-email
-      exposure categorically and matches how `brainoutside-template` launches.
-      At release: current tree → one initial commit → public repo
-      becomes the working repo; this one is archived as private
-      pre-history. GitHub noreply commit email set in the new repo
-      before the first public commit.
+- [x] Publish mode — ~~fresh history (2026-08-02)~~ **reversed
+      2026-08-09: the owner made THIS repo public with its full
+      216-commit history**, against a video deadline and after a fresh
+      clean secret scan of everything post-audit. The commit log doubles
+      as the public changelog CONTRIBUTING points at. Personal commit
+      email throughout is the accepted cost; no private twin exists.
+      Topics + description set the same day.
 
 ## 4. The website — private repo, public site
 

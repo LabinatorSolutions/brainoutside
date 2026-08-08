@@ -323,18 +323,21 @@ CLAUDE.md are engineering/agent-voiced and get rewritten, not copied.
       brain content ever landed. All IP-shaped strings are example.com
       / TEST-NET test fixtures. Personal *references* in docs and old
       code versions exist and are acceptable per the 5.1 rule.
-      **Decided 2026-08-02: publish with FRESH history anyway.** All
-      109 commits carry the personal commit email; fresh history closes
-      that categorically instead of via rewrite, clean-by-construction
-      beats clean-by-grep for a privacy-branded project, and the
-      private-era log had no public audience to lose. Mechanics at
-      release: current tree → one initial commit (orphan branch or
-      fresh clone) → pushed public; the public repo becomes the working
-      repo, this one is archived as private pre-history; configure the
-      GitHub noreply commit email in the new repo BEFORE the first
-      public commit. The audit still mattered: it proved the *tree* is
-      publishable. NOT verified: nothing — every claim above was
-      independently grepped, not assumed.
+      ~~Decided 2026-08-02: publish with FRESH history anyway.~~
+      **REVERSED 2026-08-09 by the owner: the repo went public with its
+      full history, deliberately.** The original reasoning (commit-email
+      exposure, clean-by-construction optics) gave way to a launch
+      deadline plus a better argument that surfaced late: CONTRIBUTING
+      tells readers "commit messages are the project's real changelog",
+      which is only true if the log exists — 216 commits of narrated
+      engineering is a build-in-public asset a squash would delete.
+      Before the flip stood: a fresh full-history secret scan (every
+      credential shape incl. this app's own `mcpsk_`/`mcpurl_`
+      prefixes, plus a secret-shaped-assignment pass over the ~107
+      post-audit commits) — clean, test fixtures only. The personal
+      commit email on all 216 commits is the accepted, known cost.
+      Do not re-litigate; there is no archived-private twin to
+      maintain.
 - [x] LICENSE (MIT), CONTRIBUTING, issue templates — *done 2026-08-08.
       CONTRIBUTING states the single-user boundary up front; the bug
       template asks for `/ops/health/` + logs; contract questions route

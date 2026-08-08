@@ -272,8 +272,27 @@ def tier_path_guard(tier_path: Path):
         tool_input = input_data.get("tool_input") or {}
         for key in _PATH_TOOL_INPUT_KEYS:
             raw = tool_input.get(key)
-            if not raw or not isinstance(raw, str):
+            if raw is None or raw == "":
+                # No path named. The tool's own default applies and `cwd`
+                # is the tier, so there is nothing to contain.
                 continue
+            if not isinstance(raw, str):
+                # Deny, do not skip. This used to `continue`, which means
+                # allow — so any shape the SDK might start using for a
+                # path (a list of them, most plausibly) would have walked
+                # straight past the only check confining Grep/Glob to one
+                # tier. The SDK is pinned and bumped deliberately; the
+                # failure mode of a bump that changes this shape has to be
+                # a visible refusal, not a silent widening.
+                log.warning(
+                    "tier guard refused %s %s: expected a path string, got %s",
+                    tool_name, key, type(raw).__name__,
+                )
+                return _deny(
+                    f"{tool_name}: {key} must be a single path string; "
+                    f"got {type(raw).__name__}. Refusing rather than "
+                    "skipping the tier check."
+                )
             candidate = Path(raw)
             if not candidate.is_absolute():
                 candidate = root / candidate

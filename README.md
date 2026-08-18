@@ -54,7 +54,7 @@ The llm-wiki was not the only influence; if you recognize your project
 in this lineage and want a link here, open an issue.
 
 The server itself grew out of my
-[MCP API boilerplate](https://learnwithhasan.com/boilerplates/mcp-api-boilerplate/)
+[MCP API boilerplate](https://learnwithhasan.com/boilerplates/mcp-api-boilerplate/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=body)
 — a Django starter that already had the REST + MCP plumbing, API keys
 and self-documenting endpoint pages wired up. That heritage is why you
 may occasionally find a feature the brain doesn't use; they get removed
@@ -176,12 +176,12 @@ App on <http://localhost:8000>, Postgres on `localhost:5433`, Redis on
 
 This repo is one thing I built with AI. The book is the system underneath it.
 
-**[Vibe Engineering Blocks](https://learnwithhasan.com/blocks/)** is my free 74-page book.
+**[Vibe Engineering Blocks](https://learnwithhasan.com/blocks/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=footer)** is my free 74-page book.
 47 building blocks for shipping real apps with AI. One block per page, each with the exact
 prompt to hand your AI.
 
-Built by **[Hasan Aboul Hasan](https://learnwithhasan.com)**. I build real products with AI and
+Built by **[Hasan Aboul Hasan](https://learnwithhasan.com/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=footer)**. I build real products with AI and
 write down exactly how.
-[Guides](https://learnwithhasan.com/guides/) &nbsp;·&nbsp;
+[Guides](https://learnwithhasan.com/guides/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=footer) &nbsp;·&nbsp;
 [YouTube](https://www.youtube.com/@HasanAboulHasan) &nbsp;·&nbsp;
-[Community](https://learnwithhasan.com/community/)
+[Community](https://learnwithhasan.com/community/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=footer)

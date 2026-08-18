@@ -167,3 +167,21 @@ itself. `mcp` and `worker` need `./dev.sh reload`. Only a
 
 App on <http://localhost:8000>, Postgres on `localhost:5433`, Redis on
 `localhost:6380` (offset so a host install keeps its default port).
+
+<!-- lwh-footer -->
+
+---
+
+## 📘 The free book
+
+This repo is one thing I built with AI. The book is the system underneath it.
+
+**[Vibe Engineering Blocks](https://learnwithhasan.com/blocks/)** is my free 74-page book.
+47 building blocks for shipping real apps with AI. One block per page, each with the exact
+prompt to hand your AI.
+
+Built by **[Hasan Aboul Hasan](https://learnwithhasan.com)**. I build real products with AI and
+write down exactly how.
+[Guides](https://learnwithhasan.com/guides/) &nbsp;·&nbsp;
+[YouTube](https://www.youtube.com/@HasanAboulHasan) &nbsp;·&nbsp;
+[Community](https://learnwithhasan.com/community/)

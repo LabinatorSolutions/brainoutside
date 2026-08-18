@@ -22,6 +22,15 @@ nothing. Site and docs: [brainoutside.com](https://brainoutside.com).
 > and verified end to end; what remains before the public beta is
 > packaging, docs, and launch assets.
 
+## 📖 Read the guide
+
+The full walkthrough lives on my site: what a second brain is actually for, why plain markdown
+beats a vector database for personal knowledge, and how to go from an empty repo to a
+self-hosted brain your agents can read.
+**[How to Build an AI Second Brain](https://learnwithhasan.com/guide/ai-second-brain/?utm_source=github&utm_medium=readme&utm_campaign=brainoutside&utm_content=body)**
+
+Free to read, no login.
+
 ## Where this came from
 
 This project grew out of [Andrej Karpathy's llm-wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
